@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+/* ── Polaris terminal system ─────────────────────────────────────────────
+   Dark, dense, numeric. Deep-navy canvas, brass as the structural/brand
+   accent, functional green/amber/red for data direction & risk. The brand
+   parchment + serif tokens below are kept ONLY for the client-facing report
+   "deliverable" (the /briefings/[id] reader).                              */
+@theme {
+  /* Terminal canvas — neutral near-black charcoal (no blue cast) */
+  --color-canvas: #0a0b0e;
+  --color-panel: #131419;
+  --color-panel-2: #1b1d23;
+  --color-line: #262931;
+  --color-line-soft: #1a1c22;
+  --color-fg: #c9cdd6;
+  --color-fg-bright: #f4f6f9;
+  --color-fg-dim: #787e8a;
+
+  /* Brass single brand accent + functional data colors */
+  --color-brass: #c79a45;
+  --color-brass-bright: #e6c074;
+  --color-brass-700: #9a7d36;
+  --color-up: #3ecf8e;
+  --color-down: #f0584d;
+  --color-warn: #e3a93a;
+
+  /* Risk scale — functional, tuned for legibility on near-black */
+  --color-risk-low: #3ecf8e;
+  --color-risk-med: #e3a93a;
+  --color-risk-high: #f0584d;
+
+  /* Brand "deliverable" palette (reports / print) */
+  --color-navy: #0b1d36;
+  --color-navy-700: #122845;
+  --color-navy-600: #1b3458;
+  --color-parchment: #f3efe4;
+  --color-parchment-2: #ece5d4;
+  --color-paper: #fbf9f3;
+  --color-slate: #6b7177;
+  --color-ink: #111111;
+  --color-red: #7b1e1e;
+
+  --font-display: var(--font-playfair);
+  --font-sans: var(--font-source);
+  --font-mono: var(--font-mono-data);
+}
+
+:root {
+  --background: var(--color-canvas);
+  --foreground: var(--color-fg);
+}
+
+* { box-sizing: border-box; }
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-feature-settings: "kern", "liga", "tnum";
+}
+
+/* Numeric / data type */
+.mono { font-family: var(--font-mono), ui-monospace, monospace; font-feature-settings: "tnum"; }
+
+/* Terminal panel: thin-bordered module with an optional header bar */
+.panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+}
+.panel-head {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-line);
+  background: linear-gradient(180deg, var(--color-panel-2), var(--color-panel));
+}
+
+/* Eyebrow / module label */
+.eyebrow {
+  font-family: var(--font-mono), monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--color-brass-bright);
+}
+
+/* Faint grid texture for header/hero strips */
+.map-grid {
+  background-image:
+    linear-gradient(var(--color-line-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-line-soft) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+a { color: inherit; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes fade-rise {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise { animation: fade-rise 0.3s ease both; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--color-panel) 25%, var(--color-panel-2) 37%, var(--color-panel) 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+/* ── Client report "deliverable" surface (kept on the brand style guide) ── */
+.deliverable h1, .deliverable h2, .deliverable h3, .deliverable h4, .deliverable .font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+.briefing-prose { color: var(--color-ink); font-size: 15px; line-height: 1.7; }
+.briefing-prose p { margin: 0 0 0.9rem; }
+.briefing-prose strong { color: var(--color-navy); font-weight: 600; }
+.briefing-prose ul { margin: 0 0 0.9rem 1.1rem; list-style: disc; }
+.briefing-prose li { margin: 0.2rem 0; }
+.briefing-prose a { color: var(--color-brass-700); text-decoration: underline; }
+.briefing-prose table { width: 100%; border-collapse: collapse; margin: 0.6rem 0 1rem; font-size: 13.5px; }
+.briefing-prose th { text-align: left; color: var(--color-slate); font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.04em; font-size: 11px; padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, var(--color-slate) 25%, transparent); }
+.briefing-prose td { padding: 7px 8px; border-bottom: 1px solid color-mix(in srgb, var(--color-slate) 12%, transparent); }
+.briefing-prose h3, .briefing-prose h4 { font-family: var(--font-display), serif; color: var(--color-navy); margin: 1.2rem 0 0.5rem; }

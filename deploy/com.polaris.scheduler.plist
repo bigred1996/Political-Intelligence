@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.polaris.scheduler</string>
+
+    <!-- Absolute paths; the space in "Claude Code" is fine inside these strings. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/codymcmullen/Documents/Claude Code/polaris/.venv/bin/python</string>
+        <string>/Users/codymcmullen/Documents/Claude Code/polaris/scripts/run_scheduler.py</string>
+    </array>
+
+    <!-- cwd so pydantic-settings finds .env (which holds DATABASE_URL). -->
+    <key>WorkingDirectory</key>
+    <string>/Users/codymcmullen/Documents/Claude Code/polaris</string>
+
+    <!-- Start when loaded, and restart if the process exits/crashes. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Throttle restarts so a crash-loop doesn't hammer the gov APIs. -->
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/codymcmullen/Documents/Claude Code/polaris/logs/scheduler.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/codymcmullen/Documents/Claude Code/polaris/logs/scheduler.err.log</string>
+</dict>
+</plist>

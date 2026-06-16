@@ -1,0 +1,395 @@
+"""Polaris data-refresh scheduler.
+
+Runs inside the FastAPI process via APScheduler AsyncIOScheduler.
+Each source has a configured cadence matching its upstream publish frequency.
+
+Update cadences:
+  daily       — Bills (LEGISinfo, Parliament sits daily), Canada Gazette RSS
+  weekly      — GIC Appointments (OIC appointments published weekly)
+  monthly     — Federal Contracts, OCL Lobbying Communications
+  quarterly   — Elections Canada Donations, Grants & Contributions
+
+The scheduler persists job state to the DB so next-run times survive restarts.
+Each run is logged to the scheduler_log table for auditing and dashboard display.
+"""
+from __future__ import annotations
+
+import time
+from datetime import datetime, timezone
+from typing import Any
+
+import structlog
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
+log = structlog.get_logger()
+
+scheduler = AsyncIOScheduler(timezone="America/Toronto")
+
+
+# ── Source job registry ───────────────────────────────────────────────────────
+
+SOURCE_CONFIGS: list[dict[str, Any]] = [
+    {
+        "id": "bills_daily",
+        "name": "Bills & Legislation (LEGISinfo)",
+        "cadence": "daily",
+        "trigger": CronTrigger(hour=6, minute=0, timezone="America/Toronto"),
+        "description": "LEGISinfo JSON API — Parliament sits daily; bills move status frequently.",
+        "typical_rows": 200,
+    },
+    {
+        "id": "gazette_weekly",
+        "name": "Canada Gazette Part I + II",
+        "cadence": "weekly",
+        "trigger": CronTrigger(day_of_week="sat", hour=8, minute=0, timezone="America/Toronto"),
+        "description": "Part I published every Saturday; Part II bi-weekly. RSS pull is fast (~2s).",
+        "typical_rows": 15,
+    },
+    {
+        "id": "appointments_weekly",
+        "name": "GIC Appointments",
+        "cadence": "weekly",
+        "trigger": CronTrigger(day_of_week="mon", hour=7, minute=0, timezone="America/Toronto"),
+        "description": "Governor in Council appointments published on Orders in Council weekly.",
+        "typical_rows": 50,
+    },
+    {
+        "id": "contracts_monthly",
+        "name": "Federal Contracts (Proactive Disclosure)",
+        "cadence": "monthly",
+        "trigger": CronTrigger(day=3, hour=2, minute=0, timezone="America/Toronto"),
+        "description": "open.canada.ca publishes the proactive disclosure CSV monthly. Full ingest; 15k-row cap during MVP.",
+        "typical_rows": 15000,
+    },
+    {
+        "id": "ocl_monthly",
+        "name": "OCL Lobbying Communications",
+        "cadence": "monthly",
+        "trigger": CronTrigger(day=4, hour=3, minute=0, timezone="America/Toronto"),
+        "description": "Office of the Commissioner of Lobbying publishes the monthly communications ZIP.",
+        "typical_rows": 370000,
+    },
+    {
+        "id": "grants_quarterly",
+        "name": "Grants & Contributions",
+        "cadence": "quarterly",
+        "trigger": CronTrigger(month="1,4,7,10", day=5, hour=2, minute=30, timezone="America/Toronto"),
+        "description": "open.canada.ca publishes G&C data quarterly. 30k-row cap during MVP.",
+        "typical_rows": 30000,
+    },
+    {
+        "id": "donations_quarterly",
+        "name": "Elections Canada Donations",
+        "cadence": "quarterly",
+        "trigger": CronTrigger(month="1,4,7,10", day=6, hour=3, minute=30, timezone="America/Toronto"),
+        "description": "Elections Canada reviews and publishes contributions quarterly. 80k-row cap.",
+        "typical_rows": 80000,
+    },
+]
+
+
+# ── Job implementations ───────────────────────────────────────────────────────
+
+async def _log_start(job_id: str, source_name: str, triggered_by: str = "scheduler") -> int:
+    from api.database import AsyncSessionLocal
+    from api.models.scheduler_log import SchedulerLog
+    async with AsyncSessionLocal() as session:
+        entry = SchedulerLog(job_id=job_id, source_name=source_name, triggered_by=triggered_by)
+        session.add(entry)
+        await session.commit()
+        await session.refresh(entry)
+        return entry.id
+
+
+async def _log_finish(log_id: int, status: str, rows_added: int, rows_total: int,
+                      duration_s: float, error: str | None = None) -> None:
+    from sqlalchemy import select
+    from api.database import AsyncSessionLocal
+    from api.models.scheduler_log import SchedulerLog
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(select(SchedulerLog).where(SchedulerLog.id == log_id))
+        entry = res.scalar_one_or_none()
+        if entry:
+            entry.finished_at = datetime.now(timezone.utc)
+            entry.status = status
+            entry.rows_added = rows_added
+            entry.rows_total = rows_total
+            entry.duration_s = duration_s
+            entry.error = error
+            await session.commit()
+
+
+async def _rebuild_search_index() -> None:
+    """Rebuild the semantic vector index so search reflects freshly-ingested data.
+
+    Called after any ingest that touches a text-bearing (embedded) source. Cheap
+    at current corpus size; failures are logged but never fail the ingest itself.
+    """
+    try:
+        from api.database import AsyncSessionLocal
+        from search.index import build_index
+        async with AsyncSessionLocal() as session:
+            res = await build_index(session)
+        log.info("auto_reindex_done", documents=res.get("documents"))
+    except Exception as exc:
+        log.error("auto_reindex_failed", error=str(exc))
+
+
+async def _stream_load(model, agen, *, delete_first: bool = True, batch_size: int = 5000) -> int:
+    """Stream rows from an async iterator into the DB in batches.
+
+    Keeps memory flat for full-corpus ingests (contracts ~1M rows, donations
+    multi-million) — we never materialize the whole dataset. Returns row count.
+    """
+    from api.database import AsyncSessionLocal
+    from sqlalchemy import delete as _delete
+
+    loaded = 0
+    async with AsyncSessionLocal() as session:
+        if delete_first:
+            await session.execute(_delete(model))
+            await session.commit()
+        batch: list = []
+        async for row in agen:
+            batch.append(model(**row))
+            if len(batch) >= batch_size:
+                session.add_all(batch)
+                await session.commit()
+                loaded += len(batch)
+                batch = []
+        if batch:
+            session.add_all(batch)
+            await session.commit()
+            loaded += len(batch)
+    return loaded
+
+
+async def _run_bills(triggered_by: str = "scheduler") -> None:
+    from sqlalchemy import delete
+    from api.database import AsyncSessionLocal
+    from api.models.donation import Bill
+    from pipeline.ingest import fetch_bill_rows
+    log_id = await _log_start("bills_daily", "Bills & Legislation (LEGISinfo)", triggered_by)
+    t0 = time.monotonic()
+    try:
+        rows = await fetch_bill_rows()
+        async with AsyncSessionLocal() as session:
+            await session.execute(delete(Bill))
+            session.add_all([Bill(**r) for r in rows])
+            await session.commit()
+        await _log_finish(log_id, "ok", len(rows), len(rows), time.monotonic() - t0)
+        await _rebuild_search_index()  # bills are embedded
+        log.info("scheduler_bills_done", count=len(rows))
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_bills_failed", error=str(exc))
+
+
+async def _run_gazette(triggered_by: str = "scheduler") -> None:
+    from sqlalchemy import select
+    from api.database import AsyncSessionLocal
+    from api.models.regulation import GazetteEntry
+    from pipeline.ingest import fetch_gazette_entries
+    log_id = await _log_start("gazette_weekly", "Canada Gazette Part I + II", triggered_by)
+    t0 = time.monotonic()
+    try:
+        rows = await fetch_gazette_entries()
+        added = 0
+        async with AsyncSessionLocal() as session:
+            for r in rows:
+                if r.get("guid"):
+                    exists = (await session.execute(
+                        select(GazetteEntry).where(GazetteEntry.guid == r["guid"]).limit(1)
+                    )).scalar_one_or_none()
+                    if exists:
+                        continue
+                session.add(GazetteEntry(**r))
+                added += 1
+            await session.commit()
+        await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
+        await _rebuild_search_index()  # gazette + tribunal are embedded
+        log.info("scheduler_gazette_done", added=added, total=len(rows))
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_gazette_failed", error=str(exc))
+
+
+async def _run_appointments(triggered_by: str = "scheduler") -> None:
+    from api.database import AsyncSessionLocal
+    from api.models.appointment import Appointment
+    from pipeline.ingest import fetch_appointment_rows
+    log_id = await _log_start("appointments_weekly", "GIC Appointments", triggered_by)
+    t0 = time.monotonic()
+    try:
+        rows = await fetch_appointment_rows(max_rows=10000)
+        added = 0
+        async with AsyncSessionLocal() as session:
+            session.add_all([Appointment(**r) for r in rows])
+            await session.commit()
+            added = len(rows)
+        await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
+        log.info("scheduler_appointments_done", count=added)
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_appointments_failed", error=str(exc))
+
+
+async def _run_contracts(triggered_by: str = "scheduler") -> None:
+    from sqlalchemy import delete
+    from api.database import AsyncSessionLocal
+    from api.models.contract import Contract
+    from pipeline.ingest import iter_contract_rows
+    log_id = await _log_start("contracts_monthly", "Federal Contracts (Proactive Disclosure)", triggered_by)
+    t0 = time.monotonic()
+    try:
+        # Full corpus, streamed (max_rows=0). Memory stays flat via _stream_load.
+        n = await _stream_load(Contract, iter_contract_rows(max_rows=0))
+        await _log_finish(log_id, "ok", n, n, time.monotonic() - t0)
+        log.info("scheduler_contracts_done", count=n)
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_contracts_failed", error=str(exc))
+
+
+async def _run_ocl(triggered_by: str = "scheduler") -> None:
+    from sqlalchemy import delete
+    from api.database import AsyncSessionLocal
+    from api.models.entity import LobbyingRecord
+    from pipeline.ingest import fetch_ocl_communication_rows
+    log_id = await _log_start("ocl_monthly", "OCL Lobbying Communications", triggered_by)
+    t0 = time.monotonic()
+    try:
+        # Delete cached ZIP so fresh data is pulled
+        from pipeline.ingest import OCL_COMMS_CACHE
+        if OCL_COMMS_CACHE.exists():
+            OCL_COMMS_CACHE.unlink()
+
+        rows = await fetch_ocl_communication_rows(max_rows=0)
+        async with AsyncSessionLocal() as session:
+            await session.execute(delete(LobbyingRecord).where(
+                LobbyingRecord.source == "OCL Monthly Communications"
+            ))
+            await session.commit()
+            batch = 2000
+            for i in range(0, len(rows), batch):
+                for r in rows[i:i+batch]:
+                    session.add(LobbyingRecord(
+                        company_query=r["client_org"],
+                        canonical_name=r["canonical_name"],
+                        registration_id=r["comlog_id"],
+                        client=r["client_org"],
+                        registrant=r["registrant"],
+                        subject_matters=r.get("subject_codes", []),
+                        institutions=r.get("institutions", []),
+                        communication_date=r.get("comm_date"),
+                        type=r.get("reg_type"),
+                        source="OCL Monthly Communications",
+                        raw={"dpoh_contacts": r.get("dpoh_contacts", [])},
+                    ))
+                await session.commit()
+        await _log_finish(log_id, "ok", len(rows), len(rows), time.monotonic() - t0)
+        log.info("scheduler_ocl_done", count=len(rows))
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_ocl_failed", error=str(exc))
+
+
+async def _run_grants(triggered_by: str = "scheduler") -> None:
+    from api.database import AsyncSessionLocal
+    from api.models.grant import Grant
+    from pipeline.ingest import fetch_grant_rows
+    log_id = await _log_start("grants_quarterly", "Grants & Contributions", triggered_by)
+    t0 = time.monotonic()
+    try:
+        rows = await fetch_grant_rows(max_rows=0)  # full corpus
+        added = 0
+        async with AsyncSessionLocal() as session:
+            batch = 2000
+            for i in range(0, len(rows), batch):
+                session.add_all([Grant(**r) for r in rows[i:i+batch]])
+                await session.commit()
+                added += len(rows[i:i+batch])
+        await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
+        log.info("scheduler_grants_done", count=added)
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_grants_failed", error=str(exc))
+
+
+async def _run_donations(triggered_by: str = "scheduler") -> None:
+    from api.models.donation import Donation
+    from pipeline.ingest import iter_donation_rows
+    log_id = await _log_start("donations_quarterly", "Elections Canada Donations", triggered_by)
+    t0 = time.monotonic()
+    try:
+        # Full corpus, streamed (max_rows=0).
+        n = await _stream_load(Donation, iter_donation_rows(max_rows=0))
+        await _log_finish(log_id, "ok", n, n, time.monotonic() - t0)
+        log.info("scheduler_donations_done", count=n)
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_donations_failed", error=str(exc))
+
+
+# Map job_id → async function
+JOB_RUNNERS = {
+    "bills_daily": _run_bills,
+    "gazette_weekly": _run_gazette,
+    "appointments_weekly": _run_appointments,
+    "contracts_monthly": _run_contracts,
+    "ocl_monthly": _run_ocl,
+    "grants_quarterly": _run_grants,
+    "donations_quarterly": _run_donations,
+}
+
+
+# ── Breadth sources (unified source_records table) ────────────────────────────
+# Declared once in pipeline/connectors.py; adapted here into scheduler jobs +
+# configs so they show up on the dashboard beside the core typed sources.
+def _make_connector_runner(conn):
+    async def _runner(triggered_by: str = "scheduler") -> None:
+        from pipeline.connectors import run_connector
+        try:
+            await run_connector(conn, max_rows=0, triggered_by=triggered_by)
+            if conn.embed:  # refresh the semantic index for embedded sources
+                await _rebuild_search_index()
+        except Exception as exc:  # already logged to scheduler_log inside run_connector
+            log.error("scheduler_connector_failed", id=conn.id, error=str(exc))
+    return _runner
+
+
+def _register_breadth_connectors() -> None:
+    from pipeline.connectors import CONNECTORS
+    for conn in CONNECTORS:
+        SOURCE_CONFIGS.append({
+            "id": conn.id, "name": conn.name, "cadence": conn.cadence,
+            "trigger": conn.trigger, "description": conn.description,
+            "typical_rows": conn.typical_rows,
+        })
+        JOB_RUNNERS[conn.id] = _make_connector_runner(conn)
+
+
+_register_breadth_connectors()
+
+
+# ── Scheduler lifecycle ───────────────────────────────────────────────────────
+
+def start_scheduler() -> None:
+    for cfg in SOURCE_CONFIGS:
+        scheduler.add_job(
+            JOB_RUNNERS[cfg["id"]],
+            trigger=cfg["trigger"],
+            id=cfg["id"],
+            name=cfg["name"],
+            replace_existing=True,
+            misfire_grace_time=3600,  # run up to 1h late if the server was down
+        )
+    scheduler.start()
+    log.info("scheduler_started", jobs=len(SOURCE_CONFIGS))
+
+
+def stop_scheduler() -> None:
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
+        log.info("scheduler_stopped")

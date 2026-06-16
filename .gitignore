@@ -1,0 +1,35 @@
+.DS_Store
+
+# Local environment
+.env
+.env.*
+!.env.example
+.venv/
+.claude/
+.git-backups/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Node / Next.js
+web/node_modules/
+web/.next/
+web/out/
+web/.vercel/
+
+# Local data corpus and generated artifacts
+polaris.db
+*.db
+*.sqlite
+*.sqlite3
+data/cache/
+data/index/
+data/raw/
+logs/
+reports/
+
+# Generated media
+web/public/mp/

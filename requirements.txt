@@ -1,0 +1,43 @@
+# Polaris Intelligence — Python dependencies
+
+# Core
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+python-dotenv==1.0.0
+
+# Database
+sqlalchemy==2.0.36
+alembic==1.13.3
+aiosqlite==0.20.0          # async SQLite driver (local dev / fallback)
+asyncpg==0.30.0            # async PostgreSQL driver (Supabase / production)
+greenlet==3.1.1            # required by SQLAlchemy async
+
+# AI
+anthropic==0.40.0          # Claude API + Agent SDK
+
+# Scraping
+httpx==0.27.0              # async HTTP client
+beautifulsoup4==4.12.3
+lxml==5.3.0
+playwright==1.48.0         # for JS-heavy government sites
+
+# Data processing
+pydantic==2.9.0
+pydantic-settings==2.5.0
+pandas==2.2.3              # for CSV processing (Elections Canada bulk data)
+
+# PDF generation
+weasyprint==62.3
+
+# Utilities
+python-ulid==3.0.0         # for report IDs
+tenacity==9.0.0            # retry logic with exponential backoff
+structlog==24.4.0          # structured logging
+python-multipart==0.0.12   # file uploads in FastAPI
+
+# Dev / testing
+pytest==8.3.3
+pytest-asyncio==0.24.0
+pytest-httpx==0.32.0
+httpx                      # also used as test client
+ruff==0.7.0                # linting

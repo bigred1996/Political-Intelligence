@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Polaris Intelligence — Analyst Workspace</title>
+<style>
+  :root {
+    --bg: #0b1020; --panel: #131a2e; --panel-2: #1b2440; --line: #25304f;
+    --ink: #e7ecf6; --muted: #93a0bd; --accent: #4f7cff; --accent-2: #29d3a8;
+    --warn: #f5a623; --bad: #ff5d6c; --good: #29d3a8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--ink); }
+  header { padding: 18px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+  .logo { width: 26px; height: 26px; border-radius: 7px;
+          background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+  header .tag { color: var(--muted); font-size: 12px; }
+  .health { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .dot { display:inline-block; width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle;}
+  .dot.ok { background: var(--good); }
+  .wrap { display: grid; grid-template-columns: 260px 1fr; gap: 0; min-height: calc(100vh - 61px); }
+  aside { border-right: 1px solid var(--line); padding: 18px; background: var(--panel); }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0 0 12px; }
+  .step { display:flex; gap:8px; align-items:flex-start; padding:6px 0; font-size:12.5px; color: var(--muted); }
+  .step .s { width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line); flex:0 0 auto; margin-top:1px; font-size:10px; text-align:center; line-height:14px; }
+  .step.done { color: var(--ink); }
+  .step.done .s { background: var(--good); border-color: var(--good); color:#06281f; }
+  .step.active { color: var(--ink); }
+  .step.active .s { border-color: var(--accent); color: var(--accent); }
+  main { padding: 24px; max-width: 1100px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 20px; }
+  .card h3 { margin: 0 0 4px; font-size: 14px; }
+  .card p.sub { margin: 0 0 16px; color: var(--muted); font-size: 12.5px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  input, select { background: var(--panel-2); border: 1px solid var(--line); color: var(--ink);
+                  padding: 10px 12px; border-radius: 8px; font-size: 13px; min-width: 220px; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  button { background: var(--accent); color: white; border: 0; padding: 10px 16px; border-radius: 8px;
+           font-size: 13px; font-weight: 600; cursor: pointer; }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+  button:disabled { opacity: .5; cursor: default; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .chip { background: var(--panel-2); border:1px solid var(--line); color: var(--muted); font-size:11px;
+          padding:3px 8px; border-radius:20px; cursor:pointer; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12.5px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase;
+       letter-spacing: .5px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  td { padding: 10px; border-bottom: 1px solid var(--panel-2); vertical-align: top; }
+  td .pill { display:inline-block; background: var(--panel-2); border:1px solid var(--line); border-radius:6px;
+             padding:2px 7px; margin:2px 3px 0 0; font-size:11px; color: var(--ink); }
+  .badge { font-size:10.5px; padding:2px 7px; border-radius:5px; text-transform:uppercase; letter-spacing:.4px; }
+  .badge.live { background: rgba(41,211,168,.15); color: var(--good); }
+  .badge.sample { background: rgba(245,166,35,.15); color: var(--warn); }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 20px 0; text-align:center; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"></div>
+  <div>
+    <h1>Polaris Intelligence</h1>
+    <div class="tag">Canadian political due diligence — analyst workspace</div>
+  </div>
+  <div class="health"><span id="dot" class="dot"></span><span id="health">checking…</span></div>
+</header>
+
+<div class="wrap">
+  <aside>
+    <h2>Build progress</h2>
+    <div id="steps"></div>
+  </aside>
+
+  <main>
+    <div class="card" style="border:1px solid #2b6cb0;background:linear-gradient(180deg,#0b1f33,#0a1626)">
+      <h3>🔎 Unified Search — every source, natural language <span class="badge live">hybrid</span></h3>
+      <p class="sub">Ask a question in plain English. A query planner (Claude when keyed, deterministic otherwise) turns it into filters; results fuse exact SQL matches across <b>every table</b> with local semantic vector search over text records. Pulls up individual records from contracts, donations, lobbying, bills, grants, regulations, appointments, StatCan, IAAC, CER, NPRI, Transport, geospatial &amp; GC news.</p>
+      <div class="row">
+        <input id="q" style="flex:1;min-width:340px" placeholder="e.g. pipeline incidents involving TransCanada since 2020" onkeydown="if(event.key==='Enter')runSearch()" />
+        <button id="qBtn" onclick="runSearch()">Search</button>
+        <button class="ghost" onclick="reindex()" title="Rebuild semantic index from current DB">Reindex</button>
+      </div>
+      <div class="chips">
+        <span class="chip" onclick="quickQ('federal contracts over $1 million for IT services')">$1M+ IT contracts</span>
+        <span class="chip" onclick="quickQ('pipeline incidents involving TransCanada')">CER pipeline incidents</span>
+        <span class="chip" onclick="quickQ('pollutant releases by facilities in Alberta')">NPRI Alberta releases</span>
+        <span class="chip" onclick="quickQ('what economic data is available on employment by sector')">StatCan employment</span>
+        <span class="chip" onclick="quickQ('lobbying on telecommunications')">Telecom lobbying</span>
+      </div>
+      <div id="qMeta" class="meta"></div>
+      <div id="qAnswer"></div>
+      <div id="qResults"></div>
+    </div>
+
+    <div class="card">
+      <h3>OCL Lobbying Scan</h3>
+      <p class="sub">Step 1 — pull federal lobbying registry records for a company. Try a seeded name to see the full flow.</p>
+      <div class="row">
+        <input id="company" placeholder="Company name, e.g. TELUS" />
+        <button id="scanBtn" onclick="scan()">Run scan</button>
+      </div>
+      <div class="chips">
+        <span class="chip" onclick="quick('TELUS')">TELUS</span>
+        <span class="chip" onclick="quick('Rogers')">Rogers</span>
+        <span class="chip" onclick="quick('Loblaw')">Loblaw</span>
+      </div>
+      <div id="scanMeta" class="meta"></div>
+      <div id="results"></div>
+    </div>
+
+    <div class="card">
+      <h3>Federal Contracts — Live Government Data <span class="badge live">real</span></h3>
+      <p class="sub">Step 4 — streams real "Proactive Publication: Contracts over $10,000" rows from open.canada.ca into the DB, normalized by entity. This is the production data path (ingest → DB → query), not scraping.</p>
+      <div class="row">
+        <select id="ingestRows">
+          <option value="10000">10,000 rows</option>
+          <option value="20000" selected>20,000 rows</option>
+          <option value="40000">40,000 rows</option>
+        </select>
+        <button id="ingestBtn" onclick="ingest()">Ingest live contracts</button>
+        <input id="c_company" placeholder="Search vendor, e.g. Deloitte, IBM, KPMG" onkeydown="if(event.key==='Enter')searchContracts()" />
+        <button class="ghost" onclick="searchContracts()">Search</button>
+      </div>
+      <div id="ingestMeta" class="meta"></div>
+      <div id="contractStats"></div>
+      <div id="contractResults"></div>
+    </div>
+
+    <div class="card">
+      <h3>Generate Political Risk Report <span class="badge live">pipeline</span></h3>
+      <p class="sub">Steps 6–9 — gathers all sources for the entity, scores 4 risk dimensions, drafts 9 sections (Claude when keyed, evidence-template otherwise), and opens an analyst draft.</p>
+      <div class="row">
+        <input id="g_company" placeholder="Company, e.g. TELUS" />
+        <input id="g_sector" placeholder="Sector (optional), e.g. telecommunications" />
+        <select id="g_type">
+          <option value="deal_due_diligence">Deal due diligence</option>
+          <option value="sector_monitoring">Sector monitoring</option>
+          <option value="sector_outlook">Sector outlook</option>
+          <option value="regulatory_risk">Regulatory risk</option>
+          <option value="public_accountability">Public accountability</option>
+        </select>
+        <button id="genBtn" onclick="generate()">Generate report</button>
+      </div>
+      <div id="genMeta" class="meta"></div>
+      <div id="reportList"></div>
+    </div>
+
+    <div class="card">
+      <h3>OCL Lobbying — Bulk Ingest <span class="badge live">real</span></h3>
+      <p class="sub">Direct download of the OCL Monthly Communications ZIP (~22 MB, 369k records from lobbycanada.gc.ca). All companies, all DPOH contacts, all institutions. Runs in background — check stats below.</p>
+      <div class="row">
+        <select id="ocl_rows">
+          <option value="10000">10,000 rows (quick test)</option>
+          <option value="50000">50,000 rows</option>
+          <option value="0" selected>Full corpus (~369k)</option>
+        </select>
+        <button id="oclIngestBtn" onclick="ingestOCL()">Ingest OCL lobbying</button>
+        <input id="ocl_search" placeholder="Search by canonical name, e.g. telus, bce, loblaw" onkeydown="if(event.key==='Enter')searchLobbying()" />
+        <button class="ghost" onclick="searchLobbying()">Search</button>
+      </div>
+      <div id="oclMeta" class="meta"></div>
+      <div id="oclResults"></div>
+    </div>
+
+    <div class="card">
+      <h3>Parliament Data — openparliament.ca <span class="badge live">real</span></h3>
+      <p class="sub">MPs, Hansard speeches, committees, and votes from openparliament.ca API. Seed politicians once, then search Hansard by company keyword to populate the stakeholder section of reports.</p>
+      <div class="row">
+        <button id="seedMPsBtn" onclick="seedMPs()">Seed 343 MPs</button>
+        <input id="speech_kw" placeholder="Hansard keyword, e.g. TELUS, Rogers, Loblaw" onkeydown="if(event.key==='Enter')searchSpeeches()" />
+        <button class="ghost" onclick="searchSpeeches()">Search Hansard</button>
+        <button class="ghost" onclick="loadCommittees()">List committees</button>
+      </div>
+      <div id="parlMeta" class="meta"></div>
+      <div id="parlResults"></div>
+    </div>
+
+    <div class="card">
+      <h3>Grants &amp; Contributions <span class="badge live">real</span></h3>
+      <p class="sub">Federal money transferred to organizations (not procurement). From open.canada.ca Grants & Contributions dataset. Runs in background.</p>
+      <div class="row">
+        <select id="grant_rows">
+          <option value="10000">10,000 rows (test)</option>
+          <option value="30000" selected>30,000 rows</option>
+          <option value="100000">100,000 rows</option>
+        </select>
+        <button id="grantIngestBtn" onclick="ingestGrants()">Ingest grants</button>
+        <input id="grant_search" placeholder="Search recipient, e.g. Bombardier, SNC" onkeydown="if(event.key==='Enter')searchGrants()" />
+        <button class="ghost" onclick="searchGrants()">Search</button>
+      </div>
+      <div id="grantMeta" class="meta"></div>
+      <div id="grantResults"></div>
+    </div>
+
+    <div class="card">
+      <h3>GIC Appointments <span class="badge live">real</span></h3>
+      <p class="sub">Governor in Council appointments to regulatory bodies (CRTC, Competition Bureau, Bank of Canada, etc.). From open.canada.ca.</p>
+      <div class="row">
+        <button id="apptIngestBtn" onclick="ingestAppointments()">Ingest appointments</button>
+        <input id="appt_search" placeholder="Search by name or org, e.g. CRTC, Bank of Canada" onkeydown="if(event.key==='Enter')searchAppointments()" />
+        <button class="ghost" onclick="searchAppointments()">Search</button>
+      </div>
+      <div id="apptMeta" class="meta"></div>
+      <div id="apptResults"></div>
+    </div>
+
+    <div class="card">
+      <h3>Canada Gazette + CRTC Decisions <span class="badge live">real</span></h3>
+      <p class="sub">Gazette Part I (proposed) and Part II (final) regulations via RSS. CRTC broadcast and telecom decisions. Updated on each ingest.</p>
+      <div class="row">
+        <button class="ghost" onclick="ingestGazette()">Ingest Gazette (Part I + II)</button>
+        <button class="ghost" onclick="ingestCRTC()">Ingest CRTC decisions</button>
+        <input id="reg_search" placeholder="Search keyword, e.g. telecom, spectrum, pipeline" onkeydown="if(event.key==='Enter')searchRegulations()" />
+        <button class="ghost" onclick="searchRegulations()">Search</button>
+      </div>
+      <div id="regMeta" class="meta"></div>
+      <div id="regResults"></div>
+    </div>
+
+    <div class="card">
+      <h3>All Data Sources Status <span class="badge live">real gov data</span></h3>
+      <p class="sub">Bulk Government of Canada open data, ingested into the DB and queried by entity.</p>
+      <div class="row">
+        <button class="ghost" onclick="ingestBills()">Ingest bills (LEGISinfo)</button>
+        <button class="ghost" onclick="ingestDonations()">Ingest donations (Elections Canada)</button>
+      </div>
+      <div id="sourcesStatus" class="meta"></div>
+    </div>
+
+    <div class="card">
+      <h3>Data Refresh Scheduler <span class="badge live">auto</span></h3>
+      <p class="sub">APScheduler runs inside the server process — each source refreshes at its upstream publish cadence. Click a job to trigger immediately.</p>
+      <button class="ghost" onclick="loadScheduler()" style="margin-bottom:12px">Refresh status</button>
+      <div id="schedulerStatus"></div>
+    </div>
+
+    <div class="card">
+      <h3>New Report Request</h3>
+      <p class="sub">Step 2 — intake. Stored now; full report pipeline lands in later build steps.</p>
+      <div class="row">
+        <input id="r_company" placeholder="Company / sector name" />
+        <select id="r_type">
+          <option value="deal_due_diligence">Deal due diligence</option>
+          <option value="sector_monitoring">Sector monitoring</option>
+          <option value="sector_outlook">Sector outlook</option>
+          <option value="regulatory_risk">Regulatory risk</option>
+          <option value="public_accountability">Public accountability</option>
+        </select>
+        <select id="r_horizon">
+          <option value="current">Current</option>
+          <option value="outlook_18m">18-month outlook</option>
+        </select>
+        <button class="ghost" onclick="createRequest()">Create request</button>
+      </div>
+      <div id="reqList"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+const STEPS = [
+  ["1","OCL scraper","active"],["2","Database + models","active"],["3","Elections Canada",""],
+  ["4","Contracts (live)","active"],["5","Entity resolver","active"],["6","Single-section draft",""],
+  ["7","Pipeline orchestrator","active"],["8","Bills/Hansard/Social","active"],["9","Risk scorer","active"],
+  ["10","FastAPI routes","active"],["11","Analyst workspace","active"],["12","Report + PDF","active"],["13","MCP servers","active"],
+];
+function renderSteps(){
+  document.getElementById('steps').innerHTML = STEPS.map(([n,label,st])=>{
+    const doneSteps = ['1','2','4','5','6','7','8','9','10','11','12'];
+    const cls = doneSteps.includes(n)?'done':(st==='active'?'active':'');
+    const mark = cls==='done'?'✓':n;
+    return `<div class="step ${cls}"><div class="s">${mark}</div><div>${label}</div></div>`;
+  }).join('');
+}
+renderSteps();
+
+async function health(){
+  try{ const r = await fetch('/api/health'); const j = await r.json();
+    document.getElementById('health').textContent = j.status==='ok'?'API healthy':'degraded';
+    if(j.status==='ok') document.getElementById('dot').classList.add('ok');
+  }catch(e){ document.getElementById('health').textContent='API offline'; }
+}
+health();
+
+function quick(name){ document.getElementById('company').value = name; scan(); }
+
+function escq(s){ return (s==null?'':String(s)).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function quickQ(q){ document.getElementById('q').value = q; runSearch(); }
+async function reindex(){
+  const m=document.getElementById('qMeta'); m.textContent='Rebuilding semantic index…';
+  try{ const r=await fetch('/api/search/reindex',{method:'POST'}); const j=await r.json();
+    m.textContent='Index rebuilt: '+(j.documents||0)+' documents — '+JSON.stringify(j.by_source||{}); }
+  catch(e){ m.textContent='Reindex failed: '+e; }
+}
+async function runSearch(){
+  const q=document.getElementById('q').value.trim();
+  if(!q) return;
+  const btn=document.getElementById('qBtn'), meta=document.getElementById('qMeta');
+  const ans=document.getElementById('qAnswer'), res=document.getElementById('qResults');
+  btn.disabled=true; btn.textContent='Searching…'; ans.innerHTML=''; res.innerHTML='';
+  meta.textContent='Planning query and searching across all sources…';
+  try{
+    const r=await fetch('/api/search?answer=true&limit=40&q='+encodeURIComponent(q));
+    const j=await r.json();
+    const c=j.counts||{}, p=j.plan||{};
+    const filters=[];
+    if(p.sources) filters.push('sources: '+p.sources.join(', '));
+    if(p.min_amount) filters.push('min $'+Number(p.min_amount).toLocaleString());
+    if(p.date_from) filters.push('from '+p.date_from);
+    if(p.date_to) filters.push('to '+p.date_to);
+    if(p.entity_text) filters.push('entity: '+p.entity_text);
+    meta.innerHTML='Planner: <b>'+escq(p.planner)+'</b> · '+(c.returned||0)+' results ('
+      +(c.structured||0)+' exact, '+(c.semantic||0)+' semantic)'
+      +(filters.length?' · '+escq(filters.join(' · ')):'');
+    if(j.answer){
+      ans.innerHTML='<div style="margin:10px 0;padding:12px;border-left:3px solid #2b6cb0;background:#0d2236;border-radius:6px;white-space:pre-wrap">'+escq(j.answer)+'</div>';
+    }
+    if(!j.results || !j.results.length){ res.innerHTML='<div class="meta">No matching records.</div>'; return; }
+    const rows=j.results.map(h=>{
+      const amt=h.amount?('$'+Number(h.amount).toLocaleString()):'';
+      const tag='<span class="chip" style="cursor:default">'+escq(h.source)+'</span>';
+      const m=h.match==='both'?'★ both':(h.match==='semantic'?'semantic':'exact');
+      const t=h.url?('<a href="'+escq(h.url)+'" target="_blank">'+escq(h.title)+'</a>'):escq(h.title);
+      return '<tr><td>'+tag+'</td><td>'+t+'<div class="meta" style="margin:2px 0 0">'+escq(h.snippet||'')+'</div></td>'
+        +'<td>'+escq(h.date||'')+'</td><td style="text-align:right">'+amt+'</td><td class="meta">'+m+'</td></tr>';
+    }).join('');
+    res.innerHTML='<table><thead><tr><th>Source</th><th>Record</th><th>Date</th><th>Amount</th><th>Match</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }catch(e){ meta.textContent='Search failed: '+e; }
+  finally{ btn.disabled=false; btn.textContent='Search'; }
+}
+
+async function scan(){
+  const company = document.getElementById('company').value.trim();
+  if(!company) return;
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true; btn.textContent = 'Scanning…';
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('scanMeta').textContent = '';
+  try{
+    const r = await fetch('/api/lobbying/scan', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({company_name: company})});
+    const j = await r.json();
+    renderResults(j);
+  }catch(e){
+    document.getElementById('results').innerHTML = `<div class="empty">Scan failed: ${e}</div>`;
+  }finally{ btn.disabled=false; btn.textContent='Run scan'; }
+}
+
+function renderResults(j){
+  const src = j.records[0] ? (j.records[0].source||'') : '';
+  const isSample = j.count>0; // source flag shown per-row; meta shows canonical + count
+  document.getElementById('scanMeta').innerHTML =
+    `Canonical entity: <strong>${j.canonical_name||'—'}</strong> · ${j.count} record(s) for "${j.company_name}"`;
+  if(!j.count){
+    document.getElementById('results').innerHTML =
+      `<div class="empty">No lobbying records found. Try TELUS, Rogers, or Loblaw to see seeded data.</div>`;
+    return;
+  }
+  const rows = j.records.map(r=>`
+    <tr>
+      <td><strong>${r.client||''}</strong><br><span style="color:var(--muted)">${r.registration_id||''}</span></td>
+      <td>${r.registrant||''}<br><span class="badge ${r.type==='in-house'?'live':'sample'}">${r.type||''}</span></td>
+      <td>${(r.subject_matters||[]).map(s=>`<span class="pill">${s}</span>`).join('')}</td>
+      <td>${(r.institutions||[]).map(s=>`<span class="pill">${s}</span>`).join('')}</td>
+      <td>${r.communication_date||''}</td>
+    </tr>`).join('');
+  document.getElementById('results').innerHTML = `
+    <table>
+      <thead><tr><th>Client</th><th>Registrant</th><th>Subject matters</th><th>Institutions lobbied</th><th>Date</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+async function ingest(){
+  const btn = document.getElementById('ingestBtn');
+  const rows = document.getElementById('ingestRows').value;
+  btn.disabled = true; btn.textContent = 'Streaming from open.canada.ca…';
+  document.getElementById('ingestMeta').textContent = '';
+  try{
+    const r = await fetch('/api/contracts/ingest', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({max_rows: parseInt(rows)})});
+    const j = await r.json();
+    document.getElementById('ingestMeta').innerHTML =
+      `Ingested <strong>${j.ingested.toLocaleString()}</strong> contracts · <strong>${j.distinct_vendors.toLocaleString()}</strong> distinct entities · total value <strong>$${(j.total_value).toLocaleString()}</strong><br><span style="color:var(--muted)">${j.source}</span>`;
+    loadStats();
+  }catch(e){ document.getElementById('ingestMeta').textContent = 'Ingest failed: '+e; }
+  finally{ btn.disabled=false; btn.textContent='Ingest live contracts'; }
+}
+
+async function loadStats(){
+  try{
+    const r = await fetch('/api/contracts/stats'); const j = await r.json();
+    if(!j.total){ document.getElementById('contractStats').innerHTML=''; return; }
+    const vrows = j.top_vendors.map(v=>`<tr><td><strong>${v.vendor}</strong></td><td>$${v.value.toLocaleString()}</td><td>${v.count}</td></tr>`).join('');
+    const drows = j.top_departments.map(d=>`<tr><td>${d.dept||'—'}</td><td>$${d.value.toLocaleString()}</td><td>${d.count}</td></tr>`).join('');
+    document.getElementById('contractStats').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px">
+        <div><div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Top vendors by value</div>
+        <table><thead><tr><th>Vendor</th><th>Value</th><th>#</th></tr></thead><tbody>${vrows}</tbody></table></div>
+        <div><div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Top departments by value</div>
+        <table><thead><tr><th>Department</th><th>Value</th><th>#</th></tr></thead><tbody>${drows}</tbody></table></div>
+      </div>`;
+  }catch(e){}
+}
+
+async function searchContracts(){
+  const company = document.getElementById('c_company').value.trim();
+  if(!company) return;
+  const r = await fetch('/api/contracts/search?company='+encodeURIComponent(company));
+  const j = await r.json();
+  if(!j.count){
+    document.getElementById('contractResults').innerHTML = `<div class="empty">No ingested contracts for "${company}". Ingest first, or try Deloitte / IBM / KPMG.</div>`;
+    return;
+  }
+  const rows = j.contracts.map(c=>`<tr>
+    <td><strong>${c.vendor_name}</strong></td>
+    <td>$${(c.contract_value||0).toLocaleString()}</td>
+    <td>${(c.description||'')}</td>
+    <td>${c.owner_org_title||''}</td>
+    <td>${c.contract_date||''}</td></tr>`).join('');
+  document.getElementById('contractResults').innerHTML = `
+    <div class="meta">Entity <strong>${j.canonical_name}</strong> · ${j.count} contract(s) · total $${j.total_value.toLocaleString()}</div>
+    <table><thead><tr><th>Vendor</th><th>Value</th><th>Description</th><th>Department</th><th>Date</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+loadStats();
+
+function riskColor(v){ return v>=7?'#ff5d6c':(v>=4?'#f5a623':'#29d3a8'); }
+
+async function generate(){
+  const company = document.getElementById('g_company').value.trim();
+  if(!company) return;
+  const btn = document.getElementById('genBtn');
+  btn.disabled=true; btn.textContent='Running pipeline…';
+  document.getElementById('genMeta').textContent='Gathering sources → scoring → drafting 9 sections…';
+  try{
+    const r = await fetch('/api/reports/generate',{method:'POST',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({company_name:company, sector:document.getElementById('g_sector').value.trim()||null,
+        report_type:document.getElementById('g_type').value})});
+    const j = await r.json();
+    document.getElementById('genMeta').innerHTML =
+      `Report <strong>${j.id}</strong> · overall risk <strong style="color:${riskColor(j.overall)}">${j.overall}/10</strong> · `+
+      `${j.evidence.lobbying_count} lobbying · ${j.evidence.contracts_count} contracts ($${(j.evidence.contracts_total_value||0).toLocaleString()}) · `+
+      `${j.evidence.donations_count} donations · ${j.evidence.bills_count} bills · drafted via ${j.generated_by}`;
+    loadReports();
+  }catch(e){ document.getElementById('genMeta').textContent='Generation failed: '+e; }
+  finally{ btn.disabled=false; btn.textContent='Generate report'; }
+}
+
+async function loadReports(){
+  const r = await fetch('/api/reports'); const j = await r.json();
+  if(!j.count){ document.getElementById('reportList').innerHTML=''; return; }
+  const rows = j.reports.map(rep=>`<tr>
+    <td><strong>${rep.company_name}</strong><br><span style="color:var(--muted)">${rep.report_type.replace(/_/g,' ')}</span></td>
+    <td><span style="color:${riskColor(rep.overall||0)};font-weight:700">${rep.overall ?? '—'}/10</span></td>
+    <td><span class="badge ${rep.status==='approved'?'live':'sample'}">${rep.status}</span></td>
+    <td>${rep.generated_by}</td>
+    <td><a href="/report/${rep.id}" target="_blank">View ↗</a>
+        ${rep.status!=='approved'?`· <a href="#" onclick="approve('${rep.id}');return false">Approve</a>`:''}</td>
+  </tr>`).join('');
+  document.getElementById('reportList').innerHTML =
+    `<table style="margin-top:14px"><thead><tr><th>Report</th><th>Risk</th><th>Status</th><th>Method</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function approve(id){
+  await fetch('/api/reports/'+id+'/approve',{method:'PATCH'});
+  loadReports();
+}
+
+async function ingestBills(){
+  const el=document.getElementById('sourcesStatus'); el.textContent='Ingesting bills…';
+  await fetch('/api/bills/ingest',{method:'POST'}); loadSources();
+}
+async function ingestDonations(){
+  const el=document.getElementById('sourcesStatus'); el.textContent='Ingesting donations (streaming Elections Canada)…';
+  await fetch('/api/donations/ingest',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"max_rows":80000}'}); loadSources();
+}
+async function loadSources(){
+  try{ const r=await fetch('/api/sources/status'); const j=await r.json();
+    const fmt = n => (n||0).toLocaleString();
+    document.getElementById('sourcesStatus').innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px">
+        ${[
+          ['Contracts',j.contracts],['Donations',j.donations],['Bills',j.bills],
+          ['Lobbying comms',j.lobbying_communications],['OCL registrations',j.ocl_registrations],
+          ['Grants',j.grants],['Appointments',j.appointments],
+          ['Gazette entries',j.gazette_entries],['Tribunal decisions',j.tribunal_decisions],
+          ['MPs',j.politicians],['Hansard mentions',j.hansard_mentions],
+        ].map(([name,val])=>`
+          <div style="background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px">
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">${name}</div>
+            <div style="font-size:20px;font-weight:700;color:${val>0?'var(--accent-2)':'var(--muted)'};margin-top:2px">${fmt(val)}</div>
+          </div>`).join('')}
+      </div>`;
+  }catch(e){}
+}
+
+async function ingestGrants(){
+  const btn=document.getElementById('grantIngestBtn');
+  const rows=parseInt(document.getElementById('grant_rows').value);
+  btn.disabled=true; btn.textContent='Starting ingest…';
+  document.getElementById('grantMeta').textContent='Grants ingest running in background from open.canada.ca…';
+  try{
+    const r=await fetch('/api/grants/ingest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({max_rows:rows})});
+    const j=await r.json();
+    document.getElementById('grantMeta').textContent=`Started — ${j.max_rows} rows cap. Check sources status for count.`;
+    setTimeout(loadSources,6000);
+  }catch(e){document.getElementById('grantMeta').textContent='Failed: '+e;}
+  finally{btn.disabled=false;btn.textContent='Ingest grants';}
+}
+
+async function searchGrants(){
+  const q=document.getElementById('grant_search').value.trim(); if(!q)return;
+  const r=await fetch('/api/grants/search?q='+encodeURIComponent(q)+'&limit=20');
+  const j=await r.json();
+  if(!j.count){document.getElementById('grantResults').innerHTML=`<div class="empty">No grants for "${q}"</div>`;return;}
+  const rows=j.records.map(g=>`<tr>
+    <td><strong>${g.recipient_name}</strong></td>
+    <td>$${(g.agreement_value||0).toLocaleString()}</td>
+    <td>${g.agreement_type||''}</td>
+    <td>${g.owner_org_title||''}</td>
+    <td>${g.program_name||''}</td>
+    <td>${g.agreement_start||''}</td>
+  </tr>`).join('');
+  document.getElementById('grantResults').innerHTML=`
+    <div class="meta">${j.count} record(s) · total $${j.total_value.toLocaleString()}</div>
+    <table><thead><tr><th>Recipient</th><th>Value</th><th>Type</th><th>Department</th><th>Program</th><th>Start</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+async function ingestAppointments(){
+  const btn=document.getElementById('apptIngestBtn');
+  btn.disabled=true; btn.textContent='Fetching from open.canada.ca…';
+  document.getElementById('apptMeta').textContent='GIC appointments ingest running in background…';
+  try{
+    const r=await fetch('/api/appointments/ingest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({max_rows:10000})});
+    document.getElementById('apptMeta').textContent='Started. Check sources status for count.';
+    setTimeout(loadSources,6000);
+  }catch(e){document.getElementById('apptMeta').textContent='Failed: '+e;}
+  finally{btn.disabled=false;btn.textContent='Ingest appointments';}
+}
+
+async function searchAppointments(){
+  const q=document.getElementById('appt_search').value.trim(); if(!q)return;
+  const r=await fetch('/api/appointments/search?q='+encodeURIComponent(q)+'&limit=20');
+  const j=await r.json();
+  if(!j.count){document.getElementById('apptResults').innerHTML=`<div class="empty">No appointments for "${q}"</div>`;return;}
+  const rows=j.records.map(a=>`<tr>
+    <td><strong>${a.appointee_name}</strong></td>
+    <td>${a.position_title||''}</td>
+    <td>${a.organization||''}</td>
+    <td>${a.appointment_date||''}</td>
+    <td>${a.end_date||''}</td>
+    <td><span class="pill">${a.appointment_type||''}</span></td>
+  </tr>`).join('');
+  document.getElementById('apptResults').innerHTML=`
+    <div class="meta">${j.count} record(s)</div>
+    <table><thead><tr><th>Appointee</th><th>Position</th><th>Organization</th><th>Appointed</th><th>End</th><th>Type</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+async function ingestGazette(){
+  document.getElementById('regMeta').textContent='Fetching Canada Gazette RSS (Part I + II)…';
+  try{
+    const r=await fetch('/api/regulations/gazette/ingest',{method:'POST'});
+    const j=await r.json();
+    document.getElementById('regMeta').textContent=j.message||'Started.';
+    setTimeout(()=>{loadSources();loadRegStats();},4000);
+  }catch(e){document.getElementById('regMeta').textContent='Failed: '+e;}
+}
+
+async function ingestCRTC(){
+  document.getElementById('regMeta').textContent='Fetching CRTC decisions RSS…';
+  try{
+    const r=await fetch('/api/regulations/crtc/ingest',{method:'POST'});
+    document.getElementById('regMeta').textContent='CRTC ingest started.';
+    setTimeout(()=>{loadSources();loadRegStats();},4000);
+  }catch(e){document.getElementById('regMeta').textContent='Failed: '+e;}
+}
+
+async function loadRegStats(){
+  try{
+    const r=await fetch('/api/regulations/stats'); const j=await r.json();
+    document.getElementById('regMeta').innerHTML=
+      `Gazette — <strong>${j.gazette_part_i}</strong> Part I (proposed) · <strong>${j.gazette_part_ii}</strong> Part II (final) · CRTC decisions <strong>${j.tribunal_decisions}</strong>`;
+  }catch(e){}
+}
+
+async function searchRegulations(){
+  const q=document.getElementById('reg_search').value.trim(); if(!q)return;
+  const r=await fetch('/api/regulations/gazette/search?q='+encodeURIComponent(q)+'&limit=20');
+  const j=await r.json();
+  const r2=await fetch('/api/regulations/decisions/search?q='+encodeURIComponent(q)+'&limit=10');
+  const j2=await r2.json();
+  let html='';
+  if(j.count){
+    const rows=j.records.map(g=>`<tr>
+      <td><span class="badge ${g.gazette_part==='I'?'sample':'live'}">Part ${g.gazette_part}</span></td>
+      <td>${g.published_date||''}</td>
+      <td>${g.department||''}</td>
+      <td><a href="${g.url||'#'}" target="_blank">${(g.title||'').slice(0,80)}</a></td>
+      <td>${g.regulation_id||''}</td>
+    </tr>`).join('');
+    html+=`<div class="meta" style="margin-top:12px">Gazette: ${j.count} match(es)</div>
+    <table><thead><tr><th>Part</th><th>Date</th><th>Dept</th><th>Title</th><th>Reg #</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+  }
+  if(j2.count){
+    const rows2=j2.records.map(d=>`<tr>
+      <td>${d.body}</td><td>${d.decision_number||''}</td>
+      <td><a href="${d.url||'#'}" target="_blank">${(d.title||'').slice(0,70)}</a></td>
+      <td>${d.decision_date||''}</td>
+    </tr>`).join('');
+    html+=`<div class="meta" style="margin-top:14px">Tribunal decisions: ${j2.count} match(es)</div>
+    <table><thead><tr><th>Body</th><th>Decision</th><th>Title</th><th>Date</th></tr></thead>
+    <tbody>${rows2}</tbody></table>`;
+  }
+  if(!html) html=`<div class="empty">No results for "${q}"</div>`;
+  document.getElementById('regResults').innerHTML=html;
+}
+loadRegStats();
+
+async function ingestOCL(){
+  const btn = document.getElementById('oclIngestBtn');
+  const rows = parseInt(document.getElementById('ocl_rows').value);
+  btn.disabled=true; btn.textContent='Downloading from lobbycanada.gc.ca…';
+  document.getElementById('oclMeta').textContent='OCL ingest running in background — cache is ~22 MB, full corpus ~369k records.';
+  try{
+    const r = await fetch('/api/lobbying/ingest',{method:'POST',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({max_rows: rows})});
+    const j = await r.json();
+    document.getElementById('oclMeta').textContent = j.message;
+    setTimeout(loadOCLStats, 5000);
+  }catch(e){ document.getElementById('oclMeta').textContent='Ingest failed: '+e; }
+  finally{ btn.disabled=false; btn.textContent='Ingest OCL lobbying'; }
+}
+
+async function loadOCLStats(){
+  try{
+    const r = await fetch('/api/lobbying/stats'); const j = await r.json();
+    document.getElementById('oclMeta').innerHTML =
+      `OCL lobbying — <strong>${j.total_records.toLocaleString()}</strong> communication records · <strong>${j.unique_clients.toLocaleString()}</strong> unique clients`;
+  }catch(e){}
+}
+
+async function searchLobbying(){
+  const canonical = document.getElementById('ocl_search').value.trim();
+  if(!canonical) return;
+  const r = await fetch('/api/lobbying/records?canonical='+encodeURIComponent(canonical)+'&limit=20');
+  const j = await r.json();
+  if(!j.count){
+    document.getElementById('oclResults').innerHTML = `<div class="empty">No lobbying records for "${canonical}". Try: telus, bce, rogers, loblaw, amazon</div>`;
+    return;
+  }
+  const rows = j.records.map(rec=>`<tr>
+    <td><strong>${rec.client||''}</strong><br><span style="color:var(--muted);font-size:11px">${rec.canonical_name}</span></td>
+    <td>${rec.registrant||''}</td>
+    <td>${(rec.institutions||[]).map(i=>`<span class="pill">${i}</span>`).join('')}</td>
+    <td>${rec.communication_date||''}</td>
+    <td><span class="badge ${rec.source==='OCL Monthly Communications'?'live':'sample'}">${rec.source==='OCL Monthly Communications'?'bulk':'sample'}</span></td>
+  </tr>`).join('');
+  document.getElementById('oclResults').innerHTML = `
+    <div class="meta">${j.count} record(s)</div>
+    <table><thead><tr><th>Client</th><th>Registrant</th><th>Institutions</th><th>Date</th><th>Source</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+loadOCLStats();
+
+async function seedMPs(){
+  const btn = document.getElementById('seedMPsBtn');
+  btn.disabled=true; btn.textContent='Seeding from openparliament.ca…';
+  document.getElementById('parlMeta').textContent='';
+  try{
+    const r = await fetch('/api/parliament/seed-politicians',{method:'POST'});
+    const j = await r.json();
+    document.getElementById('parlMeta').innerHTML = `Seeded <strong>${j.seeded}</strong> MPs · <strong>${j.new}</strong> new records`;
+    loadSources();
+  }catch(e){ document.getElementById('parlMeta').textContent='Seed failed: '+e; }
+  finally{ btn.disabled=false; btn.textContent='Seed 343 MPs'; }
+}
+
+async function searchSpeeches(){
+  const kw = document.getElementById('speech_kw').value.trim();
+  if(!kw) return;
+  document.getElementById('parlMeta').textContent='Searching Hansard…';
+  try{
+    const r = await fetch('/api/parliament/search-speeches',{method:'POST',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({keyword: kw, limit: 10})});
+    const j = await r.json();
+    document.getElementById('parlMeta').innerHTML = `Found <strong>${j.count}</strong> speeches mentioning "${kw}"`;
+    if(!j.count){ document.getElementById('parlResults').innerHTML=`<div class="empty">No speeches found for "${kw}"</div>`; return; }
+    const rows = j.speeches.map(s=>`<tr>
+      <td>${s.date||'—'}</td>
+      <td><strong>${s.speaker||'—'}</strong></td>
+      <td style="max-width:420px;font-size:12px">${(s.excerpt||'').slice(0,200)}…</td>
+    </tr>`).join('');
+    document.getElementById('parlResults').innerHTML = `
+      <table style="margin-top:12px"><thead><tr><th>Date</th><th>Speaker</th><th>Excerpt</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+    loadSources();
+  }catch(e){ document.getElementById('parlMeta').textContent='Search failed: '+e; }
+}
+
+async function loadCommittees(){
+  try{
+    const r = await fetch('/api/parliament/committees'); const j = await r.json();
+    const items = j.committees.map(c=>`<span class="pill" style="margin:3px">${c.short_name}</span>`).join('');
+    document.getElementById('parlResults').innerHTML = `<div style="margin-top:12px">${items}</div>`;
+    document.getElementById('parlMeta').innerHTML = `<strong>${j.count}</strong> standing committees`;
+  }catch(e){}
+}
+
+loadReports(); loadSources(); loadScheduler();
+
+function cadenceColor(c){ return c==='daily'?'var(--accent-2)':c==='weekly'?'var(--accent)':c==='monthly'?'var(--warn)':'var(--muted)'; }
+function statusColor(s){ return s==='ok'?'var(--good)':s==='error'?'var(--bad)':s==='running'?'var(--accent)':'var(--muted)'; }
+
+async function loadScheduler(){
+  try{
+    const r=await fetch('/api/scheduler/status'); const j=await r.json();
+    const rows=j.jobs.map(job=>{
+      const lr=job.last_run;
+      const statusBadge=`<span style="color:${statusColor(lr.status)};font-weight:600">${lr.status}</span>`;
+      const cadenceBadge=`<span style="color:${cadenceColor(job.cadence)};font-size:11px;text-transform:uppercase;letter-spacing:.5px">${job.cadence}</span>`;
+      const next=job.next_run?new Date(job.next_run).toLocaleString('en-CA',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+      const last=lr.started_at?new Date(lr.started_at).toLocaleString('en-CA',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'never';
+      const dur=lr.duration_s!=null?`${lr.duration_s}s`:'—';
+      const rows_info=lr.rows_added>0?`${lr.rows_added.toLocaleString()} rows`:'—';
+      return `<tr>
+        <td><strong>${job.name}</strong><br><span style="color:var(--muted);font-size:11px">${job.description.slice(0,80)}</span></td>
+        <td>${cadenceBadge}</td>
+        <td>${statusBadge}<br><span style="color:var(--muted);font-size:11px">${last}</span></td>
+        <td style="color:var(--muted);font-size:12px">${rows_info}<br>${dur}</td>
+        <td style="color:var(--muted);font-size:12px">${next}</td>
+        <td><button class="ghost" style="padding:4px 10px;font-size:11px" onclick="triggerJob('${job.id}')">Run now</button></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('schedulerStatus').innerHTML=`
+      <div style="color:var(--muted);font-size:12px;margin-bottom:8px">Scheduler: <strong style="color:${j.scheduler_running?'var(--good)':'var(--bad)'}">${j.scheduler_running?'running':'stopped'}</strong> · timezone: ${j.timezone}</div>
+      <table><thead><tr><th>Source</th><th>Cadence</th><th>Last run</th><th>Result</th><th>Next run</th><th>Action</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  }catch(e){ document.getElementById('schedulerStatus').innerHTML=`<div class="empty">Scheduler not reachable: ${e}</div>`; }
+}
+
+async function triggerJob(id){
+  const r=await fetch('/api/scheduler/trigger/'+id,{method:'POST'});
+  const j=await r.json();
+  alert(`${j.name}\n\nTriggered — running in background.\nCheck status in ~30s.`);
+  setTimeout(loadScheduler, 3000);
+}
+
+async function createRequest(){
+  const company = document.getElementById('r_company').value.trim();
+  if(!company) return;
+  await fetch('/api/requests', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({company_name: company,
+      report_type: document.getElementById('r_type').value,
+      time_horizon: document.getElementById('r_horizon').value})});
+  document.getElementById('r_company').value='';
+  loadRequests();
+}
+
+async function loadRequests(){
+  try{
+    const r = await fetch('/api/requests'); const j = await r.json();
+    if(!j.count){ document.getElementById('reqList').innerHTML=''; return; }
+    const rows = j.requests.map(q=>`
+      <tr><td><strong>${q.company_name}</strong></td><td>${q.report_type.replace(/_/g,' ')}</td>
+      <td>${q.time_horizon}</td><td><span class="badge sample">${q.status}</span></td>
+      <td style="color:var(--muted)">${new Date(q.created_at).toLocaleString()}</td></tr>`).join('');
+    document.getElementById('reqList').innerHTML = `
+      <table style="margin-top:14px"><thead><tr><th>Company</th><th>Type</th><th>Horizon</th><th>Status</th><th>Created</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  }catch(e){}
+}
+loadRequests();
+</script>
+</body>
+</html>
