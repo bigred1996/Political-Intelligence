@@ -1,6 +1,6 @@
-"""Polaris Intelligence MCP Server.
+"""Nessus Intelligence MCP Server.
 
-Exposes all Polaris data sources as callable tools for LLM decision-making.
+Exposes all Nessus data sources as callable tools for LLM decision-making.
 The LLM calls these tools to gather evidence, assess risk, and build context
 for political due diligence on Canadian companies and sectors.
 
@@ -35,9 +35,9 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP(
-    "Polaris Intelligence",
+    "Nessus Intelligence",
     instructions=(
-        "You have access to Polaris, a Canadian political due-diligence database. "
+        "You have access to Nessus, a Canadian political due-diligence database. "
         "Use these tools to gather evidence about companies, sectors, lobbyists, "
         "government contracts, grants, appointments, and regulatory activity. "
         "Always call gather_company_evidence first for a company-level analysis, "
@@ -64,7 +64,7 @@ async def _get_session():
 
 @mcp.tool()
 def list_data_sources() -> str:
-    """List all available Polaris data sources and their current record counts."""
+    """List all available Nessus data sources and their current record counts."""
     async def _go():
         from sqlalchemy import func, select
         session = await _get_session()

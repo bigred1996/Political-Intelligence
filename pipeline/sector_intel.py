@@ -14,6 +14,7 @@ route layer can add narrative synthesis on top; this module is the evidence floo
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from sqlalchemy import Float, func, or_, select
@@ -25,6 +26,7 @@ from api.models.donation import Bill, Donation
 from api.models.entity import LobbyingRecord
 from api.models.grant import Grant
 from api.models.regulation import GazetteEntry, TribunalDecision
+from api.models.report import Report
 from api.models.source_record import SourceRecord
 from pipeline.entity_resolver import normalize
 from pipeline.risk_scorer import score as score_evidence
@@ -35,6 +37,251 @@ def _kw_filter(columns: list, keywords: list[str]):
     """OR of ``col ILIKE %kw%`` across the given columns and keywords."""
     clauses = [col.ilike(f"%{kw}%") for kw in keywords for col in columns]
     return or_(*clauses) if clauses else None
+
+
+def _ref(
+    *,
+    table: str,
+    pk: int,
+    source: str,
+    title: str,
+    date: str | None = None,
+    url: str | None = None,
+    entity: str | None = None,
+) -> dict[str, Any]:
+    """Normalized record reference used by workspace pages and report evidence."""
+    return {
+        "table": table,
+        "id": pk,
+        "pk": pk,
+        "source": source,
+        "title": title,
+        "date": date,
+        "url": url,
+        "entity": entity,
+    }
+
+
+def _coverage(ev: dict[str, Any]) -> list[dict[str, Any]]:
+    """Sector-hit coverage for evidence bundles already loaded for the page.
+
+    ``rows`` is the count matching this sector lens. It is not global source
+    health; API routes can enrich these rows with source-status metadata so the
+    UI can distinguish "source is empty" from "source is live, no sector hits."
+    """
+    labels = [
+        ("contracts", "Federal contracts", "live"),
+        ("lobbying", "Lobbying communications", "live"),
+        ("donations", "Political donations", "live"),
+        ("bills", "Bills & legislation", "live"),
+        ("regulations", "Canada Gazette", "partial"),
+        ("tribunal_decisions", "Tribunal decisions", "empty"),
+        ("appointments", "GIC appointments", "empty"),
+        ("breadth", "Operations breadth", "partial"),
+    ]
+    out: list[dict[str, Any]] = []
+    for key, label, status_when_rows in labels:
+        rows = int((ev.get(key) or {}).get("count") or 0)
+        status = status_when_rows if rows else "empty"
+        out.append({"id": key, "label": label, "status": status, "rows": rows})
+    return out
+
+
+_COVERAGE_SOURCE_IDS = {
+    "contracts": "contracts",
+    "lobbying": "lobbying_communications",
+    "donations": "donations",
+    "bills": "bills",
+    "regulations": "gazette_entries",
+    "tribunal_decisions": "tribunal_decisions",
+    "appointments": "appointments",
+    "breadth": "operations",
+}
+
+
+def enrich_sector_coverage(
+    coverage: list[dict[str, Any]],
+    source_status: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Attach global source health to sector-local coverage rows.
+
+    This prevents a common diligence error: treating zero sector matches as if
+    the underlying source itself were unloaded. ``status`` remains the sector
+    hit status for backward compatibility; ``global_status`` and
+    ``sector_status`` make the distinction explicit for newer clients.
+    """
+    if not source_status:
+        return coverage
+
+    by_id = {row.get("id"): row for row in source_status.get("sources", [])}
+    enriched: list[dict[str, Any]] = []
+    for row in coverage:
+        item = dict(row)
+        item["sector_rows"] = int(item.get("rows") or 0)
+        item["sector_status"] = item.get("status")
+        source_id = _COVERAGE_SOURCE_IDS.get(str(item.get("id")))
+        item["source_id"] = source_id
+        global_row = by_id.get(source_id) if source_id else None
+        if global_row:
+            item["global_status"] = global_row.get("status")
+            item["global_rows"] = int(global_row.get("rows") or 0)
+            item["freshness"] = global_row.get("freshness")
+            item["confidence"] = global_row.get("confidence")
+            item["known_gaps"] = global_row.get("known_gaps") or []
+            item["description"] = global_row.get("description") or item.get("description")
+            item["table"] = global_row.get("table") or item.get("table")
+            item["approximate"] = bool(global_row.get("approximate"))
+            item["latest_record_date"] = global_row.get("latest_record_date")
+            if item["sector_rows"] == 0 and global_row.get("status") in {"live", "partial"}:
+                item["sector_status"] = "no_sector_hits"
+        enriched.append(item)
+    return enriched
+
+
+def risk_band_from_score(score: float | int | None, *, evidence_count: int = 0) -> str:
+    """Translate explainable score components into a reader-facing band."""
+    if evidence_count <= 0:
+        return "insufficient evidence"
+    value = float(score or 0)
+    if value >= 7:
+        return "high"
+    if value >= 4:
+        return "elevated"
+    if value >= 2:
+        return "moderate"
+    return "low"
+
+
+def movement_windows(current: int | float | None = None) -> list[dict[str, Any]]:
+    """Return honest delta windows until period snapshots exist."""
+    return [
+        {
+            "window_days": days,
+            "status": "insufficient_history",
+            "direction": "unclear",
+            "current": current,
+            "previous": None,
+            "delta": None,
+            "note": "Historical period snapshots are not yet available for this sector lens.",
+        }
+        for days in (7, 30, 90)
+    ]
+
+
+def _coverage_strength(ref_count: int, source_count: int) -> str:
+    if ref_count >= 3 and source_count >= 2:
+        return "strong"
+    if ref_count >= 1:
+        return "partial"
+    return "weak"
+
+
+def _confidence_for_coverage(coverage: str) -> str:
+    return {"strong": "high", "partial": "medium", "weak": "low"}.get(coverage, "medium")
+
+
+def _source_type(table: str) -> str:
+    return {
+        "bills": "bill",
+        "gazette": "regulatory event",
+        "tribunal": "regulatory event",
+        "lobbying": "lobbying activity",
+        "contracts": "contract",
+        "donations": "political contribution",
+        "source_records": "source record",
+        "hansard_mentions": "political statement",
+    }.get(table, "record")
+
+
+def evidence_item(ref: dict[str, Any], *, coverage: str = "partial", confidence: str | None = None) -> dict[str, Any]:
+    pk = ref.get("pk", ref.get("id"))
+    table = str(ref.get("table") or "")
+    return {
+        "source_name": ref.get("source") or table,
+        "source_type": _source_type(table),
+        "title": ref.get("title") or "Untitled record",
+        "publication_date": ref.get("date"),
+        "ingestion_date": ref.get("ingestion_date"),
+        "coverage_status": coverage,
+        "confidence": confidence or _confidence_for_coverage(coverage),
+        "table": table,
+        "pk": pk,
+        "internal_url": f"/records/{table}/{pk}" if table and pk is not None else "",
+        "external_url": ref.get("url"),
+    }
+
+
+def finding_from_signal(signal: dict[str, Any], sector: Sector | None = None) -> dict[str, Any]:
+    refs = [r for r in signal.get("references", []) if r.get("table") and r.get("pk", r.get("id")) is not None]
+    sources = {r.get("source") or r.get("table") for r in refs}
+    coverage = _coverage_strength(len(refs), len(sources))
+    severity = signal.get("severity") or signal.get("impact") or "watch"
+    risk_level = {
+        "High": "high",
+        "Medium": "elevated",
+        "Low": "moderate",
+        "high": "high",
+        "elevated": "elevated",
+        "watch": "moderate",
+    }.get(str(severity), "unknown")
+    theme = str(signal.get("theme") or "").lower()
+    signal_type = "portfolio monitoring"
+    if "regulatory" in theme:
+        signal_type = "regulatory watch"
+    elif "lobby" in theme or "influence" in theme:
+        signal_type = "lobbying intensity"
+    elif "actor" in theme or "political" in theme:
+        signal_type = "political attention"
+    elif "opportunity" in theme:
+        signal_type = "policy opportunity"
+    return {
+        "title": signal.get("title") or "Untitled finding",
+        "concise_summary": signal.get("summary") or signal.get("detail") or "",
+        "why_it_matters": signal.get("why") or "This signal may affect diligence, strategy, timing, or exposure decisions.",
+        "primary_sector": {"slug": sector.slug, "name": sector.name} if sector else (signal.get("sectors") or [None])[0],
+        "related_sectors": signal.get("sectors") or ([] if not sector else [{"slug": sector.slug, "name": sector.name}]),
+        "signal_type": signal_type,
+        "risk_direction": "unclear",
+        "risk_level": risk_level,
+        "confidence": _confidence_for_coverage(coverage),
+        "source_coverage": coverage,
+        "recency": "fresh" if refs else "aging",
+        "interpretation_type": "observed" if len(sources) <= 1 else "inferred",
+        "evidence_references": [evidence_item(r, coverage=coverage) for r in refs[:6]],
+        "related_records": refs[:6],
+        "related_bills": [r for r in refs if r.get("table") == "bills"],
+        "related_lobbying_activity": [r for r in refs if r.get("table") == "lobbying"],
+        "related_regulatory_events": [r for r in refs if r.get("table") in {"gazette", "tribunal"}],
+        "suggested_questions": decision_questions(signal, sector),
+    }
+
+
+def decision_questions(signal: dict[str, Any] | None = None, sector: Sector | None = None) -> list[str]:
+    questions = [
+        "Are the available sources complete enough to support a conclusion?",
+        "What additional evidence should the user review before acting?",
+    ]
+    text = f"{(signal or {}).get('theme', '')} {(signal or {}).get('title', '')}".lower()
+    if "regulatory" in text or "gazette" in text or "bill" in text:
+        questions.insert(0, "Could this change affect approvals, compliance costs, timelines, demand, competition, or market access?")
+        questions.insert(1, "Is the organization exposed to a regulatory consultation, bill stage, or rule-making process currently underway?")
+    if "lobby" in text or "influence" in text:
+        questions.insert(0, "Has lobbying activity around this issue increased, concentrated, or shifted to a new institution?")
+    if sector and sector.regulators:
+        questions.append(f"Which of {', '.join(sector.regulators[:3])} should be reviewed for the next evidence point?")
+    return questions[:5]
+
+
+def sector_brief(payload: dict[str, Any]) -> dict[str, Any]:
+    findings = payload.get("findings", [])
+    return {
+        "title": f"{payload['sector']['name']} intelligence brief",
+        "risk_summary": payload.get("narrative") or "",
+        "what_changed": "Period-over-period movement is not yet available; current findings are based on loaded evidence.",
+        "top_findings": findings[:3],
+        "confidence_and_limits": payload.get("source_coverage", [])[:6],
+        "suggested_questions": payload.get("suggested_questions", [])[:6],
+    }
 
 
 async def _contracts(session: AsyncSession, ents: list[str]) -> dict[str, Any]:
@@ -58,11 +305,32 @@ async def _contracts(session: AsyncSession, ents: list[str]) -> dict[str, Any]:
             .order_by(func.sum(Contract.contract_value).desc()).limit(10)
         )
     ).all()
+    records = (
+        await session.execute(
+            select(Contract)
+            .where(cf)
+            .order_by(Contract.contract_value.desc().nullslast(), Contract.contract_date.desc())
+            .limit(12)
+        )
+    ).scalars().all()
     return {
         "count": count,
         "total_value": round(total or 0, 2),
         "by_department": [{"dept": d[0], "value": round(d[1] or 0, 2), "count": d[2]} for d in by_dept],
         "by_entity": [{"entity": v[0], "value": round(v[1] or 0, 2), "count": v[2]} for v in by_vendor],
+        "records": [
+            {
+                **_ref(
+                    table="contracts", pk=r.id, source=r.source,
+                    title=f"{r.vendor_name} — {(r.description or '')[:100]}".strip(" —"),
+                    date=r.contract_date, entity=r.vendor_name,
+                ),
+                "department": r.owner_org_title,
+                "value": r.contract_value or 0,
+                "description": r.description,
+            }
+            for r in records
+        ],
     }
 
 
@@ -82,10 +350,31 @@ async def _donations(session: AsyncSession, ents: list[str], province: str | Non
             .order_by(func.sum(Donation.amount).desc()).limit(6)
         )
     ).all()
+    records = (
+        await session.execute(
+            select(Donation)
+            .where(df)
+            .order_by(Donation.amount.desc().nullslast(), Donation.received_date.desc())
+            .limit(10)
+        )
+    ).scalars().all()
     return {
         "count": count,
         "total_value": round(total or 0, 2),
         "by_party": [{"party": p[0] or "—", "value": round(p[1] or 0, 2), "count": p[2]} for p in by_party],
+        "records": [
+            {
+                **_ref(
+                    table="donations", pk=r.id, source=r.source,
+                    title=f"{r.contributor_name} -> {r.party or r.recipient or 'recipient'}",
+                    date=r.received_date, entity=r.contributor_name,
+                ),
+                "party": r.party,
+                "amount": r.amount or 0,
+                "province": r.contributor_province,
+            }
+            for r in records
+        ],
     }
 
 
@@ -112,11 +401,32 @@ async def _lobbying(session: AsyncSession, ents: list[str]) -> dict[str, Any]:
             if i:
                 inst_tally[i] = inst_tally.get(i, 0) + 1
     top_insts = sorted(inst_tally.items(), key=lambda kv: -kv[1])[:10]
+    recs = (
+        await session.execute(
+            select(LobbyingRecord)
+            .where(lf)
+            .order_by(LobbyingRecord.communication_date.desc())
+            .limit(12)
+        )
+    ).scalars().all()
     return {
         "count": count,
         "institutions": [i for i, _ in top_insts],
         "top_institutions": [{"institution": i, "count": n} for i, n in top_insts],
         "by_entity": [{"entity": e[0], "count": e[1]} for e in by_entity],
+        "records": [
+            {
+                **_ref(
+                    table="lobbying", pk=r.id, source=r.source,
+                    title=f"{r.client} lobbying communication",
+                    date=r.communication_date, entity=r.client,
+                ),
+                "registrant": r.registrant,
+                "institutions": r.institutions or [],
+                "subjects": r.subject_matters or [],
+            }
+            for r in recs
+        ],
     }
 
 
@@ -129,8 +439,18 @@ async def _bills(session: AsyncSession, keywords: list[str]) -> dict[str, Any]:
     return {
         "count": len(rows),
         "records": [
-            {"id": b.id, "table": "bills", "bill_number": b.bill_number, "title_en": b.title_en,
-             "status": b.status, "sponsor": b.sponsor, "latest_activity": b.latest_activity}
+            {
+                **_ref(
+                    table="bills", pk=b.id, source="LEGISinfo",
+                    title=f"{b.bill_number} — {b.title_en or ''}".strip(" —"),
+                    date=b.introduced_date,
+                ),
+                "bill_number": b.bill_number,
+                "title_en": b.title_en,
+                "status": b.status,
+                "sponsor": b.sponsor,
+                "latest_activity": b.latest_activity,
+            }
             for b in rows
         ],
     }
@@ -145,8 +465,16 @@ async def _regulations(session: AsyncSession, keywords: list[str]) -> dict[str, 
     return {
         "count": len(rows),
         "records": [
-            {"id": r.id, "table": "gazette", "gazette_part": r.gazette_part, "title": r.title,
-             "published_date": r.published_date, "department": r.department, "url": r.url}
+            {
+                **_ref(
+                    table="gazette", pk=r.id, source="Canada Gazette",
+                    title=r.title, date=r.published_date, url=r.url,
+                    entity=r.department,
+                ),
+                "gazette_part": r.gazette_part,
+                "published_date": r.published_date,
+                "department": r.department,
+            }
             for r in rows
         ],
     }
@@ -161,8 +489,17 @@ async def _tribunal(session: AsyncSession, keywords: list[str], regulators: list
     return {
         "count": len(rows),
         "records": [
-            {"id": r.id, "table": "tribunal", "body": r.body, "decision_number": r.decision_number,
-             "title": r.title, "decision_date": r.decision_date, "outcome": r.outcome, "url": r.url}
+            {
+                **_ref(
+                    table="tribunal", pk=r.id, source=r.body or "Tribunal",
+                    title=r.title, date=r.decision_date, url=r.url,
+                    entity=r.parties,
+                ),
+                "body": r.body,
+                "decision_number": r.decision_number,
+                "decision_date": r.decision_date,
+                "outcome": r.outcome,
+            }
             for r in rows
         ],
     }
@@ -177,9 +514,17 @@ async def _appointments(session: AsyncSession, regulators: list[str]) -> dict[st
     return {
         "count": len(rows),
         "records": [
-            {"id": r.id, "table": "appointments", "appointee_name": r.appointee_name,
-             "position_title": r.position_title, "organization": r.organization,
-             "appointment_date": r.appointment_date}
+            {
+                **_ref(
+                    table="appointments", pk=r.id, source=r.source,
+                    title=f"{r.appointee_name} — {r.position_title or ''}".strip(" —"),
+                    date=r.appointment_date, entity=r.appointee_name,
+                ),
+                "appointee_name": r.appointee_name,
+                "position_title": r.position_title,
+                "organization": r.organization,
+                "appointment_date": r.appointment_date,
+            }
             for r in rows
         ],
     }
@@ -200,9 +545,16 @@ async def _breadth(session: AsyncSession, ents: list[str], keywords: list[str], 
     return {
         "count": count,
         "records": [
-            {"id": r.id, "table": "source_records", "source": r.source, "title": r.title,
-             "summary": (r.summary or "")[:240], "event_date": r.event_date,
-             "province": r.province, "url": r.url}
+            {
+                **_ref(
+                    table="source_records", pk=r.id, source=r.source,
+                    title=r.title, date=r.event_date, url=r.url,
+                    entity=r.entity_name or r.canonical_name,
+                ),
+                "summary": (r.summary or "")[:240],
+                "event_date": r.event_date,
+                "province": r.province,
+            }
             for r in rows
         ],
     }
@@ -308,6 +660,7 @@ def detect_connections(ev: dict[str, Any]) -> list[dict[str, Any]]:
                       f"coincide with {bills['count']} bill(s) touching the sector ({bill_nums}). "
                       "Engagement is tracking the legislative agenda.",
             "sources": ["lobbying", "bills"], "severity": "high",
+            "references": bills["records"][:3],
         })
 
     # 2. Same department both contracting with the sector and being lobbied.
@@ -325,6 +678,7 @@ def detect_connections(ev: dict[str, Any]) -> list[dict[str, Any]]:
             "detail": f"{dept} is among both the sector's largest contracting departments and the "
                       "institutions it lobbies most — a procurement-plus-access pattern worth diligence.",
             "sources": ["contracts", "lobbying"], "severity": "elevated",
+            "references": con.get("records", [])[:2] + lob.get("records", [])[:2],
         })
 
     # 3. Regulatory activity in motion (gazette / tribunal) against a lobbying-heavy sector.
@@ -334,6 +688,7 @@ def detect_connections(ev: dict[str, Any]) -> list[dict[str, Any]]:
             "detail": f"{regs['count']} recent Canada Gazette item(s) intersect the sector while lobbying runs hot — "
                       "rule-making and industry engagement are moving together.",
             "sources": ["regulations", "lobbying"], "severity": "elevated",
+            "references": regs["records"][:3],
         })
 
     # 4. On-the-ground breadth events (CER incidents, NPRI releases, assessments).
@@ -344,6 +699,7 @@ def detect_connections(ev: dict[str, Any]) -> list[dict[str, Any]]:
             "detail": f"{breadth['count']:,} breadth record(s) (e.g. {sample['source']}: "
                       f"{sample['title'][:90]}) tie physical operations to the sector's risk picture.",
             "sources": ["source_records"], "severity": "watch",
+            "references": breadth["records"][:3],
         })
 
     # 5. Contract concentration in a single player.
@@ -356,9 +712,132 @@ def detect_connections(ev: dict[str, Any]) -> list[dict[str, Any]]:
                 "detail": f"{top['entity']} accounts for {share:.0%} of the sector's "
                           f"${con['total_value']:,.0f} in federal contracts — concentration risk for a deal thesis.",
                 "sources": ["contracts"], "severity": "watch",
+                "references": con.get("records", [])[:3],
             })
 
     return out
+
+
+def build_sector_signals(ev: dict[str, Any], connections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Ranked sector-level signals with internal evidence references.
+
+    Connections explain cross-source patterns. Signals are the workspace-facing
+    layer that groups related data points by diligence question.
+    """
+    signals: list[dict[str, Any]] = []
+    con = ev["contracts"]
+    lob = ev["lobbying"]
+    bills = ev["bills"]
+    regs = ev["regulations"]
+    tribunal = ev.get("tribunal_decisions", {"count": 0, "records": []})
+    donations = ev["donations"]
+    breadth = ev["breadth"]
+
+    if connections:
+        c = connections[0]
+        signals.append({
+            "theme": "Cross-source pattern",
+            "title": c["title"],
+            "summary": c["detail"],
+            "severity": c["severity"],
+            "why": "Multiple source families are pointing at the same sector exposure.",
+            "metrics": [
+                {"label": "Lobbying", "value": lob["count"]},
+                {"label": "Bills", "value": bills["count"]},
+                {"label": "Gazette", "value": regs["count"]},
+            ],
+            "sources": c["sources"],
+            "references": c.get("references", [])[:4],
+        })
+
+    if regs["count"] or tribunal["count"] or bills["count"]:
+        refs = (regs["records"][:2] + tribunal.get("records", [])[:2] + bills["records"][:2])[:5]
+        signals.append({
+            "theme": "Regulatory movement",
+            "title": "Rules, legislation, or adjudication touching the sector",
+            "summary": (
+                f"{regs['count']} Gazette item(s), {bills['count']} bill(s), and "
+                f"{tribunal.get('count', 0)} tribunal decision(s) are currently attached to this sector lens."
+            ),
+            "severity": "elevated" if regs["count"] or tribunal.get("count", 0) else "watch",
+            "why": "Regulatory movement can alter timing, compliance costs, approvals, or market access.",
+            "metrics": [
+                {"label": "Gazette", "value": regs["count"]},
+                {"label": "Bills", "value": bills["count"]},
+                {"label": "Tribunal", "value": tribunal.get("count", 0)},
+            ],
+            "sources": ["regulations", "bills", "tribunal_decisions"],
+            "references": refs,
+        })
+
+    if lob["count"]:
+        top = lob["top_institutions"][0]["institution"] if lob["top_institutions"] else "federal institutions"
+        signals.append({
+            "theme": "Influence activity",
+            "title": "Lobbying concentrates around federal decision points",
+            "summary": f"{lob['count']:,} communications are on file; the most visible target is {top}.",
+            "severity": "elevated" if lob["count"] >= 25 else "watch",
+            "why": "Sustained lobbying can reveal pressure points before they appear in formal rule-making.",
+            "metrics": [
+                {"label": "Comms", "value": lob["count"]},
+                {"label": "Institutions", "value": len(lob["top_institutions"])},
+            ],
+            "sources": ["lobbying"],
+            "references": lob.get("records", [])[:4],
+        })
+
+    if con["count"] or con["total_value"]:
+        top_dept = con["by_department"][0]["dept"] if con["by_department"] else "federal departments"
+        signals.append({
+            "theme": "Public-sector exposure",
+            "title": "Federal contracts create buyer and department dependencies",
+            "summary": (
+                f"{con['count']:,} contract record(s) total ${con['total_value']:,.0f}; "
+                f"top exposure sits with {top_dept}."
+            ),
+            "severity": "watch",
+            "why": "Procurement concentration matters for revenue quality, renewal risk, and diligence questions.",
+            "metrics": [
+                {"label": "Contracts", "value": con["count"]},
+                {"label": "Spend", "value": con["total_value"], "format": "money"},
+                {"label": "Departments", "value": len(con["by_department"])},
+            ],
+            "sources": ["contracts"],
+            "references": con.get("records", [])[:4],
+        })
+
+    if breadth["count"]:
+        signals.append({
+            "theme": "Operational footprint",
+            "title": "Operational and environmental records extend the risk picture",
+            "summary": f"{breadth['count']:,} breadth record(s) connect sector activity to places, assets, or incidents.",
+            "severity": "watch",
+            "why": "Physical footprint data helps separate abstract policy risk from concrete operating exposure.",
+            "metrics": [
+                {"label": "Records", "value": breadth["count"]},
+            ],
+            "sources": ["source_records"],
+            "references": breadth["records"][:5],
+        })
+
+    if donations["count"]:
+        signals.append({
+            "theme": "Political finance",
+            "title": "Contribution records appear in the sector graph",
+            "summary": f"{donations['count']:,} contribution record(s) total ${donations['total_value']:,.0f}.",
+            "severity": "watch",
+            "why": "Federal corporate donations are banned; records usually indicate individuals linked by name.",
+            "metrics": [
+                {"label": "Records", "value": donations["count"]},
+                {"label": "Amount", "value": donations["total_value"], "format": "money"},
+            ],
+            "sources": ["donations"],
+            "references": donations.get("records", [])[:4],
+        })
+
+    order = {"high": 0, "elevated": 1, "watch": 2}
+    signals.sort(key=lambda s: (order.get(s["severity"], 3), -sum(float(m["value"] or 0) for m in s["metrics"][:2])))
+    return signals[:6]
 
 
 def detect_entity_connections(ev: dict[str, Any]) -> list[dict[str, Any]]:
@@ -381,6 +860,7 @@ def detect_entity_connections(ev: dict[str, Any]) -> list[dict[str, Any]]:
             "detail": f"{lob['count']:,} lobbying communications coincide with {bills['count']} "
                       f"bill(s) touching this entity or its sector ({bill_nums}).",
             "sources": ["lobbying", "bills"], "severity": "elevated",
+            "references": bills["records"][:3],
         })
 
     contract_depts = {d["dept"] for d in con.get("by_department", []) if d["dept"]}
@@ -395,6 +875,7 @@ def detect_entity_connections(ev: dict[str, Any]) -> list[dict[str, Any]]:
             "detail": f"{overlap[0]} both contracts with this entity and is among the institutions it "
                       "lobbies — a procurement-plus-access pattern worth diligence.",
             "sources": ["contracts", "lobbying"], "severity": "high",
+            "references": [],
         })
 
     if don["count"] > 0 and lob["count"] >= 5:
@@ -403,6 +884,7 @@ def detect_entity_connections(ev: dict[str, Any]) -> list[dict[str, Any]]:
             "detail": f"{don['count']} political contribution record(s) sit alongside sustained "
                       "lobbying — relationship-building across both channels.",
             "sources": ["donations", "lobbying"], "severity": "watch",
+            "references": [],
         })
 
     if (regs["count"] + ev.get("tribunal_decisions", {}).get("count", 0)) > 0:
@@ -411,6 +893,7 @@ def detect_entity_connections(ev: dict[str, Any]) -> list[dict[str, Any]]:
             "detail": f"{regs['count']} Gazette item(s) and "
                       f"{ev.get('tribunal_decisions', {}).get('count', 0)} tribunal decision(s) intersect this entity.",
             "sources": ["regulations"], "severity": "watch",
+            "references": regs["records"][:3] + ev.get("tribunal_decisions", {}).get("records", [])[:2],
         })
 
     return out
@@ -428,6 +911,30 @@ def entity_narrative(ev: dict[str, Any], scores: dict[str, Any], connections: li
     if connections:
         lead += " " + " ".join(c["title"] + "." for c in connections[:2])
     return lead
+
+
+async def _entity_reports(session: AsyncSession, canonical: str, limit: int = 6) -> list[dict[str, Any]]:
+    rows = (
+        await session.execute(
+            select(Report)
+            .where(Report.canonical_name == canonical)
+            .order_by(Report.created_at.desc())
+            .limit(limit)
+        )
+    ).scalars().all()
+    return [
+        {
+            "id": report.id,
+            "company_name": report.company_name,
+            "report_type": report.report_type,
+            "status": report.status,
+            "generated_by": report.generated_by,
+            "overall": (report.risk_scores or {}).get("overall"),
+            "created_at": report.created_at.isoformat(),
+            "approved_at": report.approved_at.isoformat() if report.approved_at else None,
+        }
+        for report in rows
+    ]
 
 
 def _narrative(sector: Sector, scores: dict[str, Any], connections: list[dict[str, Any]], region: str | None) -> str:
@@ -489,6 +996,8 @@ async def gather_entity_data(
         "connections": connections,
         "narrative": entity_narrative(evidence, scores, connections),
         "trends": await _trends(session, ents),
+        "source_coverage": _coverage(evidence),
+        "reports": await _entity_reports(session, canonical),
         "evidence": {
             "contracts": contracts,
             "donations": donations,
@@ -507,15 +1016,31 @@ async def gather_sector_data(
     ents = sector.entities
     kw = sector.keywords
 
-    contracts = await _contracts(session, ents)
-    donations = await _donations(session, ents, province)
-    lobbying = await _lobbying(session, ents)
-    bills = await _bills(session, kw)
-    regulations = await _regulations(session, kw)
-    tribunal = await _tribunal(session, kw, sector.regulators)
-    appointments = await _appointments(session, sector.regulators)
-    breadth = await _breadth(session, ents, kw, province)
-    provinces = await _province_breakdown(session, ents, kw)
+    # These reads are independent, so run them concurrently — each on its own
+    # connection. SQLite serves concurrent readers, so wall-clock drops to the
+    # slowest single query instead of the sum (this was the bulk of the cold-load
+    # cost on dense sectors). Downstream scoring/connections stay sequential (CPU).
+    from api.database import AsyncSessionLocal
+
+    async def _run(fn):
+        async with AsyncSessionLocal() as s:
+            return await fn(s)
+
+    (
+        contracts, donations, lobbying, bills, regulations, tribunal,
+        appointments, breadth, provinces, trends,
+    ) = await asyncio.gather(
+        _run(lambda s: _contracts(s, ents)),
+        _run(lambda s: _donations(s, ents, province)),
+        _run(lambda s: _lobbying(s, ents)),
+        _run(lambda s: _bills(s, kw)),
+        _run(lambda s: _regulations(s, kw)),
+        _run(lambda s: _tribunal(s, kw, sector.regulators)),
+        _run(lambda s: _appointments(s, sector.regulators)),
+        _run(lambda s: _breadth(s, ents, kw, province)),
+        _run(lambda s: _province_breakdown(s, ents, kw)),
+        _run(lambda s: _trends(s, ents, province)),
+    )
 
     # Evidence bundle in the shape risk_scorer.score() consumes (sector as pseudo-entity).
     evidence = {
@@ -533,6 +1058,17 @@ async def gather_sector_data(
     }
     scores = score_evidence(evidence)
     connections = detect_connections(evidence)
+    signals = build_sector_signals(evidence, connections)
+    evidence_count = sum(int((evidence.get(k) or {}).get("count") or 0) for k in (
+        "lobbying", "contracts", "donations", "bills", "regulations",
+        "tribunal_decisions", "appointments", "breadth",
+    ))
+    findings = [finding_from_signal(signal, sector) for signal in signals]
+    suggested_questions = []
+    for finding in findings:
+        for question in finding.get("suggested_questions", []):
+            if question not in suggested_questions:
+                suggested_questions.append(question)
 
     # Most active players, ranked by combined footprint.
     rank: dict[str, dict[str, Any]] = {}
@@ -544,16 +1080,22 @@ async def gather_sector_data(
         rank[l["entity"]]["lobbying"] = l["count"]
     top_entities = sorted(rank.values(), key=lambda r: (-r["lobbying"], -r["contracts"]))[:8]
 
-    return {
+    payload = {
         "sector": sector.to_dict(),
         "province": province,
         "province_name": PROVINCES.get(province) if province else None,
         "scores": scores,
+        "risk_band": risk_band_from_score(scores.get("overall"), evidence_count=evidence_count),
+        "movement": movement_windows(evidence_count),
         "connections": connections,
+        "signals": signals,
+        "findings": findings,
+        "suggested_questions": suggested_questions[:8],
         "narrative": _narrative(sector, scores, connections, province),
-        "trends": await _trends(session, ents, province),
+        "trends": trends,
         "top_entities": top_entities,
         "province_breakdown": provinces,
+        "source_coverage": _coverage(evidence),
         "evidence": {
             "contracts": contracts,
             "donations": donations,
@@ -565,3 +1107,5 @@ async def gather_sector_data(
             "breadth": breadth,
         },
     }
+    payload["intelligence_brief"] = sector_brief(payload)
+    return payload

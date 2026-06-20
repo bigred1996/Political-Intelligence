@@ -2,119 +2,66 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { AvatarLogo, JurisdictionBadge, PartyBadge } from "@/components/intelligence";
+import { type PoliticiansResponse } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
-import { partyColor, type PoliticiansResponse } from "@/lib/api";
-import { Eyebrow, EmptyState, Panel, SkeletonBlock } from "@/components/ui";
 
-export default function PoliticiansPage() {
-  const [party, setParty] = useState<string | null>(null);
-  const [q, setQ] = useState("");
+/* Political Players — directory grid wired to /api/politicians (343 MPs). */
+
+export default function PoliticiansIndex() {
   const { data, loading } = useApi<PoliticiansResponse>("/api/politicians");
+  const [party, setParty] = useState("All Parties");
 
-  const filtered = useMemo(() => {
-    if (!data) return [];
-    const needle = q.trim().toLowerCase();
-    return data.politicians.filter(
-      (p) =>
-        (!party || p.party === party) &&
-        (!needle ||
-          p.name.toLowerCase().includes(needle) ||
-          (p.riding || "").toLowerCase().includes(needle))
-    );
-  }, [data, party, q]);
+  const facets = useMemo(() => ["All Parties", ...(data?.parties ?? []).map((p) => p.party).filter(Boolean)], [data]);
+  const mps = useMemo(() => {
+    const list = data?.politicians ?? [];
+    return party === "All Parties" ? list : list.filter((m) => m.party === party);
+  }, [data, party]);
 
   return (
-    <div>
-      <section className="bg-panel border-b border-line map-grid">
-        <div className="mx-auto max-w-[1320px] px-4 py-8">
-          <Eyebrow>Political players</Eyebrow>
-          <h1 className="text-2xl md:text-3xl font-semibold text-fg-bright mt-2">
-            The people who shape every industry.
-          </h1>
-          <p className="text-fg-dim mt-2 max-w-2xl text-sm">
-            Every federal Member of Parliament — the sponsors, regulators and voices behind the
-            contracts, bills and rules that move each sector.
-          </p>
-          <div className="mt-5 flex flex-col sm:flex-row gap-2.5 max-w-2xl">
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search by name or riding…"
-              aria-label="Search politicians"
-              className="flex-1 bg-canvas border border-line rounded px-4 py-2.5 text-fg placeholder:text-fg-dim outline-none focus:border-brass/60 transition-colors mono text-sm"
-            />
-          </div>
-          {data && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              <Chip active={party === null} onClick={() => setParty(null)} label={`All ${data.count}`} />
-              {data.parties.map((p) => (
-                <Chip
-                  key={p.party}
-                  active={party === p.party}
-                  onClick={() => setParty(party === p.party ? null : p.party)}
-                  label={`${p.party} ${p.count}`}
-                  color={partyColor(p.party)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+    <div className="animate-rise">
+      <div className="mb-gutter pb-density-comfortable border-b border-outline-variant">
+        <h1 className="font-display-lg text-display-lg text-primary">Political Players</h1>
+        <p className="font-body-lg text-body-lg text-on-surface-variant mt-unit max-w-2xl">
+          {data ? `${data.count} Members of Parliament` : "Members of Parliament"} shaping the regulatory landscape — sponsored bills, interventions, and industries touched.
+        </p>
+      </div>
 
-      <div className="mx-auto max-w-[1320px] px-4 py-6">
-        {loading && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {Array.from({ length: 15 }).map((_, i) => <SkeletonBlock key={i} className="h-44 rounded" />)}
-          </div>
-        )}
-        {!loading && (
-          <>
-            <div className="mono text-xs text-fg-dim mb-3">{filtered.length} representatives</div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {filtered.map((p) => (
-                <Link
-                  key={p.slug}
-                  href={`/politicians/${p.slug}`}
-                  className="panel p-0 overflow-hidden hover:border-brass/50 transition-colors group"
-                >
-                  <div className="aspect-[3/3.4] bg-panel-2 overflow-hidden relative">
-                    {p.photo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.photo_url} alt={p.name} loading="lazy"
-                        className="w-full h-full object-cover object-top grayscale-[35%] group-hover:grayscale-0 transition-all" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-fg-dim mono text-2xl">
-                        {p.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
-                      </div>
-                    )}
-                    <span className="absolute top-0 left-0 w-1 h-full" style={{ background: partyColor(p.party) }} />
+      <div className="flex flex-wrap gap-2 mb-gutter">
+        {facets.slice(0, 7).map((f) => (
+          <button
+            key={f}
+            onClick={() => setParty(f)}
+            className={`px-3 py-1.5 rounded-full font-body-md text-body-md transition-colors ${
+              f === party ? "bg-primary text-on-primary" : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+            }`}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-gutter">
+        {loading && !data
+          ? Array.from({ length: 9 }).map((_, i) => <div key={i} className="card-level-1 rounded-lg p-density-comfortable h-[108px] skeleton" />)
+          : mps.slice(0, 60).map((p) => {
+              return (
+                <Link key={p.slug} href={`/politicians/${p.slug}`} className="card-level-1 card-level-2 rounded-lg p-density-comfortable flex items-start gap-4 focus-ring">
+                  <AvatarLogo name={p.name} imageUrl={p.photo_url} imageAttribution={p.photo_attribution} imageSource={p.photo_source} type="person" className="w-14 h-14 rounded-full" />
+                  <div className="flex-1 min-w-0">
+                    <h2 className="font-headline-sm text-[18px] text-primary leading-tight truncate">{p.name}</h2>
+                    <p className="font-body-md text-body-md text-on-surface-variant mb-2 truncate">{p.role ?? p.party}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <PartyBadge party={p.party} compact />
+                      {p.riding && <span className="font-data-tabular text-data-tabular text-on-surface-variant truncate">{p.riding}</span>}
+                      {p.photo_source && <span className="font-data-tabular text-data-tabular text-on-surface-variant truncate">Portrait: {p.photo_source}</span>}
+                    </div>
                   </div>
-                  <div className="p-2.5">
-                    <div className="text-sm font-medium text-fg group-hover:text-brass-bright transition-colors leading-tight truncate">{p.name}</div>
-                    <div className="mono text-[10px] text-fg-dim mt-1 truncate">{p.riding || "—"}</div>
-                    <div className="mono text-[10px] mt-0.5 truncate" style={{ color: partyColor(p.party) }}>{p.party || "Independent"}</div>
-                  </div>
+                  {p.province && <JurisdictionBadge code={p.province} compact />}
                 </Link>
-              ))}
-            </div>
-            {!filtered.length && <EmptyState>No politicians match.</EmptyState>}
-          </>
-        )}
+              );
+            })}
       </div>
     </div>
-  );
-}
-
-function Chip({ active, onClick, label, color }: { active: boolean; onClick: () => void; label: string; color?: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`mono text-xs rounded px-2.5 py-1 border transition-colors cursor-pointer ${
-        active ? "border-brass/60 text-fg bg-brass/10" : "border-line text-fg-dim hover:text-fg"
-      }`}
-      style={active && color ? { borderColor: color, color } : undefined}
-    >
-      {label}
-    </button>
   );
 }

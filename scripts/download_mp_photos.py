@@ -20,7 +20,7 @@ from api.database import AsyncSessionLocal, init_db
 from api.models.politician import Politician
 
 DEST = Path(__file__).resolve().parent.parent / "web" / "public" / "mp"
-H = {"User-Agent": "Mozilla/5.0 (compatible; Polaris/1.0)"}
+H = {"User-Agent": "Mozilla/5.0 (compatible; Nessus/1.0)"}
 
 
 async def main() -> None:

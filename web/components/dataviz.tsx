@@ -59,7 +59,7 @@ export function CanadaMap({
         const code = NAME2CODE[f.properties.name];
         const v = code ? byCode[code] || 0 : 0;
         const t = v > 0 ? 0.18 + 0.82 * (v / max) : 0;
-        const fill = v > 0 ? hexLerp("#15263f", "#d8a23a", t) : "#0c1626";
+        const fill = v > 0 ? hexLerp("#15263f", "#f1c232", t) : "#0c1626";
         const isSel = selected === code;
         return (
           <path
@@ -148,10 +148,10 @@ export function TrendBars({ data, color = "var(--color-up)", height = 130 }: { d
 
 // ── Radial connection network ─────────────────────────────────────────
 const EDGE_COLOR: Record<string, string> = {
-  regulatory: "#e3a93a",
-  funding: "#3ecf8e",
-  policy: "#5b8def",
-  partnership: "#a978e8",
+  regulatory: "#f1c232",
+  funding: "#6aa84f",
+  policy: "#3b6ea5",
+  partnership: "#6c5b8f",
 };
 
 export function RadialNetwork({

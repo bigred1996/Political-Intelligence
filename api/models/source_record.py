@@ -1,6 +1,6 @@
 """Unified source-record store for the breadth data sources.
 
-Architecture decision (senior call): Polaris keeps rich, typed tables for the
+Architecture decision (senior call): Nessus keeps rich, typed tables for the
 core sources it runs analytics and risk scoring on (contracts, donations,
 lobbying, bills, grants). The wider breadth sources — StatCan, IAAC, CER, NPRI,
 Transport Canada, NRCan/GeoGratis geospatial, GC News — are heterogeneous and

@@ -20,7 +20,7 @@ from scrapers.base import BaseScraper
 log = structlog.get_logger()
 
 OPENPARL_BASE = "https://api.openparliament.ca"
-_UA = "Polaris-Political-Intelligence/1.0 (contact@polarispolitical.ca; research use)"
+_UA = "Nessus-Political-Intelligence/1.0 (contact@polarispolitical.ca; research use)"
 
 
 def _strip_html(text: str) -> str:

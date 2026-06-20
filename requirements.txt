@@ -1,4 +1,4 @@
-# Polaris Intelligence — Python dependencies
+# Nessus Intelligence — Python dependencies
 
 # Core
 fastapi==0.115.0

@@ -22,23 +22,63 @@ from typing import Any
 
 
 class Sector:
-    __slots__ = ("slug", "name", "blurb", "entities", "keywords", "regulators")
+    __slots__ = (
+        "slug", "name", "blurb", "description", "entities", "keywords", "regulators",
+        "status", "parent", "subsectors", "topics", "organizations", "departments",
+        "enabled", "display_priority",
+    )
 
     def __init__(
         self, slug: str, name: str, blurb: str,
         entities: list[str], keywords: list[str], regulators: list[str],
+        *,
+        status: str = "active",
+        parent: str | None = None,
+        subsectors: list[str] | None = None,
+        topics: list[str] | None = None,
+        organizations: list[str] | None = None,
+        departments: list[str] | None = None,
+        enabled: bool = True,
+        display_priority: int = 100,
     ) -> None:
         self.slug = slug
         self.name = name
         self.blurb = blurb
+        self.description = blurb
         self.entities = entities      # canonical slugs → indexed big-table lookups
         self.keywords = keywords      # ILIKE terms → small-table text search
         self.regulators = regulators  # org-name fragments → appointments / exposure
+        self.status = status
+        self.parent = parent
+        self.subsectors = subsectors or []
+        self.topics = topics or keywords[:]
+        self.organizations = organizations or entities[:]
+        self.departments = departments or regulators[:]
+        self.enabled = enabled
+        self.display_priority = display_priority
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "slug": self.slug, "name": self.name, "blurb": self.blurb,
-            "entity_count": len(self.entities), "regulators": self.regulators,
+            "slug": self.slug,
+            "name": self.name,
+            "blurb": self.blurb,
+            "description": self.description,
+            "status": self.status,
+            "parent": self.parent,
+            "subsectors": self.subsectors,
+            "topics": self.topics,
+            "associated_topics": self.topics,
+            "organizations": self.organizations,
+            "associated_organizations": self.organizations,
+            "departments": self.departments,
+            "associated_government_departments": self.departments,
+            "regulators": self.regulators,
+            "associated_regulators": self.regulators,
+            "keywords": self.keywords,
+            "associated_keywords": self.keywords,
+            "enabled": self.enabled,
+            "display_priority": self.display_priority,
+            "entity_count": len(self.entities),
         }
 
 
@@ -112,7 +152,10 @@ SECTORS: dict[str, Sector] = {
 
 
 def get_sector(slug: str) -> Sector | None:
-    return SECTORS.get(slug.lower().strip())
+    sector = SECTORS.get(slug.lower().strip())
+    if sector and sector.enabled:
+        return sector
+    return None
 
 
 def sector_for_entity(canonical: str) -> Sector | None:
@@ -125,4 +168,8 @@ def sector_for_entity(canonical: str) -> Sector | None:
 
 
 def list_sectors() -> list[dict[str, Any]]:
-    return [s.to_dict() for s in SECTORS.values()]
+    return [
+        s.to_dict()
+        for s in sorted(SECTORS.values(), key=lambda sector: (sector.display_priority, sector.name))
+        if s.enabled
+    ]

@@ -9,21 +9,39 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
 from ..models.politician import HansardMention, Politician
+from ..schemas import PoliticianListResponse, PoliticianProfileResponse
 from pipeline.sector_mapper import SECTORS
 
 router = APIRouter(prefix="/api/politicians", tags=["politicians"])
+
+
+def _openparliament_url(p: Politician) -> str | None:
+    if not p.url:
+        return None
+    return f"https://openparliament.ca{p.url}" if p.url.startswith("/") else p.url
+
+
+def _photo_metadata(p: Politician) -> dict[str, str | None]:
+    if not p.photo_url:
+        return {"photo_source": None, "photo_attribution": None, "photo_source_url": None}
+    return {
+        "photo_source": p.source or "openparliament.ca",
+        "photo_attribution": "OpenParliament.ca profile photo",
+        "photo_source_url": _openparliament_url(p) or p.commons_url,
+    }
 
 
 def _card(p: Politician) -> dict[str, Any]:
     return {
         "slug": p.slug, "name": p.name, "party": p.party, "riding": p.riding,
         "province": p.province, "role": p.role, "photo_url": p.photo_url,
+        **_photo_metadata(p),
     }
 
 
@@ -37,9 +55,11 @@ def _industries_from(texts: list[str]) -> list[dict[str, str]]:
     return out
 
 
-@router.get("")
+@router.get("", response_model=PoliticianListResponse)
 async def list_politicians(
-    q: str | None = None, party: str | None = None, province: str | None = None,
+    q: str | None = Query(default=None, min_length=1, max_length=255),
+    party: str | None = Query(default=None, max_length=120),
+    province: str | None = Query(default=None, min_length=2, max_length=2),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     stmt = select(Politician)
@@ -69,7 +89,7 @@ async def list_politicians(
     }
 
 
-@router.get("/{slug}")
+@router.get("/{slug}", response_model=PoliticianProfileResponse)
 async def get_politician(slug: str, session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     p = (await session.execute(
         select(Politician).where(Politician.slug == slug))).scalar_one_or_none()
@@ -114,8 +134,9 @@ async def get_politician(slug: str, session: AsyncSession = Depends(get_session)
     return {
         "slug": p.slug, "name": p.name, "party": p.party, "riding": p.riding,
         "province": p.province, "role": p.role, "photo_url": p.photo_url,
+        **_photo_metadata(p),
         "email": p.email, "since_date": p.since_date, "commons_url": p.commons_url,
-        "openparliament_url": (f"https://openparliament.ca{p.url}" if p.url and p.url.startswith("/") else p.url),
+        "openparliament_url": _openparliament_url(p),
         "summary": summary,
         "industries": industries,
         "bills": [{
@@ -123,6 +144,7 @@ async def get_politician(slug: str, session: AsyncSession = Depends(get_session)
             "title": b.title_en, "status": b.status, "date": b.introduced_date,
         } for b in bills],
         "speeches": [{
+            "table": "hansard_mentions", "pk": s.id,
             "keyword": s.keyword, "date": s.speech_date, "excerpt": s.excerpt,
             "url": s.speech_url,
         } for s in speeches],

@@ -1,260 +1,313 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, use, useState } from "react";
-import { money, moneyFull, num, recordHref, riskBand, type SectorOverview } from "@/lib/api";
+import { use } from "react";
+import { AvatarLogo, RelatedItems, type RelatedItem } from "@/components/intelligence";
+import { EvidenceRows } from "@/components/ui";
 import { useApi } from "@/lib/use-api";
-import { ConnectionCard, RiskGauge, Scorecard } from "@/components/charts";
-import { BarList, CanadaMap, TrendArea, TrendBars } from "@/components/dataviz";
-import { Eyebrow, Panel, SkeletonBlock, SourceTag } from "@/components/ui";
+import type { EvidenceGraphResponse, EvidenceRef, IntelligenceFinding, SectorOverview } from "@/lib/api";
+import { money, num } from "@/lib/api";
+import { committeeHref, entityHref, evidenceHref, findingHref, organizationHref, personHref, recordHref, sourceHref, typeLabel } from "@/lib/navigation";
 
-const BAND_LABEL: Record<string, string> = { high: "ELEVATED", medium: "MODERATE", low: "CONTAINED" };
-const BAND_COLOR: Record<string, string> = { high: "var(--color-risk-high)", medium: "var(--color-risk-med)", low: "var(--color-risk-low)" };
-
-export default function SectorPage({ params }: { params: Promise<{ slug: string }> }) {
+export default function SectorDetail({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
-  return (
-    <Suspense fallback={<Loading />}>
-      <SectorView slug={slug} />
-    </Suspense>
-  );
-}
+  const { data, loading, error } = useApi<SectorOverview>(`/api/sectors/${encodeURIComponent(slug)}/overview`);
 
-function SectorView({ slug }: { slug: string }) {
-  const search = useSearchParams();
-  const router = useRouter();
-  const province = search.get("province");
-  const [mapMetric, setMapMetric] = useState<"records" | "amount">("records");
-  const path = `/api/sectors/${slug}/overview${province ? `?province=${province}` : ""}`;
-  const { data, loading, error } = useApi<SectorOverview>(path);
+  if (loading) return <SectorSkeleton />;
+  if (error) return <Message tone="error">{error}</Message>;
+  if (!data) return <Message>Sector not found.</Message>;
 
-  if (error) return <ErrorState msg={error} />;
-  if (loading || !data) return <Loading />;
-
-  const { scores, evidence, connections, trends } = data;
-  const band = riskBand(scores.overall);
-
-  function selectProvince(code: string | null) {
-    router.push(`/sectors/${slug}${code ? `?province=${code}` : ""}`, { scroll: false });
-  }
-
-  const KPIS = [
-    { label: "Overall Risk", value: scores.overall.toFixed(1), tone: BAND_COLOR[band] },
-    { label: "Contract $", value: money(evidence.contracts.total_value) },
-    { label: "Contracts", value: num(evidence.contracts.count) },
-    { label: "Lobbying", value: num(evidence.lobbying.count) },
-    { label: "Bills", value: num(evidence.bills.count) },
-    { label: "Gazette", value: num(evidence.regulations.count) },
-    { label: "Donations", value: num(evidence.donations.count) },
-    { label: "Departments", value: num(evidence.contracts.by_department.length) },
-  ];
+  const sector = data.sector;
+  const graph = data.graph as EvidenceGraphResponse | undefined;
+  const findings = data.findings?.length ? data.findings : data.intelligence_brief?.top_findings ?? [];
+  const evidenceRefs = collectSectorEvidence(data).slice(0, 10);
+  const connectedPeople = peopleItems(graph, sector.slug);
+  const connectedOrganizations = organizationItems(data, sector.slug);
+  const connectedRecords = evidenceRefs.map((ref) => evidenceItem(ref, sector.slug));
 
   return (
-    <div className="animate-rise">
-      {/* Header strip */}
-      <section className="bg-panel border-b border-line map-grid">
-        <div className="mx-auto max-w-[1320px] px-4 py-5">
-          <div className="mono text-xs text-fg-dim mb-3 flex items-center gap-2">
-            <Link href="/sectors" className="hover:text-brass">SECTORS</Link>
-            <span className="text-line">/</span>
-            <span className="text-fg uppercase">{data.sector.name}</span>
-            {data.province_name && <><span className="text-line">/</span><span className="text-brass-bright uppercase">{data.province_name}</span></>}
+    <div className="overflow-x-hidden animate-rise">
+      <div className="mb-gutter flex flex-col md:flex-row justify-between md:items-end gap-4">
+        <div>
+          <div className="flex items-center gap-density-compact mb-density-compact text-on-surface-variant">
+            <Link className="font-label-caps text-label-caps hover:text-primary transition-colors uppercase focus-ring rounded" href="/sectors">
+              Sectors
+            </Link>
+            <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+            <span className="font-label-caps text-label-caps text-primary uppercase">{sector.name}</span>
           </div>
-
-          <div className="grid lg:grid-cols-[1fr_auto] gap-6 items-start">
-            <div>
-              <Eyebrow>Sector Intelligence</Eyebrow>
-              <h1 className="text-3xl font-semibold text-fg-bright mt-1.5 leading-tight">{data.sector.name}</h1>
-              <p className="text-fg/80 mt-2 max-w-3xl text-sm leading-relaxed">{data.narrative}</p>
-            </div>
-            <div className="flex items-center gap-4 panel bg-panel-2 px-5 py-3">
-              <RiskGauge score={scores.overall} size={120} />
-              <div>
-                <div className="eyebrow !text-fg-dim">Risk Band</div>
-                <div className="mono text-lg font-semibold" style={{ color: BAND_COLOR[band] }}>{BAND_LABEL[band]}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* KPI ticker */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-px bg-line mt-5 border border-line rounded overflow-hidden">
-            {KPIS.map((k) => (
-              <div key={k.label} className="bg-panel px-3 py-2.5">
-                <div className="eyebrow !text-fg-dim !text-[9px] mb-1 truncate">{k.label}</div>
-                <div className="mono text-lg font-semibold" style={{ color: k.tone || "var(--color-fg-bright)" }}>{k.value}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Province filter */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-4">
-            <span className="eyebrow !text-fg-dim mr-1">Region</span>
-            <Chip active={!province} onClick={() => selectProvince(null)}>All Canada</Chip>
-            {data.province_breakdown.slice(0, 10).map((p) => (
-              <Chip key={p.code} active={province === p.code} onClick={() => selectProvince(p.code)}>{p.code}</Chip>
-            ))}
-          </div>
+          <h1 className="font-display-lg text-display-lg text-primary">{sector.name}</h1>
+          <p className="font-body-lg text-body-lg text-on-surface-variant mt-unit max-w-3xl">
+            {data.intelligence_brief?.risk_summary || data.narrative || sector.blurb || sector.description || "Connected sector intelligence assembled from internal evidence records."}
+          </p>
         </div>
-      </section>
+        <div className="flex gap-density-compact shrink-0">
+          <Link href={`/search?q=${encodeURIComponent(sector.name)}`} className="px-4 py-2 border border-outline-variant text-secondary rounded font-body-md text-body-md hover:bg-surface-container-low transition-colors flex items-center gap-2 focus-ring">
+            <span className="material-symbols-outlined text-[18px]">travel_explore</span>
+            Search sector
+          </Link>
+          <Link href="/watchlists" className="px-4 py-2 bg-primary text-on-primary rounded font-body-md text-body-md hover:bg-primary-container transition-colors flex items-center gap-2 focus-ring">
+            <span className="material-symbols-outlined text-[18px]">add_alert</span>
+            Track Sector
+          </Link>
+        </div>
+      </div>
 
-      <div className="mx-auto max-w-[1320px] px-4 py-4 grid grid-cols-12 gap-3">
-        {/* Map */}
-        <Panel
-          className="col-span-12 lg:col-span-4 row-span-2"
-          title="Regional Footprint"
-          right={
-            <div className="flex gap-1 mono text-[10px]">
-              {(["records", "amount"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMapMetric(m)}
-                  className={`px-1.5 py-0.5 rounded cursor-pointer ${mapMetric === m ? "text-brass-bright bg-panel-2" : "text-fg-dim hover:text-fg"}`}
-                >
-                  {m === "records" ? "VOL" : "$"}
-                </button>
+      <div className="grid grid-cols-12 gap-gutter">
+        <div className="col-span-12 lg:col-span-8 flex flex-col gap-gutter">
+          <section className="card-level-1 card-level-2 rounded-lg p-density-comfortable">
+            <div className="flex flex-wrap justify-between items-center gap-3 mb-density-comfortable border-b border-outline-variant pb-density-compact">
+              <h2 className="font-headline-sm text-headline-sm text-primary">Sector Risk Profile</h2>
+              <span className={riskClass(data.risk_band)}>{data.risk_band}</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Metric label="Overall risk" value={String(data.scores?.overall ?? 0)} />
+              <Metric label="Lobbying" value={num(data.evidence?.lobbying?.count)} />
+              <Metric label="Legislation" value={num(data.evidence?.bills?.count)} />
+              <Metric label="Contracts" value={money(data.evidence?.contracts?.total_value)} />
+            </div>
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+              {(data.movement ?? []).map((window) => (
+                <div key={window.window_days} className="rounded border border-outline-variant bg-surface-container-low px-3 py-2">
+                  <div className="font-label-caps text-label-caps text-on-surface-variant uppercase">{window.window_days} days</div>
+                  <div className="font-body-md text-body-md text-primary capitalize">{window.status.replace(/_/g, " ")}</div>
+                  <p className="text-[12px] text-on-surface-variant mt-1">{window.note}</p>
+                </div>
               ))}
             </div>
-          }
-          bodyClass="p-3"
-        >
-          <CanadaMap rows={data.province_breakdown} selected={province} onSelect={selectProvince} metric={mapMetric} />
-          <p className="mono text-[10px] text-fg-dim mt-1 text-center">Click a province to filter · darker brass = higher {mapMetric === "amount" ? "value" : "volume"}</p>
-        </Panel>
+          </section>
 
-        {/* Trends */}
-        <Panel className="col-span-12 sm:col-span-6 lg:col-span-4" title="Federal Contract Spend / yr" right={<span className="mono text-[10px] text-brass">$</span>}>
-          <TrendArea data={trends.contracts} asMoney color="var(--color-brass)" />
-        </Panel>
-        <Panel className="col-span-12 sm:col-span-6 lg:col-span-4" title="Lobbying Cadence / yr" right={<span className="mono text-[10px] text-up">COMMS</span>}>
-          <TrendBars data={trends.lobbying} color="var(--color-up)" />
-        </Panel>
-
-        {/* Top entities + departments */}
-        <Panel className="col-span-12 sm:col-span-6 lg:col-span-4" title="Top Players · Contract $">
-          <BarList items={evidence.contracts.by_entity.slice(0, 6).map((e) => ({ label: e.entity, value: e.value }))} asMoney />
-        </Panel>
-        <Panel className="col-span-12 sm:col-span-6 lg:col-span-4" title="Contracting Departments">
-          <BarList items={evidence.contracts.by_department.slice(0, 6).map((d) => ({ label: d.dept || "—", value: d.value }))} asMoney color="var(--color-warn)" />
-        </Panel>
-
-        {/* Connections */}
-        <Panel className="col-span-12 lg:col-span-8" title="Key Connections — cross-source signals">
-          {connections.length ? (
-            <div className="grid sm:grid-cols-2 gap-2.5">
-              {connections.map((c, i) => <ConnectionCard key={i} c={c} />)}
+          <section className="card-level-1 card-level-2 rounded-lg overflow-hidden">
+            <div className="bg-surface-bright px-density-comfortable py-density-compact border-b border-outline-variant flex justify-between items-center">
+              <h2 className="font-headline-sm text-headline-sm text-primary">Top Material Findings</h2>
+              <Link href="/signals" className="font-label-caps text-label-caps text-primary hover:underline focus-ring rounded">View live feed</Link>
             </div>
-          ) : (
-            <p className="text-sm text-fg-dim">No notable cross-source patterns at current data depth.</p>
-          )}
-        </Panel>
+            <div className="flex flex-col">
+              {findings.slice(0, 5).map((finding, index) => <FindingRow key={finding.title} finding={finding} sectorSlug={sector.slug} last={index === Math.min(findings.length, 5) - 1} />)}
+              {!findings.length && <div className="p-density-comfortable text-on-surface-variant">No findings are available for this sector yet.</div>}
+            </div>
+          </section>
 
-        {/* Scorecard */}
-        <Panel className="col-span-12 lg:col-span-4" title="Risk Scorecard">
-          <Scorecard scores={scores} />
-        </Panel>
+          <section className="card-level-1 card-level-2 rounded-lg overflow-hidden">
+            <div className="bg-surface-bright px-density-comfortable py-density-compact border-b border-outline-variant">
+              <h2 className="font-headline-sm text-headline-sm text-primary">Supporting Evidence</h2>
+            </div>
+            <div className="p-density-comfortable grid grid-cols-1 md:grid-cols-2 gap-density-comfortable">
+              <RelatedItems title="Connected bills, lobbying, regulations & sources" items={connectedRecords} empty="No linked evidence records found." />
+              <div>
+                <h3 className="text-sm font-semibold text-on-surface mb-2">Evidence timeline</h3>
+                <EvidenceRows refs={evidenceRefs} limit={8} hrefFor={(ref) => withSectorContext(evidenceHref(ref), sector.slug)} />
+              </div>
+            </div>
+          </section>
+        </div>
 
-        {/* Lobbying institutions */}
-        <Panel className="col-span-12 lg:col-span-4" title="Institutions Lobbied">
-          <BarList items={evidence.lobbying.top_institutions.slice(0, 7).map((t) => ({ label: t.institution, value: t.count }))} />
-        </Panel>
+        <aside className="col-span-12 lg:col-span-4 flex flex-col gap-gutter">
+          <section className="card-level-1 card-level-2 rounded-lg p-density-comfortable">
+            <h2 className="font-headline-sm text-headline-sm text-primary mb-density-comfortable flex items-center gap-2 border-b border-outline-variant pb-density-compact">
+              <span className="material-symbols-outlined text-[20px]">account_tree</span>
+              Connected Entities
+            </h2>
+            <div className="space-y-density-comfortable">
+              <RelatedItems title="People" items={connectedPeople} empty="No connected people found." />
+              <RelatedItems title="Companies & organizations" items={connectedOrganizations} empty="No connected organizations found." />
+            </div>
+          </section>
 
-        {/* Bills */}
-        <Panel className="col-span-12 sm:col-span-6 lg:col-span-4" title={`Legislation · ${evidence.bills.count}`}>
-          <DataList
-            rows={evidence.bills.records.slice(0, 5).map((b) => ({ tag: b.bill_number, title: b.title_en, sub: b.status, href: recordHref(b.table, b.id) }))}
-            empty="No sector-relevant bills."
-          />
-        </Panel>
+          <section className="card-level-1 card-level-2 rounded-lg overflow-hidden">
+            <div className="bg-surface-bright px-density-comfortable py-density-compact border-b border-outline-variant">
+              <h2 className="font-headline-sm text-headline-sm text-primary">Source Coverage</h2>
+            </div>
+            <div className="p-density-comfortable space-y-2">
+              {(data.source_coverage ?? []).slice(0, 8).map((source) => (
+                <Link key={source.id} href={sourceHref(source.id) ?? "/sources"} className="flex items-center justify-between gap-3 rounded border border-outline-variant bg-surface-container-lowest px-3 py-2 hover:border-primary transition-colors focus-ring">
+                  <span className="font-body-md text-body-md text-primary">{source.label}</span>
+                  <span className={coverageClass(source.status)}>{source.status}</span>
+                </Link>
+              ))}
+              {!data.source_coverage?.length && <Message>No source coverage rows are available.</Message>}
+            </div>
+          </section>
 
-        {/* Regulation */}
-        <Panel className="col-span-12 sm:col-span-6 lg:col-span-4" title={`Regulation · ${evidence.regulations.count}`}>
-          <DataList
-            rows={evidence.regulations.records.slice(0, 5).map((r) => ({ tag: `P${r.gazette_part}`, title: r.title, sub: r.department, href: recordHref(r.table, r.id) }))}
-            empty="No sector-relevant regulatory items."
-          />
-        </Panel>
-
-        {/* Operations */}
-        <Panel className="col-span-12 lg:col-span-8" title={`Operations & Environment · ${evidence.breadth.count}`}>
-          {evidence.breadth.records.length ? (
-            <div className="grid sm:grid-cols-2 gap-x-5 gap-y-2">
-              {evidence.breadth.records.slice(0, 8).map((e, i) => (
-                <Link key={i} href={recordHref(e.table, e.id) || "#"} className="group flex items-start gap-2 border-b border-line/60 pb-2 hover:bg-panel-2 -mx-1 px-1 rounded">
-                  <SourceTag>{e.source}</SourceTag>
-                  <span className="text-[13px] text-fg group-hover:text-brass-bright leading-snug flex-1 transition-colors">
-                    {e.title}
-                  </span>
-                  {e.province && <span className="mono text-[10px] text-fg-dim shrink-0">{e.province}</span>}
+          <section className="card-level-1 card-level-2 rounded-lg overflow-hidden">
+            <div className="bg-surface-bright px-density-comfortable py-density-compact border-b border-outline-variant">
+              <h2 className="font-headline-sm text-headline-sm text-primary">Suggested Questions</h2>
+            </div>
+            <div className="p-density-comfortable space-y-2">
+              {(data.suggested_questions ?? data.intelligence_brief?.suggested_questions ?? []).slice(0, 4).map((question) => (
+                <Link key={question} href={`/search?q=${encodeURIComponent(question)}`} className="block rounded border border-outline-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface hover:border-primary transition-colors focus-ring">
+                  {question}
                 </Link>
               ))}
             </div>
-          ) : (
-            <p className="text-sm text-fg-dim">No operational records.</p>
-          )}
-        </Panel>
-
-        {/* Donations by party */}
-        <Panel className="col-span-12 lg:col-span-4" title="Contributions by Party">
-          <BarList items={evidence.donations.by_party.slice(0, 6).map((p) => ({ label: p.party, value: p.value }))} asMoney color="var(--color-down)" />
-        </Panel>
+          </section>
+        </aside>
       </div>
     </div>
   );
 }
 
-function DataList({ rows, empty }: { rows: { tag: string; title: string; sub?: string; url?: string; href?: string | null }[]; empty: string }) {
-  if (!rows.length) return <p className="text-sm text-fg-dim">{empty}</p>;
+function FindingRow({ finding, sectorSlug, last }: { finding: IntelligenceFinding; sectorSlug: string; last: boolean }) {
+  const href = findingHref(finding.title) ?? "/signals";
+  const firstEvidence = finding.related_records?.[0] ? evidenceHref(finding.related_records[0]) : finding.evidence_references?.[0]?.internal_url;
   return (
-    <div className="space-y-2.5">
-      {rows.map((r, i) => {
-        const body = (
-          <>
-            <div className="mono text-[10px] text-brass-bright">{r.tag}</div>
-            <div className="text-[13px] text-fg leading-snug group-hover:text-brass-bright transition-colors">{r.title}</div>
-            {r.sub && <div className="text-xs text-fg-dim mt-0.5">{r.sub}</div>}
-          </>
-        );
-        const cls = "group block border-b border-line/60 last:border-0 pb-2.5 last:pb-0";
-        if (r.href) return <Link key={i} href={r.href} className={`${cls} hover:bg-panel-2 -mx-1 px-1 rounded`}>{body}</Link>;
-        if (r.url) return <a key={i} href={r.url} target="_blank" rel="noopener noreferrer" className={cls}>{body}</a>;
-        return <div key={i} className={cls}>{body}</div>;
-      })}
+    <div className={`px-density-comfortable py-density-comfortable zebra-row flex gap-gutter items-start ${last ? "" : "border-b border-outline-variant"}`}>
+      <div className="w-2 h-16 rounded-full bg-surface-container-high overflow-hidden flex flex-col-reverse shrink-0">
+        <div className={`w-full ${finding.risk_level === "high" || finding.risk_level === "elevated" ? "h-full bg-error" : "h-2/3 bg-amber-500"}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-start gap-3 mb-1">
+          <Link href={`${href}?from=sector&sector=${encodeURIComponent(sectorSlug)}`} className="font-body-lg text-body-lg font-bold text-primary hover:underline focus-ring rounded">
+            {finding.title}
+          </Link>
+          <span className={riskClass(finding.risk_level)}>{finding.risk_level}</span>
+        </div>
+        <p className="font-body-md text-body-md text-on-surface-variant mb-density-compact">
+          {finding.concise_summary || finding.why_it_matters || "Connected evidence is available for analyst review."}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <span className="text-xs bg-surface-container px-2 py-1 rounded text-secondary border border-outline-variant">{finding.signal_type}</span>
+          <span className="text-xs bg-surface-container px-2 py-1 rounded text-secondary border border-outline-variant">{finding.confidence} confidence</span>
+          {firstEvidence && <Link href={`${firstEvidence}${firstEvidence.includes("?") ? "&" : "?"}from=sector&sector=${encodeURIComponent(sectorSlug)}`} className="text-xs bg-primary/10 px-2 py-1 rounded text-primary border border-primary/20 hover:underline focus-ring">Open evidence</Link>}
+        </div>
+      </div>
     </div>
   );
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function collectSectorEvidence(data: SectorOverview): EvidenceRef[] {
+  return [
+    ...(data.evidence?.bills?.records ?? []),
+    ...(data.evidence?.regulations?.records ?? []),
+    ...(data.evidence?.lobbying?.records ?? []),
+    ...(data.evidence?.contracts?.records ?? []),
+    ...(data.evidence?.tribunal_decisions?.records ?? []),
+    ...(data.evidence?.appointments?.records ?? []),
+    ...(data.evidence?.breadth?.records ?? []),
+  ].filter((ref) => ref.table && (ref.pk ?? ref.id) != null && ref.title);
+}
+
+function evidenceItem(ref: EvidenceRef, sectorSlug: string): RelatedItem {
+  const href = evidenceHref(ref);
+  return {
+    id: `${ref.table}-${ref.pk ?? ref.id}`,
+    title: ref.title,
+    type: typeLabel(ref.table),
+    href: withSectorContext(href, sectorSlug),
+    description: ref.date ?? null,
+    meta: ref.source,
+    relationship: evidenceRelationship(ref.table),
+    strength: "supported",
+  };
+}
+
+function evidenceRelationship(table: string): string {
+  if (table === "bills") return "bill affects sector";
+  if (table === "lobbying" || table === "ocl_registrations") return "organization registered lobbying activity";
+  if (table === "gazette" || table === "regulations" || table === "tribunal") return "regulator opened consultation";
+  if (table === "contracts" || table === "grants") return "company belongs to sector";
+  return "finding supported by record";
+}
+
+function withSectorContext(href: string | null, sectorSlug: string): string | null {
+  if (!href) return href;
+  const glue = href.includes("?") ? "&" : "?";
+  return `${href}${glue}from=sector&sector=${encodeURIComponent(sectorSlug)}`;
+}
+
+function peopleItems(graph: EvidenceGraphResponse | undefined, sectorSlug: string): RelatedItem[] {
+  const actors = new Map<string, Record<string, unknown>>();
+  for (const finding of graph?.findings ?? []) {
+    for (const actor of finding.actors ?? []) {
+      const name = String(actor.name ?? actor.label ?? "");
+      if (name) actors.set(name, actor);
+    }
+  }
+  return [...actors.entries()].slice(0, 6).map(([name, actor]) => {
+    const slug = typeof actor.slug === "string" ? actor.slug : null;
+    return {
+      id: `person-${slug ?? name}`,
+      title: name,
+      type: "Political figure",
+      href: withSectorContext(personHref(slug), sectorSlug),
+      description: [actor.role, actor.party].filter(Boolean).join(" - ") || null,
+      relationship: "person connected to sector finding",
+      strength: slug ? "supported" : "inferred",
+      icon: <AvatarLogo name={name} imageUrl={typeof actor.photo_url === "string" ? actor.photo_url : null} type="person" />,
+    };
+  });
+}
+
+function organizationItems(data: SectorOverview, sectorSlug: string): RelatedItem[] {
+  const items: RelatedItem[] = [];
+  for (const row of (data.top_entities ?? []).slice(0, 6)) {
+    items.push({
+      id: `entity-${row.entity}`,
+      title: row.entity,
+      type: "Company",
+      href: withSectorContext(entityHref(row.entity), sectorSlug),
+      description: `${num(row.contracts)} contract(s), ${num(row.lobbying)} lobbying record(s)`,
+      relationship: "company belongs to sector",
+      strength: "direct",
+      icon: <AvatarLogo name={row.entity} type="company" />,
+    });
+  }
+  for (const regulator of (data.sector?.regulators ?? []).slice(0, 4)) {
+    items.push({
+      id: `regulator-${regulator}`,
+      title: regulator,
+      type: "Regulator",
+      href: withSectorContext(organizationHref("regulator", regulator), sectorSlug),
+      relationship: "regulator opened consultation",
+      strength: "inferred",
+      icon: <AvatarLogo name={regulator} type="regulator" />,
+    });
+  }
+  const committee = (data.evidence?.bills?.records ?? []).length ? { slug: "indu", name: "Standing Committee on Industry and Technology" } : null;
+  if (committee) {
+    items.push({
+      id: `committee-${committee.slug}`,
+      title: committee.name,
+      type: "Committee",
+      href: withSectorContext(committeeHref(committee.slug), sectorSlug),
+      relationship: "committee connected to finding",
+      strength: "inferred",
+    });
+  }
+  return items;
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <button
-      onClick={onClick}
-      className={`mono text-xs px-2.5 py-1 rounded border transition-colors duration-200 cursor-pointer ${
-        active ? "bg-brass text-canvas border-brass font-semibold" : "border-line text-fg-dim hover:text-fg hover:border-brass/50"
-      }`}
-    >
+    <div className="rounded border border-outline-variant bg-surface-container-lowest p-3">
+      <span className="block font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">{label}</span>
+      <span className="font-headline-sm text-[20px] text-primary">{value}</span>
+    </div>
+  );
+}
+
+function SectorSkeleton() {
+  return <div className="space-y-gutter">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-36" />)}</div>;
+}
+
+function Message({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "error" }) {
+  return (
+    <div className={`rounded border px-4 py-3 font-body-md text-body-md ${tone === "error" ? "border-error/30 bg-error/10 text-error" : "border-outline-variant bg-surface-container-low text-on-surface-variant"}`}>
       {children}
-    </button>
-  );
-}
-
-function Loading() {
-  return (
-    <div>
-      <div className="bg-panel border-b border-line"><div className="mx-auto max-w-[1320px] px-4 py-5 space-y-3">
-        <SkeletonBlock className="h-4 w-40" /><SkeletonBlock className="h-8 w-72" /><SkeletonBlock className="h-16 w-full" />
-      </div></div>
-      <div className="mx-auto max-w-[1320px] px-4 py-4 grid grid-cols-12 gap-3">
-        {Array.from({ length: 8 }).map((_, i) => <SkeletonBlock key={i} className="h-40 rounded col-span-12 sm:col-span-6 lg:col-span-4" />)}
-      </div>
     </div>
   );
 }
 
-function ErrorState({ msg }: { msg: string }) {
-  return (
-    <div className="mx-auto max-w-[1320px] px-4 py-20 text-center text-fg-dim">
-      Couldn&rsquo;t load this sector. {msg}
-      <div className="mt-3"><Link href="/sectors" className="text-brass-bright underline">← All sectors</Link></div>
-    </div>
-  );
+function riskClass(level?: string | null) {
+  const l = (level ?? "unknown").toLowerCase();
+  if (l.includes("high") || l.includes("elevated")) return "font-label-caps text-label-caps status-chip-red px-2 py-1 rounded-full uppercase shrink-0";
+  if (l.includes("moderate") || l.includes("medium") || l.includes("watch")) return "font-label-caps text-label-caps status-chip-amber px-2 py-1 rounded-full uppercase shrink-0";
+  return "font-label-caps text-label-caps status-chip-green px-2 py-1 rounded-full uppercase shrink-0";
+}
+
+function coverageClass(status?: string) {
+  const s = (status ?? "unknown").toLowerCase();
+  if (s === "live") return "font-label-caps text-label-caps status-chip-green px-2 py-1 rounded-full uppercase";
+  if (s === "partial") return "font-label-caps text-label-caps status-chip-amber px-2 py-1 rounded-full uppercase";
+  return "font-label-caps text-label-caps bg-surface-container text-on-surface-variant px-2 py-1 rounded-full uppercase";
 }

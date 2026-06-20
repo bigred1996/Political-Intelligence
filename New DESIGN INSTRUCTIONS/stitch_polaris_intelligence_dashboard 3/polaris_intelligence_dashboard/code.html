@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Polaris Main Dashboard: Live Intelligence Briefing</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300..900;1,300..900&amp;family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed": "#e3e2e2",
+                        "secondary-fixed": "#d3e4fe",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "inverse-surface": "#2d3133",
+                        "on-surface-variant": "#44474d",
+                        "surface-container": "#eceef0",
+                        "on-error": "#ffffff",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "outline-variant": "#c5c6ce",
+                        "background": "#f7f9fb",
+                        "surface-bright": "#f7f9fb",
+                        "tertiary": "#151717",
+                        "surface-container-high": "#e6e8ea",
+                        "on-surface": "#191c1e",
+                        "on-primary": "#ffffff",
+                        "secondary": "#505f76",
+                        "surface-variant": "#e0e3e5",
+                        "surface": "#f7f9fb",
+                        "outline": "#75777e",
+                        "secondary-container": "#d0e1fb",
+                        "on-secondary-fixed": "#0b1c30",
+                        "on-tertiary-fixed-variant": "#464747",
+                        "on-background": "#191c1e",
+                        "tertiary-container": "#2a2b2b",
+                        "primary-fixed": "#d7e2ff",
+                        "on-primary-fixed-variant": "#374765",
+                        "surface-dim": "#d8dadc",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "on-primary-container": "#8393b5",
+                        "on-tertiary": "#ffffff",
+                        "primary": "#041632",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-primary-fixed": "#091b37",
+                        "primary-fixed-dim": "#b7c7eb",
+                        "primary-container": "#1b2b48",
+                        "error": "#ba1a1a",
+                        "surface-tint": "#4f5e7e",
+                        "on-secondary": "#ffffff",
+                        "surface-container-low": "#f2f4f6",
+                        "on-tertiary-container": "#929292",
+                        "on-secondary-container": "#54647a",
+                        "tertiary-fixed-dim": "#c6c6c6",
+                        "inverse-primary": "#b7c7eb",
+                        "error-container": "#ffdad6",
+                        "inverse-on-surface": "#eff1f3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "density-comfortable": "16px",
+                        "margin-mobile": "16px",
+                        "unit": "4px",
+                        "margin-desktop": "40px",
+                        "gutter": "24px",
+                        "container-max": "1440px",
+                        "density-compact": "8px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Public Sans"],
+                        "headline-md": ["\"Source Serif 4\""],
+                        "data-tabular": ["Public Sans"],
+                        "display-lg": ["\"Source Serif 4\""],
+                        "memo-body": ["\"Source Serif 4\""],
+                        "headline-sm": ["\"Source Serif 4\""],
+                        "body-md": ["Public Sans"],
+                        "label-caps": ["Public Sans"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "data-tabular": ["13px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "memo-body": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); color: theme('colors.on-background'); }
+        .glass-panel { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border: 1px solid theme('colors.outline-variant'); }
+        .data-card { background: theme('colors.surface-container-lowest'); border: 1px solid theme('colors.outline-variant'); border-radius: theme('borderRadius.DEFAULT'); }
+        .card-header { background: theme('colors.surface-container-low'); padding: theme('spacing.density-compact') theme('spacing.density-comfortable'); border-bottom: 1px solid theme('colors.outline-variant'); border-radius: theme('borderRadius.DEFAULT') theme('borderRadius.DEFAULT') 0 0; }
+        .zebra-row:nth-child(even) { background-color: rgba(4, 22, 50, 0.02); }
+        
+        /* Risk Bar */
+        .risk-indicator { display: flex; flex-direction: column; gap: 2px; height: 100%; width: 4px; border-radius: 2px; overflow: hidden; }
+        .risk-indicator .segment { flex: 1; background-color: theme('colors.surface-variant'); }
+        .risk-indicator.level-1 .segment:nth-child(3) { background-color: #10b981; } /* Muted Green */
+        .risk-indicator.level-2 .segment:nth-child(2), .risk-indicator.level-2 .segment:nth-child(3) { background-color: #f59e0b; } /* Amber */
+        .risk-indicator.level-3 .segment { background-color: theme('colors.error'); } /* Red */
+    </style>
+</head>
+<body class="font-body-md text-body-md bg-background flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col h-full w-64 bg-surface-container-low border-r border-outline-variant p-density-comfortable flex-shrink-0 z-40 relative">
+<div class="mb-8">
+<h1 class="text-label-caps font-label-caps text-primary mb-1">Intelligence Center</h1>
+<div class="flex items-center gap-2 text-data-tabular font-data-tabular text-on-surface-variant">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span>Source Health: Optimal</span>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary py-2 px-4 rounded font-data-tabular text-data-tabular mb-6 hover:bg-primary-container transition-colors shadow-sm flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" style="font-size: 16px;">add</span>
+            New Research
+        </button>
+<ul class="flex-1 flex flex-col gap-1">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 bg-secondary-container text-on-secondary-container font-semibold rounded-lg hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="text-body-md font-body-md">Briefing</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined">visibility</span>
+<span class="text-body-md font-body-md">Watchlists</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined">domain</span>
+<span class="text-body-md font-body-md">Sectors</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined">search</span>
+<span class="text-body-md font-body-md">Search</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="text-body-md font-body-md">Reports</span>
+</a>
+</li>
+</ul>
+<div class="mt-auto border-t border-outline-variant pt-4">
+<ul class="flex flex-col gap-1">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-body-md font-body-md">Settings</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="text-body-md font-body-md">Support</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col h-full overflow-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface flex justify-between items-center w-full px-margin-desktop h-16 sticky top-0 z-30 border-b border-outline-variant flex-shrink-0">
+<div class="flex items-center gap-6 flex-1">
+<span class="text-headline-sm font-headline-sm font-bold text-primary tracking-tight">Polaris</span>
+<div class="hidden md:flex gap-6 mx-4">
+<a class="text-primary border-b-2 border-primary font-bold py-5 text-label-caps font-label-caps" href="#">Live Feed</a>
+<a class="text-on-surface-variant hover:bg-surface-container-low transition-colors py-5 text-label-caps font-label-caps" href="#">Daily Memo</a>
+<a class="text-on-surface-variant hover:bg-surface-container-low transition-colors py-5 text-label-caps font-label-caps" href="#">Sector Watch</a>
+</div>
+<div class="flex-1 max-w-xl relative ml-4">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" style="font-size: 20px;">search</span>
+<input class="w-full bg-surface-container-low border-outline-variant text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant pl-10 pr-4 py-2 rounded focus:ring-1 focus:ring-primary focus:border-primary transition-all" placeholder="Ask Polaris about a company, bill, or sector..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-colors relative">
+<span class="material-symbols-outlined">sensors</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full border border-surface"></span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-colors">
+<span class="material-symbols-outlined">history</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<img alt="Analyst Profile" class="w-8 h-8 rounded-full border border-outline-variant cursor-pointer ml-2" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqZEKiJTqTmsomgRYGesxlHS9cAQDiHScYJRaOx5165KSPF5RkFc-oj1klxn1QZutjElhUbpLQNm6hEKmXAsQDfANDPbctRYYENi8PjOqjTDMmm038WhwXk-LNgpE-XoFPcT6AaTV0hsV4YtyAuctN6s32YBHhtBc-IY6cGM3oaa_dcDhoOd50D7A1R2buJIn5uTvKVGj9cI0iOywA8aiG8aQznORuzVIEt_TkLg0jZS77nDpNBUCrY98unvGYcSNq5-7bZ_ZZQQM"/>
+</div>
+</header>
+<!-- Scrollable Content Canvas -->
+<main class="flex-1 overflow-y-auto p-margin-desktop bg-background">
+<div class="max-w-container-max mx-auto space-y-gutter">
+<!-- At a Glance KPIs -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- KPI 1 -->
+<div class="data-card p-density-comfortable flex items-center justify-between hover:shadow-sm transition-shadow">
+<div>
+<p class="text-label-caps font-label-caps text-on-surface-variant mb-1 uppercase">Active Legislative Changes</p>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-md font-headline-md text-on-surface">14</span>
+<span class="text-data-tabular font-data-tabular text-secondary flex items-center"><span class="material-symbols-outlined" style="font-size: 14px;">arrow_upward</span> 3 this week</span>
+</div>
+</div>
+<div class="w-12 h-12 rounded bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">gavel</span>
+</div>
+</div>
+<!-- KPI 2 -->
+<div class="data-card p-density-comfortable flex items-center justify-between border-error/30 hover:shadow-sm transition-shadow">
+<div>
+<p class="text-label-caps font-label-caps text-on-surface-variant mb-1 uppercase">Material Risks Detected</p>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-md font-headline-md text-error">5</span>
+<span class="text-data-tabular font-data-tabular text-on-surface-variant">Requires Review</span>
+</div>
+</div>
+<div class="w-12 h-12 rounded bg-error-container text-error flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+</div>
+<!-- KPI 3 -->
+<div class="data-card p-density-comfortable flex items-center justify-between hover:shadow-sm transition-shadow">
+<div>
+<p class="text-label-caps font-label-caps text-on-surface-variant mb-1 uppercase">Watchlist Alerts</p>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-md font-headline-md text-on-surface">28</span>
+<span class="text-data-tabular font-data-tabular text-on-surface-variant">Across 4 sectors</span>
+</div>
+</div>
+<div class="w-12 h-12 rounded bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">visibility</span>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Central Column: Material Developments -->
+<section class="lg:col-span-8 space-y-density-comfortable">
+<div class="flex items-center justify-between mb-2 border-b border-outline-variant pb-2">
+<h2 class="text-headline-sm font-headline-sm text-primary flex items-center gap-2">
+<span class="material-symbols-outlined">feed</span>
+                                Material Developments
+                            </h2>
+<button class="text-data-tabular font-data-tabular text-on-surface-variant hover:text-primary flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined" style="font-size: 16px;">filter_list</span> Filter
+                            </button>
+</div>
+<!-- Card 1 -->
+<article class="data-card overflow-hidden">
+<div class="card-header flex justify-between items-center">
+<div class="flex gap-2">
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary">Federal (Ottawa)</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-secondary/10 text-secondary">Agriculture</span>
+</div>
+<span class="text-data-tabular font-data-tabular text-on-surface-variant">10:45 AM EDT</span>
+</div>
+<div class="p-density-comfortable flex gap-4">
+<div class="w-4 pt-1">
+<div class="risk-indicator level-2" title="Medium Risk">
+<div class="segment"></div><div class="segment"></div><div class="segment"></div>
+</div>
+</div>
+<div class="flex-1 space-y-4">
+<div>
+<h3 class="text-body-md font-body-md font-bold text-on-surface mb-1 flex items-center gap-2">
+                                            What Changed?
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface-variant text-[10px] uppercase font-bold tracking-wider">
+<span class="material-symbols-outlined" style="font-size: 12px;">verified</span> 94% Source Cov.
+                                            </span>
+</h3>
+<p class="text-body-lg font-body-lg text-on-surface">Bill C-234 passed third reading in the House of Commons, removing carbon tax exemptions for certain farming operations.</p>
+</div>
+<div class="bg-surface-container-low p-density-comfortable rounded border border-outline-variant/50">
+<h4 class="text-label-caps font-label-caps text-secondary mb-1">Why it Matters</h4>
+<p class="text-body-md font-body-md text-on-surface-variant">Direct commercial implication for Agriculture and Fertilizer sectors. Projected 12% increase in operational overhead for grain-drying facilities in Q3.</p>
+</div>
+<div class="flex items-center gap-4 pt-2 border-t border-outline-variant/30 text-data-tabular font-data-tabular">
+<a class="text-primary hover:underline flex items-center gap-1" href="#"><span class="material-symbols-outlined" style="font-size: 16px;">link</span> Parliamentary Transcript</a>
+<a class="text-on-surface-variant hover:text-primary flex items-center gap-1" href="#"><span class="material-symbols-outlined" style="font-size: 16px;">account_balance</span> Dept. of Finance</a>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 2 -->
+<article class="data-card overflow-hidden">
+<div class="card-header flex justify-between items-center">
+<div class="flex gap-2">
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary">Provincial (Ontario)</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-error/10 text-error">Tech / AI</span>
+</div>
+<span class="text-data-tabular font-data-tabular text-on-surface-variant">Yesterday</span>
+</div>
+<div class="p-density-comfortable flex gap-4">
+<div class="w-4 pt-1">
+<div class="risk-indicator level-3" title="High Risk">
+<div class="segment"></div><div class="segment"></div><div class="segment"></div>
+</div>
+</div>
+<div class="flex-1 space-y-4">
+<div>
+<h3 class="text-body-md font-body-md font-bold text-on-surface mb-1 flex items-center gap-2">
+                                            What Changed?
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface-variant text-[10px] uppercase font-bold tracking-wider">
+<span class="material-symbols-outlined" style="font-size: 12px;">verified</span> 88% Source Cov.
+                                            </span>
+</h3>
+<p class="text-body-lg font-body-lg text-on-surface">Standing Committee on Industry and Technology announced a snap hearing regarding algorithmic transparency in financial services.</p>
+</div>
+<div class="bg-surface-container-low p-density-comfortable rounded border border-outline-variant/50">
+<h4 class="text-label-caps font-label-caps text-secondary mb-1">Why it Matters</h4>
+<p class="text-body-md font-body-md text-on-surface-variant">Immediate compliance risk for fintech operators. Potential mandatory disclosure of proprietary risk-assessment models.</p>
+</div>
+<div class="flex items-center gap-4 pt-2 border-t border-outline-variant/30 text-data-tabular font-data-tabular">
+<a class="text-primary hover:underline flex items-center gap-1" href="#"><span class="material-symbols-outlined" style="font-size: 16px;">link</span> Committee Notice</a>
+<a class="text-on-surface-variant hover:text-primary flex items-center gap-1" href="#"><span class="material-symbols-outlined" style="font-size: 16px;">assured_workload</span> Competition Bureau</a>
+</div>
+</div>
+</div>
+</article>
+</section>
+<!-- Right Sidebar: Visual Intelligence -->
+<aside class="lg:col-span-4 space-y-gutter">
+<!-- Heatmap -->
+<div class="data-card p-density-comfortable">
+<h3 class="text-label-caps font-label-caps text-on-surface-variant mb-4 uppercase border-b border-outline-variant pb-2">Sector Activity Heatmap</h3>
+<div class="space-y-3">
+<div>
+<div class="flex justify-between text-data-tabular font-data-tabular mb-1">
+<span>Energy</span>
+<span class="text-error font-bold">High</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-error h-full w-[85%]"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-data-tabular font-data-tabular mb-1">
+<span>Banking</span>
+<span class="text-amber-500 font-bold">Medium</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-amber-500 h-full w-[60%]"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-data-tabular font-data-tabular mb-1">
+<span>Tech</span>
+<span class="text-primary font-bold">Rising</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[45%]"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Upcoming Events -->
+<div class="data-card p-density-comfortable">
+<h3 class="text-label-caps font-label-caps text-on-surface-variant mb-4 uppercase border-b border-outline-variant pb-2">Upcoming Deadlines</h3>
+<ul class="space-y-3">
+<li class="flex gap-3">
+<div class="flex flex-col items-center justify-center w-10 h-10 bg-surface-container-low rounded border border-outline-variant flex-shrink-0">
+<span class="text-[10px] font-bold uppercase text-on-surface-variant">Oct</span>
+<span class="text-body-md font-body-md font-bold text-on-surface leading-none">12</span>
+</div>
+<div>
+<p class="text-data-tabular font-data-tabular font-bold text-on-surface">Consultation Deadline</p>
+<p class="text-[11px] text-on-surface-variant">Dept. of Finance: Digital Taxation</p>
+</div>
+</li>
+<li class="flex gap-3">
+<div class="flex flex-col items-center justify-center w-10 h-10 bg-surface-container-low rounded border border-outline-variant flex-shrink-0">
+<span class="text-[10px] font-bold uppercase text-on-surface-variant">Oct</span>
+<span class="text-body-md font-body-md font-bold text-on-surface leading-none">15</span>
+</div>
+<div>
+<p class="text-data-tabular font-data-tabular font-bold text-on-surface">Committee Hearing</p>
+<p class="text-[11px] text-on-surface-variant">Industry &amp; Tech: AI Regulations</p>
+</div>
+</li>
+</ul>
+<button class="w-full mt-4 py-1.5 border border-outline-variant rounded text-data-tabular font-data-tabular text-on-surface-variant hover:bg-surface-container-low transition-colors">View Full Calendar</button>
+</div>
+<!-- Source Health Widget -->
+<div class="data-card p-density-comfortable bg-surface-container-low border-none">
+<h3 class="text-label-caps font-label-caps text-on-surface-variant mb-3 uppercase flex items-center gap-2">
+<span class="material-symbols-outlined" style="font-size: 16px;">data_usage</span> Stream Status
+                            </h3>
+<div class="space-y-2 text-data-tabular font-data-tabular">
+<div class="flex justify-between items-center">
+<span class="text-on-surface">Federal Registry</span>
+<span class="flex items-center gap-1 text-emerald-600"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Optimal</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-on-surface">Provincial (ON)</span>
+<span class="flex items-center gap-1 text-emerald-600"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Optimal</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-on-surface">Provincial (AB)</span>
+<span class="flex items-center gap-1 text-emerald-600"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Optimal</span>
+</div>
+<div class="flex justify-between items-center pt-2 border-t border-outline-variant/30 mt-2">
+<span class="text-on-surface-variant">Last sync</span>
+<span class="text-on-surface-variant">Just now</span>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</div>
+</main>
+</div>
+</body></html>

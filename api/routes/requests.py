@@ -4,27 +4,28 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
 from ..models.request import ReportRequestRow, ReportType, TimeHorizon
+from ..schemas import ReportRequestCreateResponse, ReportRequestListResponse
 
 router = APIRouter(prefix="/api/requests", tags=["requests"])
 
 
 class CreateRequest(BaseModel):
-    company_name: str
-    sector: str | None = None
-    deal_context: str | None = None
-    specific_asset: str | None = None
+    company_name: str = Field(min_length=1, max_length=255)
+    sector: str | None = Field(default=None, max_length=120)
+    deal_context: str | None = Field(default=None, max_length=5000)
+    specific_asset: str | None = Field(default=None, max_length=255)
     report_type: ReportType = ReportType.deal_due_diligence
     time_horizon: TimeHorizon = TimeHorizon.current
-    customer_name: str | None = None
+    customer_name: str | None = Field(default=None, max_length=255)
 
 
-@router.post("")
+@router.post("", response_model=ReportRequestCreateResponse)
 async def create_request(body: CreateRequest, session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     row = ReportRequestRow(
         company_name=body.company_name.strip(),
@@ -40,7 +41,7 @@ async def create_request(body: CreateRequest, session: AsyncSession = Depends(ge
     return {"id": row.id, "status": row.status, "company_name": row.company_name}
 
 
-@router.get("")
+@router.get("", response_model=ReportRequestListResponse)
 async def list_requests(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     result = await session.execute(select(ReportRequestRow).order_by(ReportRequestRow.created_at.desc()))
     items = result.scalars().all()

@@ -31,7 +31,7 @@ from pipeline.ingest import _to_float  # reuse the money parser
 log = structlog.get_logger()
 
 CKAN_API = "https://open.canada.ca/data/api/3/action"
-_UA = "Mozilla/5.0 (compatible; Polaris/1.0; +https://polaris.intelligence)"
+_UA = "Mozilla/5.0 (compatible; Nessus/1.0; +https://polaris.intelligence)"
 _HEADERS = {"User-Agent": _UA, "Accept": "*/*"}
 
 

@@ -1,4 +1,5 @@
-import { riskColorVar, type Connection, type Scores } from "@/lib/api";
+import Link from "next/link";
+import { recordHref, riskColorVar, type Connection, type Scores } from "@/lib/api";
 import { SeverityBadge, SourceTag } from "./ui";
 
 // ── Semicircular risk gauge (dark) ────────────────────────────────────
@@ -80,6 +81,18 @@ export function ConnectionCard({ c }: { c: Connection }) {
       <div className="flex flex-wrap gap-1.5 mt-2">
         {c.sources.map((s) => <SourceTag key={s}>{s.replace(/_/g, " ")}</SourceTag>)}
       </div>
+      {c.references?.length ? (
+        <div className="mt-2 space-y-1 border-t border-line/60 pt-2">
+          {c.references.slice(0, 2).map((r) => {
+            const href = recordHref(r.table, r.id ?? r.pk);
+            return href ? (
+              <Link key={`${r.table}:${r.id}`} href={href} className="block mono text-[10px] text-fg-dim hover:text-brass-bright truncate">
+                evidence: {r.source} · {r.title}
+              </Link>
+            ) : null;
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

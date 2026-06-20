@@ -18,6 +18,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.config import settings
+from pipeline.evidence_graph import normalize_reference
 from pipeline.entity_resolver import normalize
 from search.index import semantic_search
 from search.planner import make_plan
@@ -55,6 +56,23 @@ def _merge(structured: list[dict], semantic: list[dict], limit: int) -> list[dic
     return merged[:limit]
 
 
+def _normalize_hit(hit: dict[str, Any]) -> dict[str, Any]:
+    """Attach the canonical evidence reference shape to a search result."""
+    out = dict(hit)
+    if "id" not in out and out.get("pk") is not None:
+        out["id"] = out["pk"]
+    out["reference"] = normalize_reference({
+        "table": out.get("table"),
+        "pk": out.get("pk"),
+        "source": out.get("source"),
+        "title": out.get("title"),
+        "date": out.get("date"),
+        "url": out.get("url"),
+        "record_type": out.get("record_type"),
+    })
+    return out
+
+
 _ANSWER_SYSTEM = (
     "You are a Canadian political due-diligence analyst. Using ONLY the provided search "
     "results, answer the user's question concisely. Cite specific records inline as "
@@ -89,6 +107,7 @@ async def search(
     session: AsyncSession, q: str, *, limit: int = 40, answer: bool = True,
 ) -> dict[str, Any]:
     """Run the full hybrid pipeline for a natural-language query."""
+    bounded_limit = min(max(limit, 1), 100)
     plan = await make_plan(q)
     canonical = normalize(plan.entity_text) if plan.entity_text else None
 
@@ -103,9 +122,9 @@ async def search(
         sources=plan.sources,
         per_table_limit=25,
     )
-    semantic = semantic_search(plan.semantic_query, k=40, sources=plan.sources)
+    semantic = semantic_search(plan.semantic_query, k=max(40, bounded_limit), sources=plan.sources)
 
-    hits = _merge(structured, semantic, limit)
+    hits = [_normalize_hit(h) for h in _merge(structured, semantic, bounded_limit)]
     answer_text = await _synthesize(q, hits) if answer else None
 
     by_source: dict[str, int] = {}

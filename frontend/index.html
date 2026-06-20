@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Polaris Intelligence — Analyst Workspace</title>
+<title>Nessus Intelligence — Analyst Workspace</title>
 <style>
   :root {
     --bg: #0b1020; --panel: #131a2e; --panel-2: #1b2440; --line: #25304f;
@@ -63,7 +63,7 @@
 <header>
   <div class="logo"></div>
   <div>
-    <h1>Polaris Intelligence</h1>
+    <h1>Nessus Intelligence</h1>
     <div class="tag">Canadian political due diligence — analyst workspace</div>
   </div>
   <div class="health"><span id="dot" class="dot"></span><span id="health">checking…</span></div>
@@ -482,18 +482,18 @@ async function ingestDonations(){
 async function loadSources(){
   try{ const r=await fetch('/api/sources/status'); const j=await r.json();
     const fmt = n => (n||0).toLocaleString();
+    const statusColor = s => s==='live'?'var(--accent-2)':s==='partial'?'var(--warn)':s==='planned'?'var(--muted)':'var(--bad)';
+    const sources = j.sources || [];
     document.getElementById('sourcesStatus').innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px">
-        ${[
-          ['Contracts',j.contracts],['Donations',j.donations],['Bills',j.bills],
-          ['Lobbying comms',j.lobbying_communications],['OCL registrations',j.ocl_registrations],
-          ['Grants',j.grants],['Appointments',j.appointments],
-          ['Gazette entries',j.gazette_entries],['Tribunal decisions',j.tribunal_decisions],
-          ['MPs',j.politicians],['Hansard mentions',j.hansard_mentions],
-        ].map(([name,val])=>`
+        ${sources.map(s=>`
           <div style="background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px">
-            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">${name}</div>
-            <div style="font-size:20px;font-weight:700;color:${val>0?'var(--accent-2)':'var(--muted)'};margin-top:2px">${fmt(val)}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">${escq(s.label)}</div>
+              <span class="badge" style="background:rgba(255,255,255,.04);color:${statusColor(s.status)}">${escq(s.status)}</span>
+            </div>
+            <div style="font-size:20px;font-weight:700;color:${s.rows>0?'var(--accent-2)':'var(--muted)'};margin-top:2px">${fmt(s.rows)}</div>
+            <div style="color:var(--muted);font-size:11px">${s.approximate?'approx. rows':'rows'} · ${escq(s.description||'')}</div>
           </div>`).join('')}
       </div>`;
   }catch(e){}

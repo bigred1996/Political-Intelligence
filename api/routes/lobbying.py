@@ -9,13 +9,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..cache import invalidate_workspace_caches
 from ..database import get_session, AsyncSessionLocal
 from ..models.entity import LobbyingRecord
+from ..routes.sources import get_sources_status
+from ..schemas import IngestStartedResponse, RecordListResponse, SourceSearchResponse, StatsResponse
 from pipeline.entity_resolver import normalize
 from pipeline.ingest import fetch_ocl_communication_rows
 from scrapers.ocl import OCLScraper
@@ -65,6 +68,7 @@ async def _run_ocl_bulk_ingest(max_rows: int) -> None:
             await session.commit()
             log.info("ocl_bulk_ingest_progress", inserted=inserted, total=len(rows))
 
+    invalidate_workspace_caches("manual_ocl_bulk_ingest")
     log.info("ocl_bulk_ingest_done", inserted=inserted, total=len(rows))
 
 
@@ -72,7 +76,7 @@ class IngestRequest(BaseModel):
     max_rows: int = 0
 
 
-@router.post("/ingest")
+@router.post("/ingest", response_model=IngestStartedResponse)
 async def ingest_ocl(
     body: IngestRequest,
     background_tasks: BackgroundTasks,
@@ -93,7 +97,7 @@ class ScanRequest(BaseModel):
     company_name: str
 
 
-@router.post("/scan")
+@router.post("/scan", response_model=SourceSearchResponse)
 async def scan_company(body: ScanRequest, session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Pull OCL lobbying records for a company, store them, return the set."""
     company = body.company_name.strip()
@@ -122,6 +126,7 @@ async def scan_company(body: ScanRequest, session: AsyncSession = Depends(get_se
     ]
     session.add_all(rows)
     await session.commit()
+    invalidate_workspace_caches("manual_lobbying_scan")
 
     return {
         "company_name": company,
@@ -131,10 +136,24 @@ async def scan_company(body: ScanRequest, session: AsyncSession = Depends(get_se
     }
 
 
-@router.get("/stats")
-async def lobbying_stats(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+@router.get("/stats", response_model=StatsResponse)
+async def lobbying_stats(
+    include_breakdown: bool = Query(default=False, description="Run slower exact count/distinct-client aggregates."),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
     """Summary counts for the lobbying records table."""
-    total = (await session.execute(select(func.count(LobbyingRecord.id)))).scalar_one()
+    source_status = await get_sources_status(session)
+    total = int(source_status.get("counts", {}).get("lobbying_communications") or 0)
+    if not include_breakdown:
+        return {
+            "total_records": total,
+            "unique_clients": 0,
+            "source": "OCL Monthly Communications",
+            "approximate": False,
+            "summary_only": True,
+            "row_count_method": "exact_cached",
+        }
+
     unique_clients = (
         await session.execute(select(func.count(func.distinct(LobbyingRecord.canonical_name))))
     ).scalar_one()
@@ -142,13 +161,15 @@ async def lobbying_stats(session: AsyncSession = Depends(get_session)) -> dict[s
         "total_records": total,
         "unique_clients": unique_clients,
         "source": "OCL Monthly Communications",
+        "approximate": False,
+        "summary_only": False,
     }
 
 
-@router.get("/records")
+@router.get("/records", response_model=RecordListResponse)
 async def list_records(
     canonical: str | None = None,
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Stored lobbying records, optionally filtered by canonical company name."""

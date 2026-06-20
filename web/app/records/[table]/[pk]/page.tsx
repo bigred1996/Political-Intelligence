@@ -1,269 +1,329 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { use } from "react";
+import { useSearchParams } from "next/navigation";
+import { Card, Crumb, DetailHeader, Field } from "@/components/nessus";
+import { AvatarLogo, DocumentThumbnail, RelatedItems, type RelatedItem } from "@/components/intelligence";
+import { OriginalSourceLink } from "@/components/ui";
 import { useApi } from "@/lib/use-api";
-import { money, partyColor, recordHref, type PlayerRef, type RecordDetail, type RecordRef } from "@/lib/api";
-import { Eyebrow, EmptyState, Panel, SeverityBadge, SkeletonBlock, SourceTag } from "@/components/ui";
+import type { EvidenceGraphResponse, GraphFinding, RecordDetail, RecordRef } from "@/lib/api";
+import { moneyFull } from "@/lib/api";
+import { entityHref, findingHref, organizationHref, personHref, recordHref, sectorHref, sourceLabel, typeLabel } from "@/lib/navigation";
 
-export default function RecordPage() {
-  const params = useParams<{ table: string; pk: string }>();
-  const table = params?.table;
-  const pk = params?.pk;
-  const { data, loading, error } = useApi<RecordDetail>(
-    table && pk ? `/api/records/${table}/${pk}` : null
-  );
+export default function RecordDetailPage({ params }: { params: Promise<{ table: string; pk: string }> }) {
+  const { table, pk } = use(params);
+  const searchParams = useSearchParams();
+  const context = investigationContext(searchParams);
+  const detailPath = `/api/records/${encodeURIComponent(table)}/${encodeURIComponent(pk)}`;
+  const graphPath = `/api/graph/record/${encodeURIComponent(table)}/${encodeURIComponent(pk)}`;
+  const { data: detail, loading, error } = useApi<RecordDetail>(detailPath);
+  const { data: graph } = useApi<EvidenceGraphResponse>(graphPath);
 
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-[1320px] px-4 py-6 space-y-3">
-        <SkeletonBlock className="h-24 rounded" />
-        <div className="grid lg:grid-cols-3 gap-3">
-          <SkeletonBlock className="h-72 rounded" />
-          <SkeletonBlock className="h-72 rounded lg:col-span-2" />
-        </div>
-      </div>
-    );
-  }
-  if (error || !data) {
-    return (
-      <div className="mx-auto max-w-[1320px] px-4 py-10">
-        <p className="text-fg-dim">Record not found. {error}</p>
-        <Link href="/search" className="text-brass-bright text-sm mt-2 inline-block">← Back to search</Link>
-      </div>
-    );
-  }
+  if (loading) return <RecordSkeleton />;
+  if (error) return <Message tone="error">{error}</Message>;
+  if (!detail) return <Message>Record not found.</Message>;
 
-  const { record, entity, industry, impact, players, relations } = data;
+  const record = detail.record;
+  const type = detail.record.type_label || recordTypeLabel(detail.record.record_type, detail.record.source, detail.table);
+  const title = record.title || `${type} #${detail.pk}`;
+  const connectedItems = buildConnectedItems(detail, graph, context);
+  const evidenceItems = buildEvidenceItems(detail, context);
+  const findingItems = buildFindingItems(graph?.findings ?? [], context);
+  const sourceGroupItems = buildSourceGroupItems(detail, context);
+  const entityUrl = record.entity ? entityHref(record.entity) : null;
 
   return (
-    <div>
-      {/* Header band — industry first */}
-      <section className="bg-panel border-b border-line map-grid">
-        <div className="mx-auto max-w-[1320px] px-4 py-8">
-          <div className="flex items-center gap-2 flex-wrap">
-            {industry ? (
-              <Link href={`/sectors/${industry.slug}`} className="mono text-[11px] uppercase tracking-wide font-semibold text-brass-bright border border-brass/40 rounded px-2 py-0.5 hover:bg-brass/10">
-                {industry.name}
-              </Link>
-            ) : (
-              <span className="mono text-[10px] uppercase tracking-wide text-fg-dim border border-line rounded px-2 py-0.5">Unclassified industry</span>
-            )}
-            <SourceTag>{record.source}</SourceTag>
-            <span className="mono text-[10px] uppercase tracking-wide text-fg-dim">{record.record_type}</span>
-            {record.date && <span className="mono text-[10px] text-fg-dim">{record.date}</span>}
-          </div>
-          <h1 className="text-xl md:text-2xl font-semibold text-fg-bright mt-2 max-w-3xl leading-snug">
-            {record.title}
-          </h1>
-          <div className="flex items-center gap-4 mt-3 flex-wrap text-sm">
-            {record.amount != null && (
-              <span className="mono text-brass-bright font-semibold">{money(record.amount)}</span>
-            )}
-            {entity.canonical && (
-              <Link href={`/entities/${encodeURIComponent(entity.canonical)}`} className="text-fg hover:text-brass-bright">
-                {entity.name || entity.canonical} <span className="text-fg-dim">· full entity profile →</span>
-              </Link>
-            )}
-            {record.url && (
-              <a href={record.url} target="_blank" rel="noopener noreferrer" className="mono text-xs text-fg-dim hover:text-fg">
-                source ↗
-              </a>
-            )}
-          </div>
-        </div>
-      </section>
+    <div className="animate-rise">
+      <Crumb items={[{ label: "Records", href: "/records" }, { label: type }]} />
+      {context ? <InvestigationContext context={context} /> : null}
+      <DetailHeader
+        eyebrow={`${type} - ${record.source || sourceLabel(detail.table)}`}
+        title={title}
+        subtitle={detail.impact?.meaning || "This record is available inside Nessus with connected entities, source context, and related evidence."}
+        action={record.url ? (
+          <OriginalSourceLink href={record.url} className="px-4 py-2 bg-surface border border-outline-variant font-body-md text-body-md hover:bg-surface-container-low transition-colors no-underline" />
+        ) : null}
+      />
 
-      <div className="mx-auto max-w-[1320px] px-4 py-6 grid lg:grid-cols-3 gap-3">
-        {/* Left: the data point itself */}
-        <div className="space-y-3">
-          <Panel title="Record fields">
-            <dl className="divide-y divide-line">
-              {record.fields.map((f) => (
-                <div key={f.key} className="py-2 grid grid-cols-3 gap-2">
-                  <dt className="eyebrow !text-fg-dim col-span-1">{f.label}</dt>
-                  <dd className="text-sm text-fg col-span-2 break-words">{f.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </Panel>
-          {record.raw && Object.keys(record.raw).length > 0 && (
-            <Panel title="Raw source data">
-              <dl className="divide-y divide-line">
-                {Object.entries(record.raw).slice(0, 40).map(([k, v]) => (
-                  <div key={k} className="py-1.5 grid grid-cols-3 gap-2">
-                    <dt className="mono text-[11px] text-fg-dim col-span-1 break-words">{k}</dt>
-                    <dd className="text-xs text-fg col-span-2 break-words">{String(v)}</dd>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+        <div className="lg:col-span-8 space-y-gutter">
+          <Card icon="fact_check" title="Normalized Data">
+            <div className="p-density-comfortable">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-density-comfortable">
+                <Field label="Type" value={type} />
+                <Field label="Date" value={record.date ?? "Not provided"} />
+                <Field label="Entity" value={record.entity ? (entityUrl ? <Link href={withContext(entityUrl, context) ?? entityUrl} className="text-primary hover:underline focus-ring rounded">{record.entity}</Link> : record.entity) : "Not provided"} />
+                <Field label="Amount" value={record.amount ? moneyFull(record.amount) : "Not applicable"} />
+                <Field label="Source" value={record.source || sourceLabel(detail.table)} />
+                <Field label="Record ID" value={`${detail.table} / ${detail.pk}`} />
+              </div>
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                {record.fields.slice(0, 10).map((field) => (
+                  <div key={field.key} className="rounded border border-outline-variant bg-surface-container-low px-3 py-2">
+                    <div className="font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">{field.label}</div>
+                    <div className="font-body-md text-body-md text-on-surface break-words">{field.value}</div>
                   </div>
                 ))}
-              </dl>
-            </Panel>
-          )}
-        </div>
-
-        {/* Right: industry lens + the inferred connection graph */}
-        <div className="lg:col-span-2 space-y-3">
-          {/* What this means for the industry */}
-          <Panel
-            title={industry ? `Impact on ${industry.name}` : "Industry impact"}
-            className="border-l-2 border-l-brass"
-            right={<SeverityBadge severity={impact.severity} />}
-          >
-            <p className="text-[15px] text-fg/90 leading-relaxed">{impact.meaning}</p>
-            {impact.regulators.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <span className="eyebrow !text-fg-dim mr-1">Governed by</span>
-                {impact.regulators.map((r) => (
-                  <span key={r} className="text-xs text-fg border border-line rounded px-2 py-0.5 bg-panel-2">{r}</span>
-                ))}
               </div>
-            )}
-          </Panel>
-
-          {/* Relevant political players */}
-          {players.length > 0 && (
-            <Panel title="Relevant political players" right={<Eyebrow>who shapes this</Eyebrow>}>
-              <div className="grid sm:grid-cols-2 gap-2">
-                {players.map((p, i) => <PlayerCard key={`${p.name}:${i}`} p={p} />)}
-              </div>
-            </Panel>
-          )}
-
-          <Panel
-            title="Cross-source connections"
-            right={<span className="mono text-xs text-brass">{relations.total.toLocaleString()} linked records</span>}
-          >
-            {entity.canonical ? (
-              <p className="text-sm text-fg-dim">
-                Every record below shares the canonical entity{" "}
-                <span className="text-fg">{entity.name || entity.canonical}</span>
-                {relations.sector && (
-                  <>
-                    {" "}· sector{" "}
-                    <Link href={`/sectors/${relations.sector.slug}`} className="text-brass-bright">
-                      {relations.sector.name}
-                    </Link>
-                  </>
-                )}
-                . This is the entity graph that connects activity across the entire federal record.
-              </p>
-            ) : (
-              <p className="text-sm text-fg-dim">
-                This record has no resolved entity, so cross-source links are limited. Records with a
-                company or person resolve into the full connection graph.
-              </p>
-            )}
-          </Panel>
-
-          {/* Related records grouped by source */}
-          {relations.by_source.length > 0 && (
-            <div className="grid md:grid-cols-2 gap-3">
-              {relations.by_source.map((g) => (
-                <Panel
-                  key={`${g.table}:${g.source}`}
-                  title={g.label}
-                  right={<span className="mono text-xs text-fg-dim">{g.count.toLocaleString()}</span>}
-                >
-                  <ul className="space-y-1.5">
-                    {g.records.map((r) => <RelRow key={`${r.table}:${r.pk}`} r={r} />)}
-                  </ul>
-                  {g.partial && (
-                    <div className="mono text-[10px] text-fg-dim mt-2">
-                      showing top {g.records.length} of {g.count.toLocaleString()}
-                    </div>
-                  )}
-                </Panel>
-              ))}
             </div>
-          )}
+          </Card>
 
-          {/* Sector peers */}
-          {relations.sector_peers.length > 0 && (
-            <Panel title={`Peers in ${relations.sector?.name ?? "sector"}`}>
-              <div className="flex flex-wrap gap-2">
-                {relations.sector_peers.map((p) => (
-                  <Link
-                    key={p.canonical}
-                    href={`/entities/${encodeURIComponent(p.canonical)}`}
-                    className="text-xs text-fg border border-line rounded px-2 py-1 bg-panel-2 hover:border-brass/60 hover:text-brass-bright transition-colors"
-                  >
-                    {p.name}
-                  </Link>
-                ))}
+          <Card icon="psychology" title="Why It Matters">
+            <div className="p-density-comfortable font-memo-body text-memo-body text-on-surface leading-relaxed">
+              {detail.impact?.meaning || "Nessus has not yet inferred a material interpretation for this record. Use the connected evidence below to continue the investigation."}
+              <div className="mt-5 flex flex-wrap gap-2">
+                {detail.impact?.severity && <StatusChip level={detail.impact.severity}>{detail.impact.severity}</StatusChip>}
+                {detail.industry && <Link href={withContext(sectorHref(detail.industry.slug), context) ?? "/sectors"} className="font-label-caps text-label-caps bg-primary/10 text-primary px-2 py-1 rounded-full uppercase hover:underline focus-ring">{detail.industry.name}</Link>}
+                {detail.industry?.matched_by && <span className="font-label-caps text-label-caps bg-surface-container-highest text-on-surface-variant px-2 py-1 rounded-full uppercase">matched by {detail.industry.matched_by}</span>}
               </div>
-            </Panel>
-          )}
+            </div>
+          </Card>
 
-          {/* Temporal co-occurrence */}
-          {relations.timeline.length > 0 && (
-            <Panel title="Activity timeline" right={<Eyebrow>temporal co-occurrence</Eyebrow>}>
-              <ul className="space-y-1">
-                {relations.timeline.map((r, i) => (
-                  <RelRow key={`tl:${r.table}:${r.pk}:${i}`} r={r} showSource timeline />
-                ))}
-              </ul>
-            </Panel>
-          )}
+          <Card icon="account_tree" title="Connected Intelligence">
+            <div className="p-density-comfortable grid grid-cols-1 md:grid-cols-2 gap-density-comfortable">
+              <RelatedItems title="Related Findings" items={findingItems} empty="No related findings found." />
+              <RelatedItems title="Connected Entities" items={connectedItems} empty="No connected entities found." />
+              <RelatedItems title="Connected Bills, Lobbying, Regulations & Sources" items={sourceGroupItems} empty="No connected source groups found." />
+            </div>
+          </Card>
 
-          {!relations.by_source.length && !relations.timeline.length && (
-            <Panel title="Connections"><EmptyState>No linked records found for this data point.</EmptyState></Panel>
-          )}
+          <Card icon="history" title="Evidence Timeline">
+            <div className="p-density-comfortable">
+              <RelatedItems items={evidenceItems} empty="No timeline evidence is available for this record." />
+            </div>
+          </Card>
         </div>
+
+        <aside className="lg:col-span-4 space-y-gutter">
+          <Card icon="description" title="Source Document">
+            <div className="p-density-comfortable">
+              <DocumentThumbnail
+                title={title}
+                type={type}
+                source={record.source || sourceLabel(detail.table)}
+                date={record.date}
+                url={record.url}
+              />
+            </div>
+          </Card>
+
+          <Card icon="groups" title="Political Players">
+            <div className="p-density-comfortable space-y-3">
+              {detail.players.length ? detail.players.map((player) => (
+                <Link key={`${player.type}-${player.name}`} href={withContext(player.type === "politician" ? personHref(player.slug) ?? "/politicians" : organizationHref("regulator", player.name) ?? "/organizations/regulator", context) ?? "/politicians"} className="flex items-start gap-3 rounded border border-outline-variant bg-surface-container-lowest p-3 hover:border-primary transition-colors focus-ring">
+                  <AvatarLogo name={player.name} imageUrl={player.photo_url} imageAttribution={player.photo_attribution} imageSource={player.photo_source} type={player.type === "politician" ? "person" : "regulator"} />
+                  <div className="min-w-0">
+                    <div className="font-body-md text-body-md font-bold text-primary">{player.name}</div>
+                    <div className="font-data-tabular text-data-tabular text-on-surface-variant">{[player.role, player.party].filter(Boolean).join(" - ") || player.type}</div>
+                    <p className="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">{player.why}</p>
+                  </div>
+                </Link>
+              )) : <Message>No political players are connected yet.</Message>}
+            </div>
+          </Card>
+
+          <Card icon="dataset_linked" title="Supporting Evidence">
+            <div className="p-density-comfortable space-y-4">
+              {(detail.relations.by_source ?? []).slice(0, 6).map((group) => (
+                <div key={`${group.table}-${group.source}`} className="rounded border border-outline-variant bg-surface-container-lowest p-3">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="font-label-caps text-label-caps text-on-surface-variant uppercase">{group.label}</div>
+                    <span className="font-data-tabular text-data-tabular text-primary">{group.count}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {group.records.slice(0, 3).map((ref) => {
+                      const href = withContext(recordHref(ref.table, ref.pk), context);
+                      return href ? (
+                        <Link key={`${ref.table}-${ref.pk}`} href={href} className="block text-body-md font-body-md text-on-surface hover:text-primary focus-ring rounded">
+                          {ref.title}
+                        </Link>
+                      ) : (
+                        <span key={`${ref.table}-${ref.pk}`} className="block text-body-md font-body-md text-on-surface">{ref.title}</span>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {!detail.relations.by_source?.length && <Message>No source groups available.</Message>}
+            </div>
+          </Card>
+        </aside>
       </div>
     </div>
   );
 }
 
-function PlayerCard({ p }: { p: PlayerRef }) {
-  const inner = (
-    <div className="flex items-center gap-2.5 p-2 rounded border border-line bg-panel-2 group-hover:border-brass/40 transition-colors">
-      {p.type === "politician" && p.photo_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={p.photo_url} alt={p.name} className="w-9 h-9 rounded object-cover bg-panel" loading="lazy" />
-      ) : (
-        <div className="w-9 h-9 rounded bg-panel flex items-center justify-center shrink-0"
-             style={{ color: p.type === "regulator" ? "var(--color-fg-dim)" : partyColor(p.party) }}>
-          <span className="mono text-[10px] font-bold">{p.type === "regulator" ? "REG" : p.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}</span>
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="text-sm text-fg truncate group-hover:text-brass-bright transition-colors">{p.name}</div>
-        <div className="mono text-[10px] text-fg-dim truncate">{p.role || p.why}</div>
-      </div>
-      {p.party && (
-        <span className="mono text-[9px] px-1 py-0.5 rounded shrink-0"
-              style={{ color: partyColor(p.party), borderColor: partyColor(p.party), border: "1px solid" }}>
-          {p.party.slice(0, 4).toUpperCase()}
-        </span>
-      )}
-    </div>
-  );
-  return p.slug ? (
-    <Link href={`/politicians/${p.slug}`} className="group block">{inner}</Link>
-  ) : (
-    <div className="group">{inner}</div>
-  );
+type InvestigationContextValue =
+  | { from: "search"; label: string; href: string }
+  | { from: "sector"; label: string; href: string }
+  | { from: "finding"; label: string; href: string };
+
+function investigationContext(searchParams: ReturnType<typeof useSearchParams>): InvestigationContextValue | null {
+  const from = searchParams.get("from");
+  if (from === "search") {
+    const q = searchParams.get("q") ?? "";
+    return { from, label: q ? `Back to search: ${q}` : "Back to search", href: `/search${q ? `?q=${encodeURIComponent(q)}` : ""}` };
+  }
+  if (from === "sector") {
+    const sector = searchParams.get("sector") ?? "";
+    return { from, label: sector ? `Back to sector: ${sector}` : "Back to sector", href: sector ? `/sectors/${encodeURIComponent(sector)}` : "/sectors" };
+  }
+  if (from === "finding") {
+    const finding = searchParams.get("finding") ?? "";
+    return { from, label: finding ? "Back to finding" : "Back to finding", href: finding ? `/signals/${encodeURIComponent(finding)}` : "/signals" };
+  }
+  return null;
 }
 
-function RelRow({ r, showSource, timeline }: { r: RecordRef; showSource?: boolean; timeline?: boolean }) {
-  const href = recordHref(r.table, r.pk);
-  const inner = (
-    <div className={`flex items-center gap-2 ${r.current ? "text-brass-bright" : ""}`}>
-      {(showSource || timeline) && <SourceTag>{r.source}</SourceTag>}
-      <span className="text-sm truncate flex-1 group-hover:text-brass-bright transition-colors">
-        {r.current ? "● " : ""}{r.title}
-      </span>
-      {r.amount != null && <span className="mono text-xs text-brass shrink-0">{money(r.amount)}</span>}
-      {r.date && <span className="mono text-[10px] text-fg-dim shrink-0">{r.date}</span>}
-    </div>
-  );
+function withContext(href: string | null, context: InvestigationContextValue | null): string | null {
+  if (!href || !context) return href;
+  const glue = href.includes("?") ? "&" : "?";
+  if (context.from === "search") {
+    const q = context.href.includes("?q=") ? decodeURIComponent(context.href.split("?q=")[1] ?? "") : "";
+    return `${href}${glue}from=search${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+  }
+  if (context.from === "sector") {
+    const sector = context.href.split("/sectors/")[1];
+    return `${href}${glue}from=sector${sector ? `&sector=${encodeURIComponent(decodeURIComponent(sector))}` : ""}`;
+  }
+  const finding = context.href.split("/signals/")[1];
+  return `${href}${glue}from=finding${finding ? `&finding=${encodeURIComponent(decodeURIComponent(finding))}` : ""}`;
+}
+
+function InvestigationContext({ context }: { context: InvestigationContextValue }) {
   return (
-    <li>
-      {href ? (
-        <Link href={href} className="group block hover:bg-panel-2 -mx-1 px-1 py-0.5 rounded">{inner}</Link>
-      ) : (
-        <div className="px-1 py-0.5">{inner}</div>
-      )}
-    </li>
+    <div className="mb-gutter rounded border border-outline-variant bg-surface-container-lowest px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <div className="font-label-caps text-label-caps text-on-surface-variant uppercase">Investigation context</div>
+        <div className="font-body-md text-body-md text-on-surface">{context.label}</div>
+      </div>
+      <Link href={context.href} className="inline-flex items-center gap-2 px-3 py-1.5 rounded border border-outline-variant text-primary hover:bg-surface-container-low transition-colors focus-ring">
+        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+        Return
+      </Link>
+    </div>
+  );
+}
+
+function buildConnectedItems(detail: RecordDetail, graph?: EvidenceGraphResponse | null, context: InvestigationContextValue | null = null): RelatedItem[] {
+  const items: RelatedItem[] = [];
+  if (detail.entity?.name || detail.entity?.canonical) {
+    const name = detail.entity.name ?? detail.entity.canonical ?? "Entity";
+    items.push({
+      id: "entity",
+      title: name,
+      type: "Company or entity",
+      href: withContext(entityHref(name), context),
+      relationship: "named on record",
+      strength: "direct",
+      icon: <AvatarLogo name={name} type="company" />,
+    });
+  }
+  if (detail.industry) {
+    items.push({
+      id: `sector-${detail.industry.slug}`,
+      title: detail.industry.name,
+      type: "Sector",
+      href: withContext(sectorHref(detail.industry.slug), context),
+      description: detail.industry.blurb,
+      relationship: "sector match",
+      strength: detail.industry.matched_by === "entity roster" ? "direct" : "inferred",
+    });
+  }
+  for (const node of graph?.nodes ?? []) {
+    if (node.type !== "sector" && node.type !== "entity") continue;
+    const meta = (node.meta ?? {}) as Record<string, unknown>;
+    const title = String(node.label ?? meta.name ?? node.id);
+    const href = node.type === "sector" ? sectorHref(String(meta.slug ?? "")) : entityHref(title);
+    if (items.some((item) => item.href === href || item.title === title)) continue;
+    items.push({ id: node.id, title, type: node.type, href: withContext(href, context), relationship: "graph connection", strength: "supported" });
+  }
+  return items;
+}
+
+function buildEvidenceItems(detail: RecordDetail, context: InvestigationContextValue | null = null): RelatedItem[] {
+  const current: RecordRef = {
+    table: detail.table,
+    pk: detail.pk,
+    source: detail.record.source,
+    record_type: detail.record.record_type,
+    title: detail.record.title,
+    date: detail.record.date,
+    amount: detail.record.amount,
+    entity: detail.record.entity,
+    current: true,
+  };
+  const rows = detail.relations.timeline?.length ? detail.relations.timeline : [current];
+  return rows.slice(0, 12).map((ref) => ({
+    id: `${ref.table}-${ref.pk}`,
+    title: ref.title,
+    type: typeLabel(ref.table),
+    href: withContext(recordHref(ref.table, ref.pk), context),
+    description: [ref.date, ref.entity].filter(Boolean).join(" - ") || null,
+    meta: ref.current ? "Current record" : ref.source,
+    relationship: ref.current ? "current evidence" : "shared entity timeline",
+    strength: ref.current ? "direct" : "supported",
+  }));
+}
+
+function buildSourceGroupItems(detail: RecordDetail, context: InvestigationContextValue | null = null): RelatedItem[] {
+  return (detail.relations.by_source ?? []).slice(0, 8).map((group) => {
+    const first = group.records[0];
+    return {
+      id: `${group.table}-${group.source}`,
+      title: group.label,
+      type: typeLabel(group.table, true),
+      href: first ? withContext(recordHref(first.table, first.pk), context) : null,
+      description: `${group.count.toLocaleString()} related ${group.label.toLowerCase()} record${group.count === 1 ? "" : "s"}`,
+      meta: group.partial ? "Partial sample" : "Complete sample",
+      relationship: sourceGroupRelationship(group.table),
+      strength: "supported" as const,
+    };
+  });
+}
+
+function sourceGroupRelationship(table: string): string {
+  if (table === "bills") return "bill affects sector";
+  if (table === "lobbying" || table === "ocl_registrations") return "organization registered lobbying activity";
+  if (table === "gazette" || table === "tribunal") return "regulator opened consultation";
+  if (table === "source_records") return "finding supported by source";
+  return "shared entity evidence";
+}
+
+function recordTypeLabel(recordType?: string | null, source?: string | null, table?: string | null): string {
+  if (source === "social_statements" || source === "public_statements" || recordType === "public_statement" || recordType === "social_post") {
+    return "Public statement";
+  }
+  return typeLabel(table);
+}
+
+function buildFindingItems(findings: GraphFinding[], context: InvestigationContextValue | null = null): RelatedItem[] {
+  return findings.map((finding) => ({
+    id: finding.title,
+    title: finding.title,
+    type: "Finding",
+    href: withContext(findingHref(finding.title), context),
+    description: finding.summary,
+    meta: finding.confidence,
+    relationship: "record supports finding",
+    strength: (finding as GraphFinding & { relationship_strength?: "direct" | "supported" | "inferred" }).relationship_strength ?? "inferred",
+  }));
+}
+
+function StatusChip({ level, children }: { level: string; children: React.ReactNode }) {
+  const tone = level === "high" || level === "elevated" ? "status-chip-red" : level === "watch" ? "status-chip-amber" : "status-chip-green";
+  return <span className={`font-label-caps text-label-caps ${tone} px-2 py-1 rounded-full uppercase`}>{children}</span>;
+}
+
+function RecordSkeleton() {
+  return <div className="space-y-gutter">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-32" />)}</div>;
+}
+
+function Message({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "error" }) {
+  return (
+    <div className={`rounded border px-4 py-3 font-body-md text-body-md ${tone === "error" ? "border-error/30 bg-error/10 text-error" : "border-outline-variant bg-surface-container-low text-on-surface-variant"}`}>
+      {children}
+    </div>
   );
 }

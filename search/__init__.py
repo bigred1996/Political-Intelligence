@@ -1,1 +1,1 @@
-"""Polaris unified search — hybrid SQL + semantic retrieval across every source."""
+"""Nessus unified search — hybrid SQL + semantic retrieval across every source."""

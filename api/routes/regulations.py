@@ -1,12 +1,14 @@
 """Regulations routes — Canada Gazette entries and tribunal decisions."""
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.cache import invalidate_workspace_caches
 from api.database import get_session
 from api.models.regulation import GazetteEntry, TribunalDecision
+from api.schemas import IngestStartedResponse, SourceSearchResponse, StatsResponse
 from pipeline.ingest import fetch_crtc_decisions, fetch_gazette_entries
 
 router = APIRouter(prefix="/api/regulations", tags=["regulations"])
@@ -24,6 +26,7 @@ async def _run_gazette_ingest() -> None:
                 continue
             session.add(GazetteEntry(**r))
         await session.commit()
+    invalidate_workspace_caches("manual_gazette_ingest")
 
 
 async def _run_crtc_ingest() -> None:
@@ -41,21 +44,22 @@ async def _run_crtc_ingest() -> None:
                 continue
             session.add(TribunalDecision(**r))
         await session.commit()
+    invalidate_workspace_caches("manual_crtc_ingest")
 
 
-@router.post("/gazette/ingest")
+@router.post("/gazette/ingest", response_model=IngestStartedResponse)
 async def ingest_gazette(background_tasks: BackgroundTasks):
     background_tasks.add_task(_run_gazette_ingest)
     return {"status": "started", "source": "Canada Gazette Part I + II RSS"}
 
 
-@router.post("/crtc/ingest")
+@router.post("/crtc/ingest", response_model=IngestStartedResponse)
 async def ingest_crtc(background_tasks: BackgroundTasks):
     background_tasks.add_task(_run_crtc_ingest)
     return {"status": "started", "source": "CRTC Decisions RSS"}
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=StatsResponse)
 async def regulations_stats(session: AsyncSession = Depends(get_session)):
     gazette = (await session.execute(select(func.count(GazetteEntry.id)))).scalar_one()
     gazette_i = (await session.execute(select(func.count(GazetteEntry.id)).where(GazetteEntry.gazette_part == "I"))).scalar_one()
@@ -69,12 +73,12 @@ async def regulations_stats(session: AsyncSession = Depends(get_session)):
     }
 
 
-@router.get("/gazette/search")
+@router.get("/gazette/search", response_model=SourceSearchResponse)
 async def search_gazette(
-    q: str,
-    limit: int = 30,
+    q: str = Query(..., min_length=1, max_length=255),
+    limit: int = Query(default=30, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
-):
+) -> dict:
     res = await session.execute(
         select(GazetteEntry)
         .where(
@@ -106,12 +110,12 @@ async def search_gazette(
     }
 
 
-@router.get("/decisions/search")
+@router.get("/decisions/search", response_model=SourceSearchResponse)
 async def search_decisions(
-    q: str,
-    limit: int = 30,
+    q: str = Query(..., min_length=1, max_length=255),
+    limit: int = Query(default=30, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
-):
+) -> dict:
     res = await session.execute(
         select(TribunalDecision)
         .where(

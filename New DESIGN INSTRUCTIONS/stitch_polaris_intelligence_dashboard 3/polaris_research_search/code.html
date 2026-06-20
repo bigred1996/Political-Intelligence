@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Politicore Intelligence - Natural Language Search</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface-variant": "#44474d",
+                        "inverse-surface": "#2d3133",
+                        "on-background": "#191c1e",
+                        "surface-variant": "#e0e3e5",
+                        "inverse-primary": "#b7c7eb",
+                        "on-tertiary-fixed-variant": "#464747",
+                        "tertiary": "#151717",
+                        "secondary-container": "#d0e1fb",
+                        "secondary": "#505f76",
+                        "tertiary-fixed": "#e3e2e2",
+                        "error-container": "#ffdad6",
+                        "on-secondary-container": "#54647a",
+                        "tertiary-container": "#2a2b2b",
+                        "on-primary-fixed": "#091b37",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#0b1c30",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "error": "#ba1a1a",
+                        "primary-fixed-dim": "#b7c7eb",
+                        "on-primary-fixed-variant": "#374765",
+                        "on-primary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#d8dadc",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#f7f9fb",
+                        "surface": "#f7f9fb",
+                        "primary": "#041632",
+                        "primary-container": "#1b2b48",
+                        "surface-container-highest": "#e0e3e5",
+                        "tertiary-fixed-dim": "#c6c6c6",
+                        "outline": "#75777e",
+                        "on-surface": "#191c1e",
+                        "secondary-fixed": "#d3e4fe",
+                        "surface-tint": "#4f5e7e",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#d7e2ff",
+                        "background": "#f7f9fb",
+                        "on-tertiary-container": "#929292",
+                        "surface-container-high": "#e6e8ea",
+                        "on-primary-container": "#8393b5",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "outline-variant": "#c5c6ce",
+                        "on-secondary": "#ffffff",
+                        "surface-container-low": "#f2f4f6",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "surface-container": "#eceef0"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "unit": "4px",
+                        "margin-desktop": "40px",
+                        "gutter": "24px",
+                        "density-compact": "8px",
+                        "density-comfortable": "16px",
+                        "container-max": "1440px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Public Sans"],
+                        "headline-sm": ["\"Source Serif 4\""],
+                        "display-lg": ["\"Source Serif 4\""],
+                        "data-tabular": ["Public Sans"],
+                        "body-md": ["Public Sans"],
+                        "headline-md": ["\"Source Serif 4\""],
+                        "label-caps": ["Public Sans"],
+                        "memo-body": ["\"Source Serif 4\""]
+                    },
+                    "fontSize": {
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "data-tabular": ["13px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "memo-body": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 flex items-center justify-between px-margin-desktop h-16 bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-outline flat no shadows">
+<div class="flex items-center gap-4">
+<span class="font-headline-sm text-headline-sm font-semibold text-primary dark:text-primary-fixed cursor-pointer active:opacity-80">Politicore Intelligence</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 text-on-surface-variant dark:text-surface-variant font-body-md text-body-md">
+<button aria-label="notifications" class="p-2 rounded-full hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button aria-label="settings" class="p-2 rounded-full hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+<div class="h-8 w-8 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant cursor-pointer active:opacity-80">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A professional headshot of an executive analyst in a modern office setting. The lighting is soft and corporate, emphasizing professionalism and intelligence. The subject is wearing a dark navy blazer over a crisp white shirt, fitting the 'Intelligence Grade' brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqYhY1p40End98ZEk1bzymU1XwjXoVxg7BO-WIzq5GwDR5QYENxFvJJAYDlp13ofL6u3uJmup5L8iIjMfULjWDbpZAR9OA9Zr8bAIqnQyGWLL_e74Bz7dBEb1i7Ho_ebdlTh47CTsqcnbkd4uZ5N4Ih9-Yzf6rXD1j2-1JleMl8GBPooaHJRdZxWp5rzQk6JDcDHasOnN57aUeO8DlSc4h-wfkebtF1eXOqE6SzXs3AoZyr5DpcuUH1P6puIMIYU6uQCYwJJ3k1Vo"/>
+</div>
+</div>
+</header>
+<div class="flex flex-1 pt-16">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 py-density-comfortable px-4 gap-y-unit bg-surface-container-low dark:bg-surface-container-lowest border-r border-outline-variant dark:border-outline flat no shadows transition-all duration-200 ease-in-out z-40 mt-16">
+<div class="mb-6 px-2">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-primary flex items-center justify-center text-on-primary font-bold">
+                        P
+                    </div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-primary dark:text-primary-fixed text-sm leading-tight">Politicore</h2>
+<span class="text-xs text-on-surface-variant">Institutional Intelligence</span>
+</div>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 font-label-caps text-label-caps rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="rss_feed">rss_feed</span>
+                    Live Feed
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 font-label-caps text-label-caps rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="article">article</span>
+                    Daily Memo
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 font-label-caps text-label-caps rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="analytics">analytics</span>
+                    Sector Watch
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 font-label-caps text-label-caps rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="description">description</span>
+                    Briefing
+                </a>
+<!-- Setting Briefing as active conceptually as it's a research interface, but Polaris/Search isn't explicitly in the nav array, so Watchlists or Briefing are closest. We'll use default inactive for all to keep focus on Canvas if none perfectly match, but rules say 'pick single closest match'. Research/Query -> Briefing/Memo. Let's make "Briefing" active. Wait, rules say "If the page content does not logically sit under the categories... suppress the navigation". A central search engine might be the main dashboard. Let's assume it's the core utility under "Briefing" for now, or we can suppress. Actually, let's keep nav and set Briefing as active. Wait, "Briefing" was above. Let's adjust.-->
+<a class="flex items-center gap-3 px-3 py-2 bg-secondary-container dark:bg-primary-container text-on-secondary-container dark:text-on-primary-container font-label-caps text-label-caps font-bold rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="search">search</span> <!-- Not in JSON, but representing the active search state. Wait, JSON says "description". I must use exact icons from JSON. -->
+<span class="material-symbols-outlined text-[20px] hidden" data-icon="description">description</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 font-label-caps text-label-caps rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="visibility">visibility</span>
+                    Watchlists
+                </a>
+</nav>
+<div class="mt-auto pt-4 border-t border-outline-variant flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 font-label-caps text-label-caps rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="domain">domain</span>
+                    Sectors
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 font-label-caps text-label-caps rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="assessment">assessment</span>
+                    Reports
+                </a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 p-margin-mobile md:p-margin-desktop w-full max-w-container-max mx-auto flex flex-col gap-gutter">
+<!-- Search Header Section -->
+<section class="flex flex-col items-center justify-center pt-12 pb-8">
+<h1 class="font-display-lg text-display-lg text-primary mb-6 text-center">Ask Polaris</h1>
+<div class="w-full max-w-3xl relative">
+<div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline" data-icon="search">search</span>
+</div>
+<input class="w-full bg-surface-container-lowest border-2 border-primary-fixed rounded-xl py-4 pl-12 pr-4 font-body-lg text-body-lg text-on-surface focus:outline-none focus:ring-4 focus:ring-primary-fixed/30 focus:border-primary transition-all shadow-sm" placeholder="e.g., 'How does the new capital gains proposal affect the VC sector?'" type="text"/>
+<button class="absolute inset-y-2 right-2 px-4 bg-primary text-on-primary rounded-lg font-label-caps text-label-caps hover:bg-primary/90 transition-colors flex items-center gap-2">
+                        Query <span class="material-symbols-outlined text-[16px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter mt-4">
+<!-- Left Column: Suggested & Recent -->
+<div class="flex flex-col gap-gutter col-span-1">
+<!-- Suggested Inquiries -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<div class="bg-surface-container-low px-4 py-3 border-b border-outline-variant">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]" data-icon="lightbulb">lightbulb</span>
+                                Suggested Inquiries
+                            </h3>
+</div>
+<div class="p-2 flex flex-col gap-1">
+<button class="text-left px-3 py-2 text-body-md font-body-md text-on-surface hover:bg-surface-container transition-colors rounded-lg flex items-start gap-2 group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary text-[18px] mt-0.5" data-icon="trending_up">trending_up</span>
+                                Impact of Bill C-27 on tech M&amp;A timelines
+                            </button>
+<button class="text-left px-3 py-2 text-body-md font-body-md text-on-surface hover:bg-surface-container transition-colors rounded-lg flex items-start gap-2 group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary text-[18px] mt-0.5" data-icon="gavel">gavel</span>
+                                Recent lobbying activity by Telcos in Q3
+                            </button>
+<button class="text-left px-3 py-2 text-body-md font-body-md text-on-surface hover:bg-surface-container transition-colors rounded-lg flex items-start gap-2 group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary text-[18px] mt-0.5" data-icon="policy">policy</span>
+                                Environmental committee schedule changes
+                            </button>
+</div>
+</div>
+<!-- Recent Research Threads -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<div class="bg-surface-container-low px-4 py-3 border-b border-outline-variant flex justify-between items-center">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]" data-icon="history">history</span>
+                                Recent Threads
+                            </h3>
+<button class="text-primary font-label-caps text-label-caps hover:underline">View All</button>
+</div>
+<div class="p-0">
+<div class="border-b border-outline-variant/50 p-4 hover:bg-surface-bright cursor-pointer transition-colors">
+<h4 class="font-body-md text-body-md font-medium text-on-surface mb-1">Defense Procurement Review</h4>
+<div class="flex items-center gap-2 text-xs text-on-surface-variant">
+<span class="px-2 py-0.5 bg-surface-container-high rounded text-[10px] uppercase font-semibold">2 days ago</span>
+<span>• 14 sources analyzed</span>
+</div>
+</div>
+<div class="p-4 hover:bg-surface-bright cursor-pointer transition-colors">
+<h4 class="font-body-md text-body-md font-medium text-on-surface mb-1">Pharma Pricing Guidelines</h4>
+<div class="flex items-center gap-2 text-xs text-on-surface-variant">
+<span class="px-2 py-0.5 bg-surface-container-high rounded text-[10px] uppercase font-semibold">5 days ago</span>
+<span>• 8 sources analyzed</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Results Preview Bento Grid -->
+<div class="col-span-1 lg:col-span-2 flex flex-col gap-6">
+<div class="flex items-center justify-between border-b border-outline-variant pb-2">
+<h2 class="font-headline-sm text-headline-sm text-primary">Intelligence Overview</h2>
+<div class="flex gap-2">
+<span class="px-3 py-1 bg-primary/10 text-primary font-data-tabular text-data-tabular rounded-full border border-primary/20">Capital Gains</span>
+<span class="px-3 py-1 bg-surface-container-high text-on-surface-variant font-data-tabular text-data-tabular rounded-full border border-outline-variant">VC Sector</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<!-- Bills & Legislation -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow group relative overflow-hidden">
+<div class="absolute top-0 right-0 w-24 h-24 bg-secondary-fixed/30 rounded-bl-full -mr-4 -mt-4 z-0 transition-transform group-hover:scale-110"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary border border-outline-variant">
+<span class="material-symbols-outlined text-[18px]" data-icon="gavel">gavel</span>
+</div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant">Active Bills</h3>
+</div>
+<p class="font-headline-sm text-headline-sm text-on-surface mb-1">Bill C-59</p>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4 line-clamp-2">Fall Economic Statement Implementation Act, containing key provisions on capital gains inclusion rates.</p>
+<div class="flex items-center gap-2">
+<span class="px-2 py-1 bg-error-container text-on-error-container font-label-caps text-[10px] rounded">High Impact</span>
+<span class="text-xs text-outline font-data-tabular">2nd Reading</span>
+</div>
+</div>
+</div>
+<!-- Committee Activity -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow group relative overflow-hidden">
+<div class="absolute top-0 right-0 w-24 h-24 bg-primary-fixed/30 rounded-bl-full -mr-4 -mt-4 z-0 transition-transform group-hover:scale-110"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary border border-outline-variant">
+<span class="material-symbols-outlined text-[18px]" data-icon="groups">groups</span>
+</div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant">Committees</h3>
+</div>
+<p class="font-headline-sm text-headline-sm text-on-surface mb-1">FINA Hearings</p>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4 line-clamp-2">Standing Committee on Finance scheduled to hear testimonies from CVCA representatives next Tuesday.</p>
+<div class="flex items-center gap-2">
+<span class="px-2 py-1 bg-surface-container-high text-on-surface font-label-caps text-[10px] rounded">Scheduled</span>
+<span class="text-xs text-outline font-data-tabular">Oct 24, 2023</span>
+</div>
+</div>
+</div>
+<!-- Lobbying Records -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow group relative overflow-hidden">
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary border border-outline-variant">
+<span class="material-symbols-outlined text-[18px]" data-icon="handshake">handshake</span>
+</div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant">Lobbying</h3>
+</div>
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center border-b border-outline-variant/30 pb-2">
+<span class="font-data-tabular text-data-tabular text-on-surface">Can. Venture Capital Assoc.</span>
+<span class="font-data-tabular text-data-tabular text-primary">3 meetings</span>
+</div>
+<div class="flex justify-between items-center border-b border-outline-variant/30 pb-2">
+<span class="font-data-tabular text-data-tabular text-on-surface">Tech Council</span>
+<span class="font-data-tabular text-data-tabular text-primary">1 meeting</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Sentiment / News -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow glass-panel relative">
+<div class="flex items-center gap-2 mb-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary border border-outline-variant">
+<span class="material-symbols-outlined text-[18px]" data-icon="newspaper">newspaper</span>
+</div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant">Media &amp; Sentiment</h3>
+</div>
+<div class="mt-2">
+<div class="h-2 w-full bg-surface-container-high rounded-full overflow-hidden flex">
+<div class="h-full bg-error" style="width: 60%"></div>
+<div class="h-full bg-secondary" style="width: 30%"></div>
+<div class="h-full bg-surface-tint" style="width: 10%"></div>
+</div>
+<div class="flex justify-between mt-1 text-[10px] font-label-caps text-outline">
+<span>Negative (60%)</span>
+<span>Neutral (30%)</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-4 italic">"Industry leaders warn of severe chilling effect on seed-stage funding..."</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

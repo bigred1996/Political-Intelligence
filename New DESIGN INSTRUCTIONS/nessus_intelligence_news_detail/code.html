@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Polaris - Evidence Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=Source+Serif+4:ital,wght@0,400;0,600;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-container": "#eceef0",
+                      "on-tertiary-container": "#929292",
+                      "inverse-surface": "#2d3133",
+                      "on-tertiary-fixed": "#1a1c1c",
+                      "tertiary-container": "#2a2b2b",
+                      "inverse-primary": "#b7c7eb",
+                      "surface-dim": "#d8dadc",
+                      "on-surface-variant": "#44474d",
+                      "surface-bright": "#f7f9fb",
+                      "surface-container-high": "#e6e8ea",
+                      "surface": "#f7f9fb",
+                      "on-tertiary": "#ffffff",
+                      "on-primary-fixed": "#091b37",
+                      "surface-container-lowest": "#ffffff",
+                      "primary-fixed-dim": "#b7c7eb",
+                      "outline": "#75777e",
+                      "inverse-on-surface": "#eff1f3",
+                      "on-secondary-fixed": "#0b1c30",
+                      "tertiary-fixed": "#e3e2e2",
+                      "on-secondary-fixed-variant": "#38485d",
+                      "primary-fixed": "#d7e2ff",
+                      "on-surface": "#191c1e",
+                      "on-primary-fixed-variant": "#374765",
+                      "secondary-fixed": "#d3e4fe",
+                      "secondary-container": "#d0e1fb",
+                      "on-secondary-container": "#54647a",
+                      "on-error-container": "#93000a",
+                      "on-tertiary-fixed-variant": "#464747",
+                      "secondary-fixed-dim": "#b7c8e1",
+                      "on-primary": "#ffffff",
+                      "surface-variant": "#e0e3e5",
+                      "secondary": "#505f76",
+                      "on-error": "#ffffff",
+                      "primary": "#041632",
+                      "outline-variant": "#c5c6ce",
+                      "primary-container": "#1b2b48",
+                      "error": "#ba1a1a",
+                      "on-secondary": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "tertiary-fixed-dim": "#c6c6c6",
+                      "on-primary-container": "#8393b5",
+                      "surface-container-low": "#f2f4f6",
+                      "surface-container-highest": "#e0e3e5",
+                      "background": "#f7f9fb",
+                      "on-background": "#191c1e",
+                      "surface-tint": "#4f5e7e",
+                      "tertiary": "#151717"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "density-compact": "8px",
+                      "container-max": "1440px",
+                      "unit": "4px",
+                      "margin-desktop": "40px",
+                      "gutter": "24px",
+                      "density-comfortable": "16px",
+                      "margin-mobile": "16px"
+              },
+              "fontFamily": {
+                      "headline-sm": [
+                              "\"Source Serif 4\""
+                      ],
+                      "headline-md": [
+                              "\"Source Serif 4\""
+                      ],
+                      "display-lg": [
+                              "\"Source Serif 4\""
+                      ],
+                      "body-md": [
+                              "Public Sans"
+                      ],
+                      "body-lg": [
+                              "Public Sans"
+                      ],
+                      "label-caps": [
+                              "Public Sans"
+                      ],
+                      "data-tabular": [
+                              "Public Sans"
+                      ],
+                      "memo-body": [
+                              "\"Source Serif 4\""
+                      ]
+              },
+              "fontSize": {
+                      "headline-sm": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-caps": [
+                              "11px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "data-tabular": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "memo-body": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .symbol-fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Subtle Tonal Layering Utilities */
+        .card-border {
+            border: 1px solid #E2E8F0;
+        }
+        .card-hover-fx {
+            transition: all 0.2s ease-in-out;
+        }
+        .card-hover-fx:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border-color: #041632; /* Primary */
+        }
+        .glass-overlay {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col antialiased selection:bg-secondary-container selection:text-on-secondary-container">
+<!-- TopNavBar: Standard navigation shell hidden because this is a detail view (Task-Focused). 
+         Replacing with a context-specific top bar with back action -->
+<header class="flex justify-between items-center w-full px-margin-desktop h-16 sticky top-0 z-50 bg-surface dark:bg-surface border-b border-outline-variant dark:border-outline flat no shadows">
+<div class="flex items-center gap-4">
+<button class="flex items-center text-on-surface-variant hover:text-primary transition-colors group">
+<span class="material-symbols-outlined mr-2 group-hover:-translate-x-1 transition-transform">arrow_back</span>
+<span class="text-label-caps font-label-caps uppercase tracking-widest">Back to Briefing</span>
+</button>
+</div>
+<div class="text-headline-sm font-headline-sm font-bold text-primary dark:text-inverse-primary tracking-tight">
+            Polaris
+        </div>
+<div class="flex items-center gap-6">
+<button class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined">bookmark_add</span>
+<span class="text-label-caps font-label-caps uppercase">Save</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined">share</span>
+<span class="text-label-caps font-label-caps uppercase">Share</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow w-full max-w-[1440px] mx-auto px-margin-mobile md:px-margin-desktop py-gutter">
+<!-- Header Section -->
+<div class="mb-12 max-w-4xl">
+<div class="flex items-center gap-3 mb-6">
+<span class="inline-flex items-center px-3 py-1 bg-surface-container-high text-on-surface-variant rounded-full text-label-caps font-label-caps uppercase tracking-widest">
+                    Proprietary Intel
+                </span>
+<span class="text-on-surface-variant text-body-md font-body-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+                    Published 2h ago
+                </span>
+</div>
+<h1 class="text-display-lg font-display-lg text-primary mb-6 leading-tight">
+                European Commission Signals Aggressive Timeline for AI Act Enforcement Mechanisms
+            </h1>
+<div class="flex flex-wrap gap-6 items-center border-y border-outline-variant py-4 mt-8">
+<div class="flex items-center gap-3 pr-6 border-r border-outline-variant">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary font-bold">
+                        BR
+                    </div>
+<div>
+<div class="text-body-md font-body-md font-medium">Brussels Bureau</div>
+<div class="text-label-caps font-label-caps text-on-surface-variant">Primary Source</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-label-caps font-label-caps text-on-surface-variant uppercase">Source Reliability</span>
+<div class="flex gap-1">
+<span class="material-symbols-outlined symbol-fill text-primary text-[18px]">star</span>
+<span class="material-symbols-outlined symbol-fill text-primary text-[18px]">star</span>
+<span class="material-symbols-outlined symbol-fill text-primary text-[18px]">star</span>
+<span class="material-symbols-outlined symbol-fill text-primary text-[18px]">star</span>
+<span class="material-symbols-outlined text-outline text-[18px]">star_half</span>
+</div>
+<span class="text-body-md font-body-md font-medium text-primary">High (8.5/10)</span>
+</div>
+</div>
+</div>
+<!-- Layout Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column: Article Body (8 cols) -->
+<article class="lg:col-span-8 space-y-8">
+<!-- AI Key Takeaways Box -->
+<div class="bg-surface-container-low rounded-lg p-6 border-l-4 border-primary card-border">
+<div class="flex items-center gap-2 mb-4 text-primary">
+<span class="material-symbols-outlined symbol-fill">psychology</span>
+<h3 class="text-body-lg font-body-lg font-semibold uppercase tracking-wide">AI Extracted Takeaways</h3>
+</div>
+<ul class="space-y-3">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline mt-0.5 text-[18px]">commit</span>
+<span class="text-body-lg font-body-lg text-on-surface">Enforcement bodies expected to be operational 6 months earlier than previously drafted timelines.</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline mt-0.5 text-[18px]">commit</span>
+<span class="text-body-lg font-body-lg text-on-surface">Fines for non-compliance could hit top-tier brackets immediately upon enforcement date, contrary to rumored grace periods.</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline mt-0.5 text-[18px]">commit</span>
+<span class="text-body-lg font-body-lg text-on-surface">Sector-specific guidelines for financial services are being fast-tracked internally.</span>
+</li>
+</ul>
+</div>
+<!-- Main Text Content -->
+<div class="prose max-w-none text-memo-body font-memo-body text-on-surface space-y-6">
+<p class="text-headline-sm font-headline-sm font-normal text-on-surface-variant leading-relaxed">
+                        Internal documents circulated among working groups in Brussels indicate a significant shift in the timeline for the establishment of the AI Office and subsequent enforcement mechanisms.
+                    </p>
+<p>
+                        The shift suggests that member states are feeling pressure to demonstrate regulatory teeth prior to the upcoming parliamentary cycle. Sources close to the internal market committee suggest that the previous assumption of a "soft landing" or extended grace period for initial compliance is actively being dismantled in ongoing drafts.
+                    </p>
+<h2 class="text-headline-md font-headline-md text-primary mt-12 mb-4">The Compliance Window Narrows</h2>
+<p>
+                        Particularly concerning for enterprise entities is the re-wording around "high-risk" classification procedures. The burden of proof for exempting a system from high-risk classification is becoming substantially heavier. The initial self-assessment models proposed are being replaced with mandatory third-party audits for a wider swathe of applications than initially modeled.
+                    </p>
+<blockquote class="border-l-2 border-outline pl-6 my-8 italic text-on-surface-variant">
+                        "The prevailing sentiment has shifted from fostering innovation with guardrails to establishing immediate dominance over the regulatory landscape of generative models." 
+                        <footer class="text-body-md font-body-md not-italic mt-2 font-medium">— Confidential Memo excerpt, Directorate-General for Communications Networks, Content and Technology</footer>
+</blockquote>
+<p>
+                        Financial institutions currently developing internal LLM models for risk assessment and customer service automation will likely face the sharpest edge of this accelerated timeline, given the intersecting complexity with existing financial regulations.
+                    </p>
+</div>
+</article>
+<!-- Right Column: Context & Metadata (4 cols) -->
+<aside class="lg:col-span-4 space-y-6">
+<!-- Sentiment Pulse -->
+<div class="bg-surface rounded-lg p-6 card-border card-hover-fx">
+<h3 class="text-label-caps font-label-caps uppercase tracking-widest text-on-surface-variant mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">thermostat</span>
+                        Regulatory Climate Pulse
+                    </h3>
+<div class="flex items-end gap-4 mb-2">
+<div class="text-display-lg font-display-lg text-error leading-none">Cooling</div>
+<div class="text-body-md font-body-md text-on-surface-variant mb-1">vs previous quarter</div>
+</div>
+<p class="text-body-md font-body-md text-on-surface mt-4 mb-6">
+                        Environment is becoming increasingly restrictive. Compliance overhead expected to rise significantly.
+                    </p>
+<!-- Risk Indicator Visual -->
+<div class="h-2 w-full bg-surface-container-high rounded-full overflow-hidden flex">
+<div class="h-full bg-secondary opacity-30 w-1/3"></div>
+<div class="h-full bg-secondary opacity-60 w-1/3"></div>
+<div class="h-full bg-error w-1/3 relative">
+<div class="absolute right-0 top-0 bottom-0 w-1 bg-on-error"></div>
+</div>
+</div>
+<div class="flex justify-between mt-2 text-label-caps font-label-caps text-on-surface-variant">
+<span>Favorable</span>
+<span>Neutral</span>
+<span class="text-error font-bold">Restrictive</span>
+</div>
+</div>
+<!-- Sector Contagion -->
+<div class="bg-surface rounded-lg p-0 card-border card-hover-fx overflow-hidden">
+<div class="bg-surface-container-low px-6 py-4 border-b border-outline-variant flex justify-between items-center">
+<h3 class="text-label-caps font-label-caps uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">account_tree</span>
+                            Sector Contagion Risk
+                        </h3>
+</div>
+<div class="p-4 space-y-4">
+<!-- High Risk Item -->
+<div class="flex items-center justify-between p-3 rounded bg-error-container/20 border border-error/20">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-error">account_balance</span>
+<span class="text-data-tabular font-data-tabular font-semibold">Financial Services</span>
+</div>
+<span class="text-label-caps font-label-caps text-error bg-error-container px-2 py-1 rounded">HIGH</span>
+</div>
+<!-- Medium Risk Item -->
+<div class="flex items-center justify-between p-3 rounded hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">local_hospital</span>
+<span class="text-data-tabular font-data-tabular">Healthcare Tech</span>
+</div>
+<span class="text-label-caps font-label-caps text-on-surface-variant bg-surface-container-high px-2 py-1 rounded">ELEVATED</span>
+</div>
+<!-- Medium Risk Item -->
+<div class="flex items-center justify-between p-3 rounded hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">precision_manufacturing</span>
+<span class="text-data-tabular font-data-tabular">Automotive &amp; IoT</span>
+</div>
+<span class="text-label-caps font-label-caps text-on-surface-variant bg-surface-container-high px-2 py-1 rounded">ELEVATED</span>
+</div>
+</div>
+</div>
+<!-- Related Entities -->
+<div class="bg-surface rounded-lg p-6 card-border">
+<h3 class="text-label-caps font-label-caps uppercase tracking-widest text-on-surface-variant mb-4">Mentioned Entities</h3>
+<div class="flex flex-wrap gap-2">
+<span class="inline-flex items-center px-3 py-1.5 border border-outline-variant rounded text-body-md font-body-md hover:border-primary hover:text-primary cursor-pointer transition-colors bg-surface-container-lowest">
+                            European Commission
+                        </span>
+<span class="inline-flex items-center px-3 py-1.5 border border-outline-variant rounded text-body-md font-body-md hover:border-primary hover:text-primary cursor-pointer transition-colors bg-surface-container-lowest">
+                            AI Office
+                        </span>
+<span class="inline-flex items-center px-3 py-1.5 border border-outline-variant rounded text-body-md font-body-md hover:border-primary hover:text-primary cursor-pointer transition-colors bg-surface-container-lowest">
+                            DG CONNECT
+                        </span>
+</div>
+</div>
+</aside>
+</div>
+</main>
+</body></html>

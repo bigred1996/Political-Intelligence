@@ -1,4 +1,4 @@
-// The Polaris compass-star mark from the style guide. Brass on transparent.
+// The Nessus compass-star mark from the style guide. Brass on transparent.
 export function CompassMark({ size = 28, className = "" }: { size?: number; className?: string }) {
   return (
     <svg

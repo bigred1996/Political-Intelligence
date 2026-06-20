@@ -1,6 +1,6 @@
 """Bulk Open Data ingestion (the real data path).
 
-Architecture decision: Polaris does NOT scrape government HTML per request. It
+Architecture decision: Nessus does NOT scrape government HTML per request. It
 ingests the authoritative Government of Canada bulk Open Data files once, streams
 them, normalizes each entity to a canonical key, and loads rows into the local DB.
 Per-company queries then hit the DB — fast, complete, and the foundation for the
@@ -456,7 +456,7 @@ GAZETTE_RSS = {
     "I": "https://gazette.gc.ca/rss/p1-eng.xml",
     "II": "https://gazette.gc.ca/rss/p2-eng.xml",
 }
-_GAZETTE_UA = "Mozilla/5.0 (compatible; Polaris/1.0)"
+_GAZETTE_UA = "Mozilla/5.0 (compatible; Nessus/1.0)"
 _DEPT_RE = re.compile(r"^([A-Z][^:]+?)(?:\s*—|\s*:)", re.MULTILINE)
 
 

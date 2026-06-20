@@ -1,4 +1,4 @@
-# Polaris — Master Data Catalog
+# Nessus — Master Data Catalog
 
 Every candidate source, with access method, product priority, and status.
 This supersedes the source table in `DATA_CHECKLIST.md` (that file stays as the

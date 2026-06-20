@@ -1,4 +1,4 @@
-# Supabase Setup — moving Polaris off local SQLite
+# Supabase Setup — moving Nessus off local SQLite
 
 This is the one part only you can do (it needs your account). It takes ~10 minutes.
 Once you paste the connection string into `.env`, I run the migration and we're on Postgres.

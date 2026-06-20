@@ -13,15 +13,16 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.database import get_session
+from api.schemas import EntityProfileResponse
 from pipeline.sector_intel import gather_entity_data
 
 router = APIRouter(prefix="/api/entities", tags=["entities"])
 
 
-@router.get("/{name}")
+@router.get("/{name}", response_model=EntityProfileResponse)
 async def entity_profile(
     name: str,
-    sector: str | None = Query(default=None),
+    sector: str | None = Query(default=None, max_length=120),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     return await gather_entity_data(session, name.strip(), sector)

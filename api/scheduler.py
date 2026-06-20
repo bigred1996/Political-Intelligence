@@ -1,4 +1,4 @@
-"""Polaris data-refresh scheduler.
+"""Nessus data-refresh scheduler.
 
 Runs inside the FastAPI process via APScheduler AsyncIOScheduler.
 Each source has a configured cadence matching its upstream publish frequency.
@@ -21,6 +21,8 @@ from typing import Any
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+
+from api.cache import invalidate_workspace_caches
 
 log = structlog.get_logger()
 
@@ -47,6 +49,22 @@ SOURCE_CONFIGS: list[dict[str, Any]] = [
         "typical_rows": 15,
     },
     {
+        "id": "parliament_seed",
+        "name": "MP Profiles",
+        "cadence": "weekly",
+        "trigger": CronTrigger(day_of_week="sun", hour=7, minute=0, timezone="America/Toronto"),
+        "description": "OpenParliament MP roster refresh for politician profiles and actor resolution.",
+        "typical_rows": 350,
+    },
+    {
+        "id": "hansard_search",
+        "name": "Hansard Sector Mentions",
+        "cadence": "daily",
+        "trigger": CronTrigger(hour=7, minute=30, timezone="America/Toronto"),
+        "description": "Lightweight OpenParliament speech search over sector keywords for actor-risk context.",
+        "typical_rows": 100,
+    },
+    {
         "id": "appointments_weekly",
         "name": "GIC Appointments",
         "cadence": "weekly",
@@ -71,6 +89,14 @@ SOURCE_CONFIGS: list[dict[str, Any]] = [
         "typical_rows": 370000,
     },
     {
+        "id": "ocl_registrations",
+        "name": "OCL Lobbying Registrations",
+        "cadence": "monthly",
+        "trigger": CronTrigger(day=4, hour=4, minute=30, timezone="America/Toronto"),
+        "description": "Office of the Commissioner of Lobbying registration filings: clients, subjects, funding and status.",
+        "typical_rows": 25000,
+    },
+    {
         "id": "grants_quarterly",
         "name": "Grants & Contributions",
         "cadence": "quarterly",
@@ -85,6 +111,14 @@ SOURCE_CONFIGS: list[dict[str, Any]] = [
         "trigger": CronTrigger(month="1,4,7,10", day=6, hour=3, minute=30, timezone="America/Toronto"),
         "description": "Elections Canada reviews and publishes contributions quarterly. 80k-row cap.",
         "typical_rows": 80000,
+    },
+    {
+        "id": "tribunal_decisions",
+        "name": "Tribunal Decisions",
+        "cadence": "weekly",
+        "trigger": CronTrigger(day_of_week="sat", hour=9, minute=0, timezone="America/Toronto"),
+        "description": "Regulatory tribunal decisions; MVP connector currently loads CRTC decisions.",
+        "typical_rows": 1000,
     },
 ]
 
@@ -179,6 +213,7 @@ async def _run_bills(triggered_by: str = "scheduler") -> None:
             session.add_all([Bill(**r) for r in rows])
             await session.commit()
         await _log_finish(log_id, "ok", len(rows), len(rows), time.monotonic() - t0)
+        invalidate_workspace_caches("bills_daily")
         await _rebuild_search_index()  # bills are embedded
         log.info("scheduler_bills_done", count=len(rows))
     except Exception as exc:
@@ -208,11 +243,109 @@ async def _run_gazette(triggered_by: str = "scheduler") -> None:
                 added += 1
             await session.commit()
         await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
+        invalidate_workspace_caches("gazette_weekly")
         await _rebuild_search_index()  # gazette + tribunal are embedded
         log.info("scheduler_gazette_done", added=added, total=len(rows))
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
         log.error("scheduler_gazette_failed", error=str(exc))
+
+
+async def _run_parliament_seed(triggered_by: str = "scheduler") -> None:
+    from api.database import AsyncSessionLocal
+    from api.models.politician import Politician
+    from scrapers.hansard import OpenParliamentClient
+    from sqlalchemy import select
+    log_id = await _log_start("parliament_seed", "MP Profiles", triggered_by)
+    t0 = time.monotonic()
+    try:
+        async with OpenParliamentClient() as client:
+            politicians = await client.get_politicians()
+        changed = 0
+        async with AsyncSessionLocal() as session:
+            for p in politicians:
+                if not p.get("slug"):
+                    continue
+                row = (await session.execute(
+                    select(Politician).where(Politician.slug == p["slug"])
+                )).scalar_one_or_none()
+                if row is None:
+                    session.add(Politician(
+                        slug=p["slug"],
+                        name=p["name"],
+                        party=p.get("party"),
+                        riding=p.get("riding"),
+                        province=p.get("province"),
+                        url=p.get("url"),
+                    ))
+                    changed += 1
+                else:
+                    row.name = p["name"]
+                    row.party = p.get("party")
+                    row.riding = p.get("riding")
+                    row.province = p.get("province")
+                    row.url = p.get("url")
+            await session.commit()
+        await _log_finish(log_id, "ok", changed, len(politicians), time.monotonic() - t0)
+        invalidate_workspace_caches("parliament_seed")
+        log.info("scheduler_parliament_seed_done", changed=changed, total=len(politicians))
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_parliament_seed_failed", error=str(exc))
+
+
+async def _run_hansard_search(triggered_by: str = "scheduler") -> None:
+    from api.database import AsyncSessionLocal
+    from api.models.politician import HansardMention
+    from pipeline.entity_resolver import normalize
+    from pipeline.sector_mapper import SECTORS
+    from scrapers.hansard import OpenParliamentClient
+    from sqlalchemy import select
+
+    log_id = await _log_start("hansard_search", "Hansard Sector Mentions", triggered_by)
+    t0 = time.monotonic()
+    try:
+        keywords: list[str] = []
+        for sector in SECTORS.values():
+            keywords.extend(sector.keywords[:3])
+        # Preserve order while avoiding duplicate broad terms.
+        keywords = list(dict.fromkeys(k for k in keywords if len(k) >= 4))[:24]
+
+        total = 0
+        added = 0
+        async with OpenParliamentClient() as client:
+            async with AsyncSessionLocal() as session:
+                for keyword in keywords:
+                    speeches = await client.search_speeches(keyword, limit=8)
+                    total += len(speeches)
+                    canonical = normalize(keyword)
+                    for speech in speeches:
+                        exists = (await session.execute(
+                            select(HansardMention).where(
+                                HansardMention.keyword == keyword,
+                                HansardMention.speech_url == speech.get("url"),
+                                HansardMention.speaker == speech.get("speaker"),
+                            ).limit(1)
+                        )).scalar_one_or_none() if speech.get("url") else None
+                        if exists:
+                            continue
+                        session.add(HansardMention(
+                            canonical_name=canonical,
+                            keyword=keyword,
+                            speech_date=speech.get("date"),
+                            speaker=speech.get("speaker"),
+                            excerpt=speech.get("excerpt"),
+                            speech_url=speech.get("url"),
+                        ))
+                        added += 1
+                await session.commit()
+        await _log_finish(log_id, "ok", added, total, time.monotonic() - t0)
+        invalidate_workspace_caches("hansard_search")
+        await _rebuild_search_index()
+        log.info("scheduler_hansard_search_done", added=added, total=total)
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_hansard_search_failed", error=str(exc))
 
 
 async def _run_appointments(triggered_by: str = "scheduler") -> None:
@@ -229,6 +362,7 @@ async def _run_appointments(triggered_by: str = "scheduler") -> None:
             await session.commit()
             added = len(rows)
         await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
+        invalidate_workspace_caches("appointments_weekly")
         log.info("scheduler_appointments_done", count=added)
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
@@ -246,6 +380,7 @@ async def _run_contracts(triggered_by: str = "scheduler") -> None:
         # Full corpus, streamed (max_rows=0). Memory stays flat via _stream_load.
         n = await _stream_load(Contract, iter_contract_rows(max_rows=0))
         await _log_finish(log_id, "ok", n, n, time.monotonic() - t0)
+        invalidate_workspace_caches("contracts_monthly")
         log.info("scheduler_contracts_done", count=n)
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
@@ -289,6 +424,7 @@ async def _run_ocl(triggered_by: str = "scheduler") -> None:
                     ))
                 await session.commit()
         await _log_finish(log_id, "ok", len(rows), len(rows), time.monotonic() - t0)
+        invalidate_workspace_caches("ocl_monthly")
         log.info("scheduler_ocl_done", count=len(rows))
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
@@ -311,10 +447,75 @@ async def _run_grants(triggered_by: str = "scheduler") -> None:
                 await session.commit()
                 added += len(rows[i:i+batch])
         await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
+        invalidate_workspace_caches("grants_quarterly")
         log.info("scheduler_grants_done", count=added)
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
         log.error("scheduler_grants_failed", error=str(exc))
+
+
+async def _run_ocl_registrations(triggered_by: str = "scheduler") -> None:
+    from sqlalchemy import select
+    from api.database import AsyncSessionLocal
+    from api.models.ocl_registration import OCLRegistration
+    from pipeline.ingest import fetch_ocl_registration_rows
+    log_id = await _log_start("ocl_registrations", "OCL Lobbying Registrations", triggered_by)
+    t0 = time.monotonic()
+    try:
+        rows = await fetch_ocl_registration_rows(max_rows=0)
+        added = 0
+        async with AsyncSessionLocal() as session:
+            batch = 2000
+            for i in range(0, len(rows), batch):
+                for r in rows[i:i+batch]:
+                    exists = (await session.execute(
+                        select(OCLRegistration).where(
+                            OCLRegistration.registration_num == r["registration_num"]
+                        ).limit(1)
+                    )).scalar_one_or_none() if r.get("registration_num") else None
+                    if exists:
+                        continue
+                    session.add(OCLRegistration(**r))
+                    added += 1
+                await session.commit()
+        await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
+        invalidate_workspace_caches("ocl_registrations")
+        log.info("scheduler_ocl_registrations_done", added=added, total=len(rows))
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_ocl_registrations_failed", error=str(exc))
+
+
+async def _run_tribunal_decisions(triggered_by: str = "scheduler") -> None:
+    from sqlalchemy import select
+    from api.database import AsyncSessionLocal
+    from api.models.regulation import TribunalDecision
+    from pipeline.ingest import fetch_crtc_decisions
+    log_id = await _log_start("tribunal_decisions", "Tribunal Decisions", triggered_by)
+    t0 = time.monotonic()
+    try:
+        rows = await fetch_crtc_decisions()
+        added = 0
+        async with AsyncSessionLocal() as session:
+            for r in rows:
+                exists = (await session.execute(
+                    select(TribunalDecision).where(
+                        TribunalDecision.decision_number == r["decision_number"],
+                        TribunalDecision.body == r["body"],
+                    ).limit(1)
+                )).scalar_one_or_none() if r.get("decision_number") else None
+                if exists:
+                    continue
+                session.add(TribunalDecision(**r))
+                added += 1
+            await session.commit()
+        await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
+        invalidate_workspace_caches("tribunal_decisions")
+        await _rebuild_search_index()
+        log.info("scheduler_tribunal_decisions_done", added=added, total=len(rows))
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_tribunal_decisions_failed", error=str(exc))
 
 
 async def _run_donations(triggered_by: str = "scheduler") -> None:
@@ -326,6 +527,7 @@ async def _run_donations(triggered_by: str = "scheduler") -> None:
         # Full corpus, streamed (max_rows=0).
         n = await _stream_load(Donation, iter_donation_rows(max_rows=0))
         await _log_finish(log_id, "ok", n, n, time.monotonic() - t0)
+        invalidate_workspace_caches("donations_quarterly")
         log.info("scheduler_donations_done", count=n)
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
@@ -336,11 +538,15 @@ async def _run_donations(triggered_by: str = "scheduler") -> None:
 JOB_RUNNERS = {
     "bills_daily": _run_bills,
     "gazette_weekly": _run_gazette,
+    "parliament_seed": _run_parliament_seed,
+    "hansard_search": _run_hansard_search,
     "appointments_weekly": _run_appointments,
     "contracts_monthly": _run_contracts,
     "ocl_monthly": _run_ocl,
+    "ocl_registrations": _run_ocl_registrations,
     "grants_quarterly": _run_grants,
     "donations_quarterly": _run_donations,
+    "tribunal_decisions": _run_tribunal_decisions,
 }
 
 
@@ -352,6 +558,7 @@ def _make_connector_runner(conn):
         from pipeline.connectors import run_connector
         try:
             await run_connector(conn, max_rows=0, triggered_by=triggered_by)
+            invalidate_workspace_caches(conn.id)
             if conn.embed:  # refresh the semantic index for embedded sources
                 await _rebuild_search_index()
         except Exception as exc:  # already logged to scheduler_log inside run_connector

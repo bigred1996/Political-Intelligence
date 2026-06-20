@@ -7,6 +7,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.models.report import Report
+from pipeline.evidence_graph import build_report_findings
 from pipeline.entity_resolver import normalize
 from pipeline.gather import gather_company_data
 from pipeline.report_builder import build_sections
@@ -33,6 +34,8 @@ async def generate_report(
 
     log.info("pipeline_start", report_id=report.id, company=company, type=report_type)
     evidence = await gather_company_data(session, company, sector, report_type)
+    graph_findings = build_report_findings(evidence)
+    evidence["graph_findings"] = graph_findings
     scores = score(evidence)
     sections, generated_by = build_sections(evidence, scores)
 
@@ -49,6 +52,14 @@ async def generate_report(
         "donations_total": evidence["donations"]["total_value"],
         "bills_count": evidence["bills"]["count"],
         "stakeholders_count": len(evidence["stakeholders"]),
+        "source_references": evidence.get("source_references", []),
+        "graph_findings": graph_findings,
+        "breadth_count": evidence.get("breadth", {}).get("count", 0),
+        "grants_count": evidence.get("grants", {}).get("count", 0),
+        "regulations_count": evidence.get("regulations", {}).get("count", 0),
+        "tribunal_decisions_count": evidence.get("tribunal_decisions", {}).get("count", 0),
+        "appointments_count": evidence.get("appointments", {}).get("count", 0),
+        "ocl_registrations_count": evidence.get("ocl_registrations", {}).get("count", 0),
     }
     report.generated_by = generated_by
     report.status = "analyst_review"

@@ -1,6 +1,6 @@
-# Polaris MCP Server
+# Nessus MCP Server
 
-Exposes all Polaris data sources as callable tools for Claude and any MCP-compatible LLM.
+Exposes all Nessus data sources as callable tools for Claude and any MCP-compatible LLM.
 
 ## Setup
 

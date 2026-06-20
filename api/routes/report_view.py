@@ -18,6 +18,7 @@ def _score_color(v: float) -> str:
 def render_report_html(report, for_pdf: bool = False) -> str:
     scores = report.risk_scores or {}
     overall = scores.get("overall", 0)
+    evidence = report.evidence or {}
 
     cards = "".join(
         f"""<div class="score">
@@ -30,6 +31,46 @@ def render_report_html(report, for_pdf: bool = False) -> str:
         f"""<section><h2>{i+1}. {SECTION_TITLES[k]}</h2><div class="body">{report.sections.get(k,'') or '<p>—</p>'}</div></section>"""
         for i, k in enumerate(SECTION_ORDER)
     )
+    findings = evidence.get("graph_findings") or []
+    findings_html = ""
+    if findings:
+        items = "".join(
+            f"""<tr>
+                  <td>{f.get('severity','').title()}</td>
+                  <td><strong>{f.get('title','')}</strong><br><span>{f.get('summary','')}</span></td>
+                  <td>{', '.join(r.get('source','') for r in (f.get('references') or [])[:3])}</td>
+                </tr>"""
+            for f in findings[:8]
+        )
+        findings_html = f"""<section><h2>Connected Findings</h2>
+          <div class="body"><p>These are deterministic cross-source patterns generated from the same evidence layer that powers the Nessus workspace.</p>
+          <table><thead><tr><th>Severity</th><th>Finding</th><th>Evidence</th></tr></thead><tbody>{items}</tbody></table></div>
+        </section>"""
+    refs = evidence.get("source_references") or []
+    sources_html = ""
+    if refs:
+        def _reference_cell(r: dict) -> str:
+            table = r.get("table")
+            pk = r.get("pk") or r.get("id")
+            if table and pk:
+                return f'<a href="/records/{table}/{pk}">Nessus record</a>'
+            if r.get("url"):
+                return f'<a href="{r.get("url")}">source</a>'
+            return "Nessus record"
+
+        rows = "".join(
+            f"""<tr>
+                  <td>{(r.get('source') or '').replace('_', ' ')}</td>
+                  <td>{r.get('title') or ''}</td>
+                  <td>{r.get('date') or ''}</td>
+                  <td>{_reference_cell(r)}</td>
+                </tr>"""
+            for r in refs[:30]
+        )
+        sources_html = f"""<section><h2>Sources Used</h2>
+          <div class="body"><p>This brief is grounded in the records below. Nessus keeps the underlying source rows available for analyst review.</p>
+          <table><thead><tr><th>Source</th><th>Record</th><th>Date</th><th>Reference</th></tr></thead><tbody>{rows}</tbody></table></div>
+        </section>"""
 
     draft_banner = "" if report.status == "approved" else \
         '<div class="banner">DRAFT — pending analyst approval</div>'
@@ -37,7 +78,7 @@ def render_report_html(report, for_pdf: bool = False) -> str:
 
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Polaris — {report.company_name} Political Risk Report</title>
+<title>Nessus — {report.company_name} Political Risk Report</title>
 <style>
   body {{ font: 15px/1.65 Georgia, "Times New Roman", serif; color:#1a1f2b; margin:0; background:#f4f5f7; }}
   .page {{ max-width: 820px; margin: 0 auto; background:#fff; }}
@@ -66,7 +107,7 @@ def render_report_html(report, for_pdf: bool = False) -> str:
 </style></head><body><div class="page">
   {draft_banner}
   <div class="masthead">
-    <div class="brand">Polaris Intelligence · Political Due Diligence</div>
+    <div class="brand">Nessus Intelligence · Political Due Diligence</div>
     <h1>{report.company_name}</h1>
     <div class="meta">{report.report_type.replace('_',' ').title()} · Horizon: {report.time_horizon} · Report {report.id}</div>
   </div>
@@ -76,7 +117,9 @@ def render_report_html(report, for_pdf: bool = False) -> str:
       <span style="color:#778;font-size:13px">Generated via: {method}</span></div>
   </div>
   <div class="scores">{cards}</div>
+  {findings_html}
   {sections_html}
+  {sources_html}
   <div class="actions">{'' if for_pdf else f'<a href="/report/{report.id}/pdf">⬇ Download / Print PDF</a>'}</div>
-  <div class="footer">Polaris Intelligence — sourced from Government of Canada open data (lobbying registry, federal contracts, Elections Canada contributions, LEGISinfo). For institutional due-diligence use.</div>
+  <div class="footer">Nessus Intelligence — sourced from Government of Canada open data (lobbying registry, federal contracts, Elections Canada contributions, LEGISinfo). For institutional due-diligence use.</div>
 </div></body></html>"""

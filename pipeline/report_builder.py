@@ -45,15 +45,22 @@ def _fmt_money(v: float | None) -> str:
 
 # ── Template (no-key) renderers ──────────────────────────────────────────────
 def _t_executive_summary(ev, scores) -> str:
-    c = ev["contracts"]; l = ev["lobbying"]; b = ev["bills"]
+    c = ev["contracts"]; l = ev["lobbying"]; b = ev["bills"]; breadth = ev.get("breadth", {})
+    findings = ev.get("graph_findings") or []
+    findings_html = ""
+    if findings:
+        items = "".join(f"<li>{f.get('title','')} — {f.get('summary','')}</li>" for f in findings[:3])
+        findings_html = f"<p><strong>Connected findings:</strong></p><ul>{items}</ul>"
     return (
         f"<p><strong>{ev['company']}</strong> presents an overall political-risk score of "
         f"<strong>{scores['overall']}/10</strong>. The federal record shows "
         f"<strong>{l['count']}</strong> lobbying registration(s), "
         f"<strong>{c['count']}</strong> federal contract(s) totalling <strong>{_fmt_money(c['total_value'])}</strong>, "
-        f"and <strong>{b['count']}</strong> potentially relevant bill(s) before Parliament. "
+        f"<strong>{b['count']}</strong> potentially relevant bill(s) before Parliament, "
+        f"and <strong>{breadth.get('count', 0)}</strong> operational or public-record signal(s). "
         f"Regulatory risk is rated {scores['regulatory_risk']}/10 and lobbying intensity {scores['lobbying_intensity']}/10. "
         f"{'Engagement with Ottawa is material and should be diligenced directly.' if l['count'] else 'Limited direct federal lobbying footprint — engagement appears low.'}</p>"
+        f"{findings_html}"
     )
 
 
@@ -76,6 +83,14 @@ def _t_regulatory_landscape(ev, scores) -> str:
     items = "".join(f"<li>{d['dept']} — {_fmt_money(d['value'])} across {d['count']} contract(s)</li>" for d in depts)
     body = f"<p>Departmental exposure inferred from federal contracting:</p><ul>{items}</ul>" if items else \
         "<p>No federal contracting footprint found for this entity, limiting visible departmental exposure.</p>"
+    regs = ev.get("regulations", {}).get("records", [])
+    breadth = ev.get("breadth", {}).get("records", [])
+    reg_items = "".join(f"<li>{r.get('title','')} ({r.get('published_date') or r.get('date') or 'undated'})</li>" for r in regs[:5])
+    breadth_items = "".join(f"<li>{r.get('source','source')}: {r.get('title','')} ({r.get('event_date') or r.get('date') or 'undated'})</li>" for r in breadth[:5])
+    if reg_items:
+        body += f"<p><strong>Regulatory notices surfaced:</strong></p><ul>{reg_items}</ul>"
+    if breadth_items:
+        body += f"<p><strong>Operational/public-record signals:</strong></p><ul>{breadth_items}</ul>"
     return body
 
 
@@ -198,6 +213,8 @@ def _t_deal_impact(ev, scores) -> str:
 
     if bil["count"]:
         risks.append(f"{bil['count']} bill(s) before Parliament touching this sector or company")
+    if ev.get("breadth", {}).get("count", 0):
+        risks.append(f"{ev['breadth']['count']} operational/public-record signal(s) surfaced for diligence review")
 
     # Lobbying-specific risk signals — institutions come from both records and aggregated list
     insts = lob.get("institutions", [])

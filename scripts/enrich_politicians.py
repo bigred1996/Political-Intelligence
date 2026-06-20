@@ -22,7 +22,7 @@ from api.models.politician import Politician
 
 OPENPARL = "https://openparliament.ca"
 API = "https://api.openparliament.ca"
-H = {"User-Agent": "Mozilla/5.0 (compatible; Polaris/1.0)", "Accept": "application/json"}
+H = {"User-Agent": "Mozilla/5.0 (compatible; Nessus/1.0)", "Accept": "application/json"}
 
 NEW_COLS = {
     "photo_url": "VARCHAR(512)", "role": "VARCHAR(256)", "email": "VARCHAR(256)",

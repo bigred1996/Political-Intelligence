@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Evidence Detail - Intelligence Center</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;700&amp;family=Source+Serif+4:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container": "#eceef0",
+                    "on-tertiary-container": "#929292",
+                    "inverse-surface": "#2d3133",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "tertiary-container": "#2a2b2b",
+                    "inverse-primary": "#b7c7eb",
+                    "surface-dim": "#d8dadc",
+                    "on-surface-variant": "#44474d",
+                    "surface-bright": "#f7f9fb",
+                    "surface-container-high": "#e6e8ea",
+                    "surface": "#f7f9fb",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed": "#091b37",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-fixed-dim": "#b7c7eb",
+                    "outline": "#75777e",
+                    "inverse-on-surface": "#eff1f3",
+                    "on-secondary-fixed": "#0b1c30",
+                    "tertiary-fixed": "#e3e2e2",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "primary-fixed": "#d7e2ff",
+                    "on-surface": "#191c1e",
+                    "on-primary-fixed-variant": "#374765",
+                    "secondary-fixed": "#d3e4fe",
+                    "secondary-container": "#d0e1fb",
+                    "on-secondary-container": "#54647a",
+                    "on-error-container": "#93000a",
+                    "on-tertiary-fixed-variant": "#464747",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "on-primary": "#ffffff",
+                    "surface-variant": "#e0e3e5",
+                    "secondary": "#505f76",
+                    "on-error": "#ffffff",
+                    "primary": "#041632",
+                    "outline-variant": "#c5c6ce",
+                    "primary-container": "#1b2b48",
+                    "error": "#ba1a1a",
+                    "on-secondary": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "tertiary-fixed-dim": "#c6c6c6",
+                    "on-primary-container": "#8393b5",
+                    "surface-container-low": "#f2f4f6",
+                    "surface-container-highest": "#e0e3e5",
+                    "background": "#f7f9fb",
+                    "on-background": "#191c1e",
+                    "surface-tint": "#4f5e7e",
+                    "tertiary": "#151717"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "density-compact": "8px",
+                    "container-max": "1440px",
+                    "unit": "4px",
+                    "margin-desktop": "40px",
+                    "gutter": "24px",
+                    "density-comfortable": "16px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "headline-sm": [
+                            "\"Source Serif 4\""
+                    ],
+                    "headline-md": [
+                            "\"Source Serif 4\""
+                    ],
+                    "display-lg": [
+                            "\"Source Serif 4\""
+                    ],
+                    "body-md": [
+                            "Public Sans"
+                    ],
+                    "body-lg": [
+                            "Public Sans"
+                    ],
+                    "label-caps": [
+                            "Public Sans"
+                    ],
+                    "data-tabular": [
+                            "Public Sans"
+                    ],
+                    "memo-body": [
+                            "\"Source Serif 4\""
+                    ]
+            },
+            "fontSize": {
+                    "headline-sm": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-md": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "display-lg": [
+                            "48px",
+                            {
+                                    "lineHeight": "56px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-lg": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "label-caps": [
+                            "11px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "data-tabular": [
+                            "13px",
+                            {
+                                    "lineHeight": "18px",
+                                    "letterSpacing": "0.01em",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "memo-body": [
+                            "18px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid theme('colors.outline-variant');
+        }
+        .risk-indicator-high {
+            background: linear-gradient(180deg, theme('colors.error') 0%, theme('colors.error-container') 100%);
+        }
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+          font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col md:flex-row">
+<!-- TopNavBar (Mobile Only) -->
+<header class="md:hidden flex justify-between items-center w-full px-margin-mobile h-16 sticky top-0 z-50 bg-surface dark:bg-surface border-b border-outline-variant dark:border-outline">
+<div class="text-headline-sm font-headline-sm font-bold text-primary dark:text-inverse-primary tracking-tight">Polaris</div>
+<div class="flex items-center gap-density-comfortable">
+<button class="text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-colors p-density-compact rounded-full">
+<span class="material-symbols-outlined" data-icon="sensors">sensors</span>
+</button>
+<button class="text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-colors p-density-compact rounded-full">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+</button>
+<button class="text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-colors p-density-compact rounded-full">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</div>
+</header>
+<!-- SideNavBar (Desktop Only) -->
+<nav class="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 bg-surface-container-low dark:bg-surface-container border-r border-outline-variant dark:border-outline p-density-comfortable">
+<div class="mb-gutter">
+<h1 class="text-headline-sm font-headline-sm font-bold text-primary dark:text-inverse-primary tracking-tight">Intelligence Center</h1>
+<p class="text-label-caps font-label-caps text-on-surface-variant mt-unit">Source Health: Optimal</p>
+</div>
+<button class="bg-primary text-on-primary w-full py-density-compact rounded-DEFAULT text-body-md font-body-md font-bold mb-gutter hover:bg-primary-container transition-colors shadow-sm">
+            New Research
+        </button>
+<ul class="space-y-density-compact flex-1">
+<li>
+<a class="flex items-center gap-density-comfortable p-density-compact text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all rounded-DEFAULT text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                    Briefing
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-density-comfortable p-density-compact text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all rounded-DEFAULT text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="visibility">visibility</span>
+                    Watchlists
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-density-comfortable p-density-compact bg-secondary-container dark:bg-primary-container text-on-secondary-container dark:text-on-primary-container font-semibold rounded-lg text-body-md font-body-md opacity-80 transition-all scale-[0.98]" href="#">
+<span class="material-symbols-outlined" data-icon="domain" data-weight="fill">domain</span>
+                    Sectors
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-density-comfortable p-density-compact text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all rounded-DEFAULT text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+                    Search
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-density-comfortable p-density-compact text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all rounded-DEFAULT text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+                    Reports
+                </a>
+</li>
+</ul>
+<div class="mt-auto pt-gutter border-t border-outline-variant">
+<ul class="space-y-density-compact">
+<li>
+<a class="flex items-center gap-density-comfortable p-density-compact text-on-surface-variant hover:text-on-surface text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                        Settings
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-density-comfortable p-density-compact text-on-surface-variant hover:text-on-surface text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+                        Support
+                    </a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 p-margin-mobile md:p-margin-desktop max-w-container-max mx-auto w-full">
+<!-- Breadcrumb & Actions -->
+<div class="flex justify-between items-end mb-gutter">
+<div>
+<nav class="flex text-label-caps font-label-caps text-on-surface-variant mb-density-compact">
+<a class="hover:text-primary transition-colors" href="#">SECTORS</a>
+<span class="mx-unit">/</span>
+<a class="hover:text-primary transition-colors" href="#">ENERGY</a>
+<span class="mx-unit">/</span>
+<span class="text-on-surface">EVIDENCE REF: TW-992A</span>
+</nav>
+<h2 class="text-headline-md font-headline-md text-primary mt-unit">Social Evidence Detail</h2>
+</div>
+<div class="flex gap-density-compact">
+<button class="px-density-comfortable py-density-compact border border-outline text-on-surface text-body-md font-body-md rounded-DEFAULT hover:bg-surface-container-low transition-colors flex items-center gap-unit h-[28px]">
+<span class="material-symbols-outlined text-[18px]" data-icon="bookmark">bookmark</span>
+                    Save
+                </button>
+<button class="px-density-comfortable py-density-compact bg-primary text-on-primary text-body-md font-body-md rounded-DEFAULT hover:bg-primary-container transition-colors flex items-center gap-unit h-[28px]">
+<span class="material-symbols-outlined text-[18px]" data-icon="share">share</span>
+                    Export
+                </button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Column 1: Raw Evidence (8 cols) -->
+<div class="lg:col-span-8 flex flex-col gap-gutter">
+<!-- Raw Post Card -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden shadow-sm">
+<div class="bg-surface-container-low border-b border-outline-variant px-density-comfortable py-density-compact flex justify-between items-center">
+<div class="flex items-center gap-density-compact">
+<span class="material-symbols-outlined text-primary" data-icon="tag">tag</span>
+<span class="text-label-caps font-label-caps text-on-surface-variant">SOURCE: LINKEDIN PUBLIC POST</span>
+</div>
+<span class="text-label-caps font-label-caps text-on-surface-variant">CAPTURED: 2023-10-24 14:02 EST</span>
+</div>
+<div class="p-gutter">
+<div class="flex items-start gap-density-comfortable mb-density-comfortable">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-outline-variant shrink-0">
+<img class="w-full h-full object-cover" data-alt="A professional corporate headshot of a middle-aged male executive or political figure in a sharp navy suit. The lighting is soft and high-key, conveying a trustworthy and authoritative presence suitable for an intelligence dossier or professional networking profile. Neutral grey background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0EEUvz7579DojXRMplAiBmCocte78ciDJxcKVNLuSCne6kxPq5OBGIPiBEgrJQtRVOsMOVr3x7chhV0qpVEStv04LGryp3hZoJfNUdzKnCXQJs2l5ZAdsZs0olMidYZjy1-t4rNuOms7AF2ivaXndB_Y10eiEgWG7w97uOWerIrZmMIKg9l4TMVvMYWmPgP59u9MFNFF6RT65e0euWmHAT4nM2zJivu6GRchf0QJK9HayyQRaqPS4OqacEmDNobfxuSHkAdCIgnc"/>
+</div>
+<div>
+<h3 class="text-body-lg font-body-lg font-bold text-primary">Hon. Robert Vance</h3>
+<p class="text-body-md font-body-md text-on-surface-variant">Minister of Natural Resources | Government of Canada</p>
+<p class="text-label-caps font-label-caps text-on-tertiary-container mt-unit">Posted 2 hours ago</p>
+</div>
+</div>
+<div class="text-memo-body font-memo-body text-on-surface space-y-density-comfortable leading-relaxed">
+<p>Productive discussions this morning with key stakeholders in the clean energy sector. We are committed to accelerating the transition while ensuring grid stability. The upcoming fall economic statement will reflect our priority to streamline approvals for critical mineral projects.</p>
+<p>We cannot afford to lag in the global market. Regulatory agility is not a buzzword; it's an economic imperative. #CleanEnergy #CriticalMinerals #PolicyUpdate</p>
+</div>
+</div>
+</article>
+<!-- Political Context Memo -->
+<section class="glass-panel rounded-lg p-gutter">
+<h3 class="text-headline-sm font-headline-sm text-primary mb-density-comfortable flex items-center gap-density-compact border-b border-outline-variant pb-density-compact">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+                        Political Context &amp; Analysis
+                    </h3>
+<div class="text-body-lg font-body-lg text-on-surface space-y-density-comfortable">
+<p>This public statement precedes the highly anticipated Fall Economic Statement by three weeks. The explicit mention of "streamlining approvals" marks a rhetorical shift from previous ministerial statements which heavily emphasized environmental diligence over speed.</p>
+<p>Intelligence suggests this post is a calculated signal to the capital markets following last week's capital flight report in the critical minerals sector. It indicates an internal cabinet consensus likely favoring the proposed amendments in Bill C-69 regarding assessment timelines.</p>
+</div>
+</section>
+</div>
+<!-- Column 2: Metadata & Materiality (4 cols) -->
+<div class="lg:col-span-4 flex flex-col gap-gutter">
+<!-- Materiality Score -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-gutter shadow-sm relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+<h3 class="text-label-caps font-label-caps text-on-surface-variant mb-density-comfortable">MATERIALITY SCORE</h3>
+<div class="flex items-end gap-density-comfortable">
+<div class="text-display-lg font-display-lg text-primary leading-none">84</div>
+<div class="text-body-md font-body-md text-on-surface-variant mb-unit">/ 100</div>
+</div>
+<div class="mt-gutter space-y-density-compact">
+<div class="flex justify-between text-body-md font-body-md">
+<span class="text-on-surface-variant">Policy Shift Probability</span>
+<span class="font-bold text-on-surface">High</span>
+</div>
+<div class="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[85%]"></div>
+</div>
+</div>
+<div class="mt-density-comfortable space-y-density-compact">
+<div class="flex justify-between text-body-md font-body-md">
+<span class="text-on-surface-variant">Market Impact</span>
+<span class="font-bold text-on-surface">Moderate</span>
+</div>
+<div class="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[60%]"></div>
+</div>
+</div>
+</div>
+<!-- Related Activity (Zebra Grid) -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden shadow-sm">
+<div class="bg-surface-container-low border-b border-outline-variant px-density-comfortable py-density-compact">
+<h3 class="text-label-caps font-label-caps text-on-surface-variant">RELATED ACTIVITY</h3>
+</div>
+<div class="flex flex-col">
+<!-- Grid Row -->
+<div class="flex justify-between items-center p-density-comfortable border-b border-outline-variant bg-primary/5">
+<div class="flex items-center gap-density-compact">
+<span class="material-symbols-outlined text-secondary text-[18px]" data-icon="trending_up">trending_up</span>
+<div>
+<p class="text-data-tabular font-data-tabular text-on-surface">Lobbying Spike</p>
+<p class="text-label-caps font-label-caps text-on-surface-variant">MINING ASSOC. OF CANADA</p>
+</div>
+</div>
+<span class="px-2 py-1 bg-secondary/10 text-secondary rounded-full text-label-caps font-label-caps">+14 interactions</span>
+</div>
+<!-- Grid Row -->
+<div class="flex justify-between items-center p-density-comfortable border-b border-outline-variant">
+<div class="flex items-center gap-density-compact">
+<span class="material-symbols-outlined text-secondary text-[18px]" data-icon="gavel">gavel</span>
+<div>
+<p class="text-data-tabular font-data-tabular text-on-surface">Bill Amendment</p>
+<p class="text-label-caps font-label-caps text-on-surface-variant">BILL C-69 SUB-SECTION 4</p>
+</div>
+</div>
+<span class="px-2 py-1 bg-surface-container-high text-on-surface-variant rounded-full text-label-caps font-label-caps">In Committee</span>
+</div>
+<!-- Grid Row -->
+<div class="flex justify-between items-center p-density-comfortable bg-primary/5">
+<div class="flex items-center gap-density-compact">
+<span class="material-symbols-outlined text-secondary text-[18px]" data-icon="article">article</span>
+<div>
+<p class="text-data-tabular font-data-tabular text-on-surface">Briefing Note</p>
+<p class="text-label-caps font-label-caps text-on-surface-variant">"CRITICAL MINERALS SUPPLY"</p>
+</div>
+</div>
+<span class="px-2 py-1 bg-surface-container-high text-on-surface-variant rounded-full text-label-caps font-label-caps">Obtained ATIP</span>
+</div>
+</div>
+</div>
+<!-- Risk Indicators -->
+<div class="glass-panel rounded-lg p-density-comfortable flex items-center justify-between">
+<div>
+<h4 class="text-label-caps font-label-caps text-on-surface-variant mb-unit">REGULATORY RISK</h4>
+<p class="text-body-md font-body-md font-bold text-on-surface">Elevated Scrutiny</p>
+</div>
+<div class="flex flex-col gap-1 w-4">
+<div class="h-8 w-full bg-error rounded-t-sm risk-indicator-high"></div>
+<div class="h-6 w-full bg-surface-container-high"></div>
+<div class="h-6 w-full bg-surface-container-high rounded-b-sm"></div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

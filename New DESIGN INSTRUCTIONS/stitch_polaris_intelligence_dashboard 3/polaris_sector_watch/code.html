@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Politicore Intelligence - Sector Watch</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=Source+Serif+4:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface-variant": "#44474d",
+                    "inverse-surface": "#2d3133",
+                    "on-background": "#191c1e",
+                    "surface-variant": "#e0e3e5",
+                    "inverse-primary": "#b7c7eb",
+                    "on-tertiary-fixed-variant": "#464747",
+                    "tertiary": "#151717",
+                    "secondary-container": "#d0e1fb",
+                    "secondary": "#505f76",
+                    "tertiary-fixed": "#e3e2e2",
+                    "error-container": "#ffdad6",
+                    "on-secondary-container": "#54647a",
+                    "tertiary-container": "#2a2b2b",
+                    "on-primary-fixed": "#091b37",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-fixed": "#0b1c30",
+                    "inverse-on-surface": "#eff1f3",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "error": "#ba1a1a",
+                    "primary-fixed-dim": "#b7c7eb",
+                    "on-primary-fixed-variant": "#374765",
+                    "on-primary": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "surface-dim": "#d8dadc",
+                    "on-error": "#ffffff",
+                    "surface-bright": "#f7f9fb",
+                    "surface": "#f7f9fb",
+                    "primary": "#041632",
+                    "primary-container": "#1b2b48",
+                    "surface-container-highest": "#e0e3e5",
+                    "tertiary-fixed-dim": "#c6c6c6",
+                    "outline": "#75777e",
+                    "on-surface": "#191c1e",
+                    "secondary-fixed": "#d3e4fe",
+                    "surface-tint": "#4f5e7e",
+                    "on-tertiary": "#ffffff",
+                    "primary-fixed": "#d7e2ff",
+                    "background": "#f7f9fb",
+                    "on-tertiary-container": "#929292",
+                    "surface-container-high": "#e6e8ea",
+                    "on-primary-container": "#8393b5",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "outline-variant": "#c5c6ce",
+                    "on-secondary": "#ffffff",
+                    "surface-container-low": "#f2f4f6",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "surface-container": "#eceef0"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "margin-mobile": "16px",
+                    "unit": "4px",
+                    "margin-desktop": "40px",
+                    "gutter": "24px",
+                    "density-compact": "8px",
+                    "density-comfortable": "16px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "body-lg": [
+                            "Public Sans"
+                    ],
+                    "headline-sm": [
+                            "\"Source Serif 4\""
+                    ],
+                    "display-lg": [
+                            "\"Source Serif 4\""
+                    ],
+                    "data-tabular": [
+                            "Public Sans"
+                    ],
+                    "body-md": [
+                            "Public Sans"
+                    ],
+                    "headline-md": [
+                            "\"Source Serif 4\""
+                    ],
+                    "label-caps": [
+                            "Public Sans"
+                    ],
+                    "memo-body": [
+                            "\"Source Serif 4\""
+                    ]
+            },
+            "fontSize": {
+                    "body-lg": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-sm": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "display-lg": [
+                            "48px",
+                            {
+                                    "lineHeight": "56px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "data-tabular": [
+                            "13px",
+                            {
+                                    "lineHeight": "18px",
+                                    "letterSpacing": "0.01em",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "body-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-md": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-caps": [
+                            "11px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "memo-body": [
+                            "18px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        
+        .zebra-row:nth-child(even) {
+            background-color: rgba(4, 22, 50, 0.02);
+        }
+        
+        /* Custom scrollbar for data tables */
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f2f4f6;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c5c6ce;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #75777e;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased min-h-screen flex flex-col md:flex-row">
+<!-- Mobile Top Navigation (Visible only on md:hidden) -->
+<nav class="md:hidden fixed top-0 w-full z-50 flex items-center justify-between px-margin-mobile h-16 bg-surface border-b border-outline-variant flat no shadows">
+<div class="flex items-center gap-2 cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="font-headline-sm text-headline-sm font-semibold text-primary">Sector Watch</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors rounded-full p-2 cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors rounded-full p-2 cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<img alt="User Profile" class="w-8 h-8 rounded-full border border-outline-variant object-cover cursor-pointer active:opacity-80" data-alt="A small, professional headshot of an intelligence analyst wearing a dark navy blazer against a neutral grey background, corporate modern lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDA1Rl9JGR7WonBGf_ZajVXzX7wCYDQV5WL-PZqx8mwDhbWMpGmo_EUOWSCWdvzhIJ-2uxgXf5mtbeIUqOJDBLVFkFcnltMxkrTqlS5n0rJM6Y0mPojuc-856yUhL-V0MTA1aH4mjR7BEB-OSnE8T1i30fuat-3e1YXNuGT76WLWKgy3WdI3p3EtVKM7dpLyh5wFLPlcHoEGh4z9MttjyCZxoPe5D3XUVYJULxKjG2Jw2ooRsiNRoxt6b2SYkHgG3ou-OVt3gMbIqA"/>
+</div>
+</nav>
+<!-- SideNavBar (Visible on md:flex) -->
+<aside class="hidden md:flex fixed left-0 top-0 h-full w-64 flex-col py-density-comfortable px-4 gap-y-unit bg-surface-container-low border-r border-outline-variant flat no shadows z-40">
+<!-- Header -->
+<div class="flex items-center gap-3 px-3 py-4 mb-6">
+<img alt="System Status" class="w-10 h-10 rounded shadow-sm object-cover" data-alt="A sleek, minimalist corporate logo depicting a stylized compass or data node in deep parliament navy, representing institutional intelligence on a pure white background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBOcmkB5mQk4ruRRNOUjidqmvCetAahA55HbnqdZwoCDGDN7cWDUa1otJSY2tgGnvEhBGO5vMRrG4NJME2Txw--mlixla4U4dhMzuAZK5Dp563iippJsopBi0hvxRqz1Zhz00F1RASSfqMcHpBvhUAPVlGV6GxbUq6by8uHcmKUAypy8aE8acCMD0S7ip_CLYNhoeJa9KeQTL7Xl08R7AljP1CSNl9O8Tt7SrfQdMKiqnw1N2E642leEnJdrW6DQJVHVGJ0PNJNJG0"/>
+<div>
+<h1 class="font-headline-sm text-headline-sm text-primary">Politicore</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Institutional Intelligence</p>
+</div>
+</div>
+<!-- Main Navigation -->
+<nav class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-variant/50 hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">rss_feed</span>
+<span>Live Feed</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-variant/50 hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">article</span>
+<span>Daily Memo</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary-container text-on-secondary-container font-bold hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px; font-variation-settings: 'FILL' 1;">analytics</span>
+<span>Sector Watch</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-variant/50 hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">description</span>
+<span>Briefing</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-variant/50 hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">visibility</span>
+<span>Watchlists</span>
+</a>
+</nav>
+<!-- Footer Navigation -->
+<div class="mt-auto pt-4 border-t border-outline-variant flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-variant/50 hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">domain</span>
+<span>Sectors</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-variant/50 hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">assessment</span>
+<span>Reports</span>
+</a>
+</div>
+<!-- User Profile -->
+<div class="mt-4 px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-surface-container-high rounded-lg transition-all duration-200 ease-in-out">
+<div class="flex items-center gap-2">
+<img alt="User Profile" class="w-8 h-8 rounded-full border border-outline-variant object-cover" data-alt="A small, professional headshot of an intelligence analyst wearing a dark navy blazer against a neutral grey background, corporate modern lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4ldzxb20kfrkjHZn9LaHMgieAUNUCc5nluzDvmWn49oMAn7wLQcNms6gGRXHFvAb3T8_76LrHKnWilDsm80SaMAcdqQXhpzLhq0Ys2tfgVijdcAW7nQxJme7ubzamWrD3o5K9L1aOuyCp1kG7M5OKbQqIOzZdy7L06ZQ9S1ubJThB32_UtSoQGfo8tZYWFPjpUrGpP4rdO89hSATdUlC1R3yZBdZF_t7TE8b5rKg9oTZZa5UDKwrpuP-lpJJy5idaJSnz3Wd5W9s"/>
+<div class="flex flex-col">
+<span class="font-data-tabular text-data-tabular text-primary">A. Mercer</span>
+<span class="text-[10px] text-on-surface-variant">Lead Analyst</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" style="font-size: 16px;">settings</span>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full md:ml-64 mt-16 md:mt-0 p-margin-mobile md:p-margin-desktop overflow-x-hidden">
+<!-- Top App Bar (Desktop Context inside Canvas) -->
+<header class="hidden md:flex items-center justify-between w-full max-w-container-max mx-auto mb-8">
+<div class="flex items-center gap-4">
+<h2 class="font-headline-md text-headline-md text-primary">Sector Intelligence</h2>
+</div>
+<div class="flex items-center gap-6">
+<!-- Global Search -->
+<div class="relative w-64 group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none group-focus-within:text-primary transition-colors">search</span>
+<input class="w-full h-10 pl-10 pr-4 bg-surface-container-low border border-outline-variant rounded-lg font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Search entities, bills..." type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="h-10 px-4 bg-primary text-on-primary font-label-caps text-label-caps rounded-lg hover:bg-primary-container transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined" style="font-size: 16px;">download</span>
+<span>Export Report</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Dashboard Content -->
+<div class="max-w-container-max mx-auto space-y-gutter">
+<!-- Sector Control Bar -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+<div class="flex flex-col gap-1">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Active Sector Focus</span>
+<div class="flex items-center gap-2">
+<select class="bg-transparent border-none p-0 pr-8 font-headline-sm text-headline-sm text-primary focus:ring-0 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23041632%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_center] bg-[length:20px]">
+<option value="energy">Energy &amp; Natural Resources</option>
+<option value="tech">Technology &amp; Telecommunications</option>
+<option value="finance">Banking &amp; Financial Services</option>
+<option value="health">Healthcare &amp; Pharmaceuticals</option>
+</select>
+</div>
+</div>
+<div class="flex flex-wrap items-center gap-2">
+<button class="h-8 px-3 rounded-full border border-primary text-primary bg-primary/5 font-label-caps text-label-caps flex items-center gap-1 hover:bg-primary/10 transition-colors">
+<span>Oil &amp; Gas</span>
+<span class="material-symbols-outlined" style="font-size: 14px;">close</span>
+</button>
+<button class="h-8 px-3 rounded-full border border-outline-variant text-on-surface-variant bg-surface-container-low font-label-caps text-label-caps flex items-center gap-1 hover:bg-surface-variant transition-colors">
+<span>Renewables</span>
+</button>
+<button class="h-8 px-3 rounded-full border border-outline-variant text-on-surface-variant bg-surface-container-low font-label-caps text-label-caps flex items-center gap-1 hover:bg-surface-variant transition-colors">
+<span>Mining</span>
+</button>
+<button class="w-8 h-8 rounded-full border border-outline-variant text-on-surface-variant bg-surface-container-low flex items-center justify-center hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined" style="font-size: 16px;">add</span>
+</button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column (Activity & Entities) -->
+<div class="lg:col-span-8 flex flex-col gap-gutter">
+<!-- Activity Intensity Timeline -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm flex flex-col">
+<div class="bg-surface-container-low px-4 py-3 border-b border-outline-variant flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" style="font-size: 18px;">timeline</span>
+<h3 class="font-label-caps text-label-caps text-primary uppercase tracking-wider">Activity Intensity</h3>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="text-[10px] uppercase font-semibold">30 Days</span>
+<span class="material-symbols-outlined" style="font-size: 14px;">expand_more</span>
+</div>
+</div>
+<div class="p-6 relative h-64 flex flex-col justify-end">
+<!-- Simulated Chart Area -->
+<div class="absolute inset-0 p-6 flex items-end gap-1 pb-8">
+<!-- Bars representing lobbying/regulatory volume -->
+<div class="w-full flex items-end justify-between gap-[2px] h-full opacity-80">
+<div class="w-full bg-primary/20 rounded-t-sm h-[20%] relative group"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] py-1 px-2 rounded whitespace-nowrap">Vol: 12</div></div>
+<div class="w-full bg-primary/30 rounded-t-sm h-[35%] relative group"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] py-1 px-2 rounded whitespace-nowrap">Vol: 24</div></div>
+<div class="w-full bg-primary/20 rounded-t-sm h-[25%] relative group"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] py-1 px-2 rounded whitespace-nowrap">Vol: 18</div></div>
+<div class="w-full bg-primary/40 rounded-t-sm h-[50%] relative group"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] py-1 px-2 rounded whitespace-nowrap">Vol: 45</div></div>
+<div class="w-full bg-primary/30 rounded-t-sm h-[40%] relative group"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] py-1 px-2 rounded whitespace-nowrap">Vol: 32</div></div>
+<div class="w-full bg-secondary/80 rounded-t-sm h-[85%] relative group border-t-2 border-error"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] py-1 px-2 rounded whitespace-nowrap z-10">Bill C-49 Introduced</div></div>
+<div class="w-full bg-primary/60 rounded-t-sm h-[70%] relative group"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] py-1 px-2 rounded whitespace-nowrap">Vol: 65</div></div>
+<div class="w-full bg-primary/50 rounded-t-sm h-[55%] relative group"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] py-1 px-2 rounded whitespace-nowrap">Vol: 48</div></div>
+<div class="w-full bg-primary/40 rounded-t-sm h-[45%] relative group"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] py-1 px-2 rounded whitespace-nowrap">Vol: 38</div></div>
+<div class="w-full bg-primary/30 rounded-t-sm h-[30%] relative group"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] py-1 px-2 rounded whitespace-nowrap">Vol: 22</div></div>
+</div>
+</div>
+<!-- Overlay Trendline -->
+<svg class="absolute inset-0 w-full h-[calc(100%-2rem)] top-0 left-0 pointer-events-none stroke-error" preserveaspectratio="none" viewbox="0 0 100 100">
+<path class="opacity-80" d="M0,80 Q10,70 20,60 T40,50 T60,20 T80,30 T100,10" fill="none" stroke-linecap="round" stroke-width="2"></path>
+<circle class="text-error" cx="60" cy="20" fill="currentColor" r="2"></circle>
+</svg>
+<!-- X Axis Labels -->
+<div class="w-full flex justify-between text-[10px] text-on-surface-variant border-t border-outline-variant pt-2 z-10">
+<span>Oct 01</span>
+<span>Oct 15</span>
+<span>Today</span>
+</div>
+</div>
+</div>
+<!-- Impacted Entities Grid -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm flex flex-col flex-1">
+<div class="bg-surface-container-low px-4 py-3 border-b border-outline-variant flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" style="font-size: 18px;">business</span>
+<h3 class="font-label-caps text-label-caps text-primary uppercase tracking-wider">Impacted Entities</h3>
+</div>
+<button class="text-xs text-primary font-semibold hover:underline">View All Registry</button>
+</div>
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant bg-surface font-label-caps text-label-caps text-on-surface-variant">
+<th class="py-3 px-4 font-semibold">Entity Name</th>
+<th class="py-3 px-4 font-semibold">Classification</th>
+<th class="py-3 px-4 font-semibold">Risk Exposure</th>
+<th class="py-3 px-4 font-semibold">Active Lobbyists</th>
+<th class="py-3 px-4 font-semibold text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="font-data-tabular text-data-tabular text-on-surface">
+<tr class="border-b border-outline-variant/50 zebra-row hover:bg-surface-container-low transition-colors">
+<td class="py-3 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded border border-outline-variant bg-surface flex items-center justify-center text-primary font-bold text-xs">EN</div>
+<div>
+<div class="font-semibold text-primary">Enbridge Inc.</div>
+<div class="text-[10px] text-on-surface-variant font-normal">Corp / O&amp;G Pipeline</div>
+</div>
+</td>
+<td class="py-3 px-4"><span class="px-2 py-0.5 rounded-full bg-surface-container-highest text-xs border border-outline-variant">Tier 1 Operator</span></td>
+<td class="py-3 px-4">
+<!-- Risk Indicator Component -->
+<div class="flex items-center gap-1 h-3 w-12">
+<div class="h-full w-1/3 bg-surface-variant rounded-l-sm"></div>
+<div class="h-full w-1/3 bg-surface-variant"></div>
+<div class="h-full w-1/3 bg-error rounded-r-sm"></div>
+</div>
+<span class="text-[10px] text-error ml-2">High</span>
+</td>
+<td class="py-3 px-4">14 Active</td>
+<td class="py-3 px-4 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" style="font-size: 18px;">chevron_right</span>
+</button>
+</td>
+</tr>
+<tr class="border-b border-outline-variant/50 zebra-row hover:bg-surface-container-low transition-colors">
+<td class="py-3 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded border border-outline-variant bg-surface flex items-center justify-center text-primary font-bold text-xs">SU</div>
+<div>
+<div class="font-semibold text-primary">Suncor Energy</div>
+<div class="text-[10px] text-on-surface-variant font-normal">Corp / Upstream</div>
+</div>
+</td>
+<td class="py-3 px-4"><span class="px-2 py-0.5 rounded-full bg-surface-container-highest text-xs border border-outline-variant">Tier 1 Operator</span></td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-1 h-3 w-12">
+<div class="h-full w-1/3 bg-surface-variant rounded-l-sm"></div>
+<div class="h-full w-1/3 bg-amber-500 rounded-r-sm"></div>
+<div class="h-full w-1/3 bg-surface-container-low rounded-r-sm"></div>
+</div>
+<span class="text-[10px] text-amber-600 ml-2">Elevated</span>
+</td>
+<td class="py-3 px-4">8 Active</td>
+<td class="py-3 px-4 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" style="font-size: 18px;">chevron_right</span>
+</button>
+</td>
+</tr>
+<tr class="border-b border-outline-variant/50 zebra-row hover:bg-surface-container-low transition-colors">
+<td class="py-3 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded border border-outline-variant bg-surface flex items-center justify-center text-primary font-bold text-xs">CA</div>
+<div>
+<div class="font-semibold text-primary">CAPP</div>
+<div class="text-[10px] text-on-surface-variant font-normal">Industry Association</div>
+</div>
+</td>
+<td class="py-3 px-4"><span class="px-2 py-0.5 rounded-full bg-surface-container-highest text-xs border border-outline-variant">Advocacy Group</span></td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-1 h-3 w-12">
+<div class="h-full w-1/3 bg-surface-variant rounded-l-sm"></div>
+<div class="h-full w-1/3 bg-amber-500"></div>
+<div class="h-full w-1/3 bg-error rounded-r-sm"></div>
+</div>
+<span class="text-[10px] text-error ml-2">High</span>
+</td>
+<td class="py-3 px-4">22 Active</td>
+<td class="py-3 px-4 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" style="font-size: 18px;">chevron_right</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Right Column (Pulse & Feed) -->
+<div class="lg:col-span-4 flex flex-col gap-gutter">
+<!-- Regulatory Pulse -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+<div class="bg-surface-container-low px-4 py-3 border-b border-outline-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" style="font-size: 18px;">vital_signs</span>
+<h3 class="font-label-caps text-label-caps text-primary uppercase tracking-wider">Regulatory Pulse</h3>
+</div>
+<div class="p-4 flex flex-col gap-4">
+<!-- Sentiment Shift -->
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md text-on-surface-variant">Sector Sentiment</span>
+<div class="flex items-center gap-1 text-error bg-error/10 px-2 py-1 rounded">
+<span class="material-symbols-outlined" style="font-size: 14px;">trending_down</span>
+<span class="font-data-tabular font-bold">-4.2%</span>
+</div>
+</div>
+<!-- Active Legislation -->
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md text-on-surface-variant">Active Bills</span>
+<div class="font-data-tabular font-bold text-primary">12</div>
+</div>
+<!-- Upcoming Hearings -->
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md text-on-surface-variant">Committee Hearings (7d)</span>
+<div class="font-data-tabular font-bold text-primary">3</div>
+</div>
+<hr class="border-outline-variant my-1"/>
+<!-- Key Driver -->
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider block mb-2">Primary Driver</span>
+<div class="bg-surface border border-outline-variant rounded p-3 text-sm text-on-surface">
+                                    Increased scrutiny on emissions reporting frameworks following Environment Commissioner's latest audit report.
+                                </div>
+</div>
+</div>
+</div>
+<!-- Material Developments Feed -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm flex flex-col flex-1">
+<div class="bg-surface-container-low px-4 py-3 border-b border-outline-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" style="font-size: 18px;">dynamic_feed</span>
+<h3 class="font-label-caps text-label-caps text-primary uppercase tracking-wider">Material Developments</h3>
+</div>
+<div class="flex flex-col overflow-y-auto h-[400px] custom-scrollbar p-2">
+<!-- Feed Item 1 -->
+<div class="p-3 border-b border-outline-variant/50 hover:bg-surface-container-low transition-colors group cursor-pointer">
+<div class="flex items-center justify-between mb-1">
+<span class="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded text-[10px] font-bold uppercase tracking-wide">Legislation</span>
+<span class="text-[10px] text-on-surface-variant">2 hours ago</span>
+</div>
+<h4 class="font-headline-sm text-[16px] leading-tight font-semibold text-primary mb-2 group-hover:underline">Bill C-49 Passes Second Reading</h4>
+<p class="text-sm text-on-surface-variant line-clamp-2 mb-2">The Offshore Renewable Energy accord advances to committee phase, prompting immediate response from major operators regarding liability clauses.</p>
+<div class="flex items-center gap-2">
+<span class="text-[10px] text-on-surface-variant bg-surface px-1.5 py-0.5 rounded border border-outline-variant">Natural Resources Comm.</span>
+</div>
+</div>
+<!-- Feed Item 2 -->
+<div class="p-3 border-b border-outline-variant/50 hover:bg-surface-container-low transition-colors group cursor-pointer">
+<div class="flex items-center justify-between mb-1">
+<span class="px-2 py-0.5 bg-secondary/10 text-secondary border border-secondary/20 rounded text-[10px] font-bold uppercase tracking-wide">Registry Filing</span>
+<span class="text-[10px] text-on-surface-variant">5 hours ago</span>
+</div>
+<h4 class="font-headline-sm text-[16px] leading-tight font-semibold text-primary mb-2 group-hover:underline">CAPP Registers 3 New Lobbyists</h4>
+<p class="text-sm text-on-surface-variant line-clamp-2 mb-2">Targeting PMO and Finance regarding forthcoming clean investment tax credit implementation details.</p>
+</div>
+<!-- Feed Item 3 -->
+<div class="p-3 hover:bg-surface-container-low transition-colors group cursor-pointer">
+<div class="flex items-center justify-between mb-1">
+<span class="px-2 py-0.5 bg-amber-500/10 text-amber-700 border border-amber-500/20 rounded text-[10px] font-bold uppercase tracking-wide">Regulatory Notice</span>
+<span class="text-[10px] text-on-surface-variant">Yesterday</span>
+</div>
+<h4 class="font-headline-sm text-[16px] leading-tight font-semibold text-primary mb-2 group-hover:underline">CER Issues Draft Guidance on Emissions</h4>
+<p class="text-sm text-on-surface-variant line-clamp-2 mb-2">Canada Energy Regulator opens 30-day consultation window for revised filing requirements related to scope 3 emissions tracking.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Visible only on md:hidden) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 flex items-center justify-around h-16 bg-surface-container-low border-t border-outline-variant pb-safe flat no shadows">
+<a class="flex flex-col items-center justify-center w-full h-full text-on-surface-variant active:opacity-80" href="#">
+<span class="material-symbols-outlined" style="font-size: 24px;">rss_feed</span>
+<span class="text-[10px] mt-1 font-medium">Feed</span>
+</a>
+<a class="flex flex-col items-center justify-center w-full h-full text-on-surface-variant active:opacity-80" href="#">
+<span class="material-symbols-outlined" style="font-size: 24px;">article</span>
+<span class="text-[10px] mt-1 font-medium">Memo</span>
+</a>
+<a class="flex flex-col items-center justify-center w-full h-full bg-secondary-container text-on-secondary-container active:opacity-80" href="#">
+<span class="material-symbols-outlined" style="font-size: 24px; font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="text-[10px] mt-1 font-bold">Sectors</span>
+</a>
+<a class="flex flex-col items-center justify-center w-full h-full text-on-surface-variant active:opacity-80" href="#">
+<span class="material-symbols-outlined" style="font-size: 24px;">description</span>
+<span class="text-[10px] mt-1 font-medium">Briefing</span>
+</a>
+<a class="flex flex-col items-center justify-center w-full h-full text-on-surface-variant active:opacity-80" href="#">
+<span class="material-symbols-outlined" style="font-size: 24px;">visibility</span>
+<span class="text-[10px] mt-1 font-medium">Watchlists</span>
+</a>
+</nav>
+</body></html>

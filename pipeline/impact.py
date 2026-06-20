@@ -1,6 +1,6 @@
 """Industry-lens layer — read every data point through the industry it touches.
 
-Polaris is positioned around *industries*, not companies: a contract, a bill, a
+Nessus is positioned around *industries*, not companies: a contract, a bill, a
 lobbying notice or a pollutant release matters because of what it means for a
 *sector* and which *political players* shape that sector. This module turns any
 record into three things:

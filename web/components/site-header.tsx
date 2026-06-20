@@ -27,7 +27,7 @@ export function SiteHeader() {
       <div className="mx-auto max-w-[1320px] px-4 h-14 flex items-center gap-5">
         <Link href="/" className="flex items-center gap-2 text-brass-bright shrink-0 group">
           <CompassMark size={26} className="transition-transform duration-300 group-hover:rotate-[30deg]" />
-          <span className="text-fg-bright text-base font-semibold tracking-wide">POLARIS</span>
+          <span className="text-fg-bright text-base font-semibold tracking-wide">NESSUS</span>
           <span className="hidden sm:inline mono text-[10px] text-up flex items-center gap-1 ml-1">● LIVE</span>
         </Link>
 

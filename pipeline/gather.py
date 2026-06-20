@@ -19,6 +19,8 @@ from api.models.grant import Grant
 from api.models.ocl_registration import OCLRegistration
 from api.models.politician import HansardMention, Politician
 from api.models.regulation import GazetteEntry, TribunalDecision
+from api.models.source_record import SourceRecord
+from pipeline.evidence_graph import normalize_reference
 from pipeline.entity_resolver import normalize
 from scrapers.ocl import OCLScraper
 
@@ -48,6 +50,11 @@ async def _lobbying(session: AsyncSession, company: str, canonical: str) -> list
     if rows:
         return [
             {
+                "id": r.id,
+                "pk": r.id,
+                "table": "lobbying",
+                "source": r.source,
+                "title": f"{r.client} lobbying communication",
                 "registration_id": r.registration_id,
                 "client": r.client,
                 "registrant": r.registrant,
@@ -132,6 +139,11 @@ async def _grants(session: AsyncSession, company: str, canonical: str) -> list[d
     )
     return [
         {
+            "id": r.id,
+            "pk": r.id,
+            "table": "grants",
+            "source": r.source,
+            "title": f"{r.recipient_name} — {r.program_name or 'grant'}",
             "recipient_name": r.recipient_name,
             "owner_org_title": r.owner_org_title,
             "program_name": r.program_name,
@@ -160,6 +172,10 @@ async def _regulations(session: AsyncSession, company: str, sector: str | None) 
     res = await session.execute(q)
     return [
         {
+            "id": r.id,
+            "pk": r.id,
+            "table": "gazette",
+            "source": "Canada Gazette",
             "gazette_part": r.gazette_part,
             "title": r.title,
             "published_date": r.published_date,
@@ -188,6 +204,10 @@ async def _tribunal_decisions(session: AsyncSession, company: str, sector: str |
     res = await session.execute(q)
     return [
         {
+            "id": r.id,
+            "pk": r.id,
+            "table": "tribunal",
+            "source": r.source,
             "body": r.body,
             "decision_number": r.decision_number,
             "title": r.title,
@@ -223,6 +243,11 @@ async def _appointments(session: AsyncSession, sector: str | None) -> list[dict[
     )
     return [
         {
+            "id": r.id,
+            "pk": r.id,
+            "table": "appointments",
+            "source": r.source,
+            "title": f"{r.appointee_name} — {r.position_title or 'appointment'}",
             "appointee_name": r.appointee_name,
             "position_title": r.position_title,
             "organization": r.organization,
@@ -242,6 +267,11 @@ async def _ocl_registrations(session: AsyncSession, company: str, canonical: str
     )
     return [
         {
+            "id": r.id,
+            "pk": r.id,
+            "table": "ocl_registrations",
+            "source": r.source,
+            "title": f"{r.client_org} registration",
             "registration_num": r.registration_num,
             "registrant_name": r.registrant_name,
             "firm_name": r.firm_name,
@@ -253,6 +283,119 @@ async def _ocl_registrations(session: AsyncSession, company: str, canonical: str
         }
         for r in res.scalars().all()
     ]
+
+
+async def _breadth(session: AsyncSession, company: str, canonical: str, sector: str | None) -> list[dict[str, Any]]:
+    keywords = [company] + ([sector] if sector else [])
+    filters = [
+        or_(
+            SourceRecord.title.ilike(f"%{kw}%"),
+            SourceRecord.summary.ilike(f"%{kw}%"),
+            SourceRecord.entity_name.ilike(f"%{kw}%"),
+        )
+        for kw in keywords if kw
+    ]
+    match = SourceRecord.canonical_name == canonical
+    if filters:
+        match = or_(match, *filters)
+    res = await session.execute(
+        select(SourceRecord)
+        .where(match)
+        .order_by(SourceRecord.event_date.desc())
+        .limit(30)
+    )
+    return [
+        {
+            "id": r.id,
+            "pk": r.id,
+            "table": "source_records",
+            "source": r.source,
+            "record_type": r.record_type,
+            "title": r.title,
+            "date": r.event_date,
+            "event_date": r.event_date,
+            "url": r.url,
+            "entity": r.entity_name or r.canonical_name,
+            "province": r.province,
+            "summary": (r.summary or "")[:240],
+        }
+        for r in res.scalars().all()
+    ]
+
+
+def _source_refs(ev: dict[str, Any]) -> list[dict[str, Any]]:
+    refs: list[dict[str, Any]] = []
+
+    for r in ev.get("lobbying", {}).get("records", [])[:12]:
+        refs.append({
+            "table": "lobbying", "pk": r.get("pk") or r.get("id"), "source": r.get("source") or "OCL Monthly Communications",
+            "title": r.get("title") or f"{r.get('client', '')} lobbying communication".strip(),
+            "date": r.get("communication_date"), "url": None,
+        })
+    for r in ev.get("contracts", {}).get("records", [])[:12]:
+        refs.append({
+            "table": "contracts", "pk": r.get("pk") or r.get("id"), "source": r.get("source") or "Federal contracts",
+            "title": r.get("title") or f"{r.get('vendor_name', '')} — {(r.get('description') or '')[:80]}".strip(" —"),
+            "date": r.get("contract_date"), "url": None,
+        })
+    for r in ev.get("grants", {}).get("records", [])[:12]:
+        refs.append({
+            "table": "grants", "pk": r.get("pk") or r.get("id"), "source": r.get("source") or "Grants",
+            "title": r.get("title") or f"{r.get('recipient_name', '')} — {r.get('program_name', '')}".strip(" —"),
+            "date": r.get("agreement_start"), "url": None,
+        })
+    for r in ev.get("donations", {}).get("records", [])[:12]:
+        refs.append({
+            "table": "donations", "pk": r.get("pk") or r.get("id"), "source": r.get("source") or "Elections Canada",
+            "title": r.get("title") or f"{r.get('contributor_name', '')} contribution",
+            "date": r.get("received_date"), "url": None,
+        })
+    for r in ev.get("bills", {}).get("records", [])[:12]:
+        refs.append({
+            "table": "bills", "pk": r.get("pk") or r.get("id"), "source": "LEGISinfo",
+            "title": r.get("title") or f"{r.get('bill_number', '')} — {r.get('title_en', '')}".strip(" —"),
+            "date": r.get("introduced_date"), "url": None,
+        })
+    for r in ev.get("regulations", {}).get("records", [])[:12]:
+        refs.append({
+            "table": "gazette", "pk": r.get("pk") or r.get("id"), "source": "Canada Gazette",
+            "title": r.get("title", ""), "date": r.get("published_date"), "url": r.get("url"),
+        })
+    for r in ev.get("tribunal_decisions", {}).get("records", [])[:12]:
+        refs.append({
+            "table": "tribunal", "pk": r.get("pk") or r.get("id"), "source": r.get("source") or "Tribunal",
+            "title": r.get("title", ""), "date": r.get("decision_date"), "url": r.get("url"),
+        })
+    for r in ev.get("appointments", {}).get("records", [])[:12]:
+        refs.append({
+            "table": "appointments", "pk": r.get("pk") or r.get("id"), "source": r.get("source") or "Appointments",
+            "title": r.get("title") or f"{r.get('appointee_name', '')} appointment",
+            "date": r.get("appointment_date"), "url": None,
+        })
+    for r in ev.get("ocl_registrations", {}).get("records", [])[:12]:
+        refs.append({
+            "table": "ocl_registrations", "pk": r.get("pk") or r.get("id"), "source": r.get("source") or "OCL Registrations",
+            "title": r.get("title") or f"{r.get('registration_num', '')} registration",
+            "date": r.get("effective_date"), "url": None,
+        })
+    for r in ev.get("breadth", {}).get("records", [])[:12]:
+        refs.append({
+            "table": "source_records", "pk": r.get("pk") or r.get("id"), "source": r.get("source", "source_records"),
+            "title": r.get("title", ""), "date": r.get("event_date") or r.get("date"), "url": r.get("url"),
+        })
+
+    seen: set[tuple[str, int | None, str, str | None]] = set()
+    unique = []
+    for item in refs:
+        ref = normalize_reference(item)
+        if not ref:
+            continue
+        key = (ref.get("table", ""), ref.get("pk"), ref.get("title", ""), ref.get("date"))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(ref)
+    return unique[:40]
 
 
 async def gather_company_data(
@@ -307,8 +450,9 @@ async def gather_company_data(
     tribunal = await _tribunal_decisions(session, company, sector)
     appointments = await _appointments(session, sector)
     ocl_regs = await _ocl_registrations(session, company, canonical)
+    breadth = await _breadth(session, company, canonical, sector)
 
-    return {
+    ev = {
         "company": company,
         "canonical": canonical,
         "sector": sector,
@@ -331,7 +475,9 @@ async def gather_company_data(
                 {"dept": d[0], "value": round(d[1] or 0, 2), "count": d[2]} for d in dept_rows
             ],
             "records": [
-                {"vendor_name": c.vendor_name, "description": c.description,
+                {"id": c.id, "pk": c.id, "table": "contracts", "source": c.source,
+                 "title": f"{c.vendor_name} — {(c.description or '')[:100]}".strip(" —"),
+                 "vendor_name": c.vendor_name, "description": c.description,
                  "contract_value": c.contract_value, "owner_org_title": c.owner_org_title,
                  "contract_date": c.contract_date}
                 for c in contracts[:25]
@@ -346,7 +492,9 @@ async def gather_company_data(
             "count": len(donations),
             "total_value": round(sum(d.amount or 0 for d in donations), 2),
             "records": [
-                {"contributor_name": d.contributor_name, "party": d.party,
+                {"id": d.id, "pk": d.id, "table": "donations", "source": d.source,
+                 "title": f"{d.contributor_name} contribution",
+                 "contributor_name": d.contributor_name, "party": d.party,
                  "amount": d.amount, "received_date": d.received_date}
                 for d in donations[:25]
             ],
@@ -354,7 +502,9 @@ async def gather_company_data(
         "bills": {
             "count": len(bills),
             "records": [
-                {"bill_number": b.bill_number, "title_en": b.title_en, "status": b.status,
+                {"id": b.id, "pk": b.id, "table": "bills", "source": b.source,
+                 "title": f"{b.bill_number} — {b.title_en or ''}".strip(" —"),
+                 "bill_number": b.bill_number, "title_en": b.title_en, "status": b.status,
                  "sponsor": b.sponsor, "latest_activity": b.latest_activity}
                 for b in bills
             ],
@@ -371,5 +521,11 @@ async def gather_company_data(
             "count": len(appointments),
             "records": appointments,
         },
+        "breadth": {
+            "count": len(breadth),
+            "records": breadth,
+        },
         "stakeholders": await _stakeholders(session, company, canonical, sector),
     }
+    ev["source_references"] = _source_refs(ev)
+    return ev

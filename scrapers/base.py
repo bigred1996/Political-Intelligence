@@ -42,7 +42,7 @@ class BaseScraper:
     async def __aenter__(self) -> "BaseScraper":
         self._client = httpx.AsyncClient(
             timeout=self._timeout,
-            headers={"User-Agent": "PolarisIntelligence/0.1 (+political-risk-research)"},
+            headers={"User-Agent": "NessusIntelligence/0.1 (+political-risk-research)"},
             follow_redirects=True,
         )
         return self

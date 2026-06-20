@@ -1,0 +1,21 @@
+{
+  "name": "Nessus Intelligence",
+  "short_name": "Nessus",
+  "description": "Institutional-grade political and regulatory intelligence for the Canadian market.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1b2b48",
+  "theme_color": "#1b2b48",
+  "icons": [
+    {
+      "src": "{{DATA:IMAGE:IMAGE_1}}",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "{{DATA:IMAGE:IMAGE_2}}",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { use } from "react";
-import { riskColorVar, type ReportDetail, type Scores } from "@/lib/api";
+import { useSearchParams } from "next/navigation";
+import { riskColorVar, type GraphFinding, type ReportDetail, type Scores } from "@/lib/api";
+import { evidenceHref, findingHref } from "@/lib/navigation";
+import { RelatedItems, type RelatedItem } from "@/components/intelligence";
 import { useApi } from "@/lib/use-api";
-import { Eyebrow, RiskBadge, SkeletonBlock } from "@/components/ui";
+import { EvidenceRows, Eyebrow, OriginalSourceLink, Panel, RiskBadge, SectionHeader, SkeletonBlock } from "@/components/ui";
 
 function typeLabel(t: string) {
   return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -42,6 +45,8 @@ function LightScorecard({ scores }: { scores: Scores }) {
 
 export default function BriefingReader({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
+  const context = briefingContext(searchParams);
   const { data, loading, error } = useApi<ReportDetail>(`/api/reports/${id}`);
 
   if (error) {
@@ -62,12 +67,15 @@ export default function BriefingReader({ params }: { params: Promise<{ id: strin
     );
   }
 
+  const findingItems = reportFindingItems(data.graph_findings ?? [], context);
+  const evidenceRefs = data.source_references ?? [];
+
   return (
     <div className="bg-parchment">
       {/* Classification strip */}
       <div className="bg-navy text-parchment border-b border-brass/25">
         <div className="mx-auto max-w-[900px] px-6 py-2.5 flex items-center justify-between text-[11px] uppercase tracking-[0.18em]">
-          <Link href="/briefings" className="text-parchment/60 hover:text-brass">← Briefings</Link>
+          <Link href={context?.href ?? "/briefings"} className="text-parchment/60 hover:text-brass">{context ? `← ${context.label}` : "← Briefings"}</Link>
           <span className="text-red bg-red/10 border border-red/30 rounded px-2 py-0.5">Confidential</span>
         </div>
       </div>
@@ -112,6 +120,30 @@ export default function BriefingReader({ params }: { params: Promise<{ id: strin
           </section>
         )}
 
+
+        {(findingItems.length || evidenceRefs.length) ? (
+          <section className="mb-9 grid md:grid-cols-2 gap-4">
+            <Panel title="Connected findings" bodyClass="p-4">
+              <RelatedItems
+                items={findingItems}
+                empty="No graph findings are attached to this report yet."
+              />
+            </Panel>
+            <Panel title="Supporting evidence" bodyClass="p-4">
+              <SectionHeader title="Internal records" subtitle="Evidence opens inside Nessus first." />
+              <EvidenceRows refs={evidenceRefs} limit={8} hrefFor={(ref) => withContext(evidenceHref(ref), context)} />
+              {externalSourceRefs(evidenceRefs).length ? (
+                <div className="mt-3 pt-3 border-t border-line space-y-1.5">
+                  <div className="mono text-[10px] text-muted uppercase">Original sources</div>
+                  {externalSourceRefs(evidenceRefs).slice(0, 4).map((ref) => (
+                    <OriginalSourceLink key={`${ref.table}:${ref.pk ?? ref.id}:external`} href={ref.url!} source={ref.source} className="mono text-[10px] text-muted hover:text-fg" />
+                  ))}
+                </div>
+              ) : null}
+            </Panel>
+          </section>
+        ) : null}
+
         {/* Sections */}
         <div className="space-y-9">
           {data.sections
@@ -133,4 +165,60 @@ export default function BriefingReader({ params }: { params: Promise<{ id: strin
       </article>
     </div>
   );
+}
+
+type BriefingContextValue =
+  | { from: "search"; label: string; href: string }
+  | { from: "sector"; label: string; href: string }
+  | { from: "finding"; label: string; href: string }
+  | null;
+
+function briefingContext(searchParams: ReturnType<typeof useSearchParams>): BriefingContextValue {
+  const from = searchParams.get("from");
+  if (from === "search") {
+    const q = searchParams.get("q") ?? "";
+    return { from, label: q ? `Search: ${q}` : "Search", href: `/search${q ? `?q=${encodeURIComponent(q)}` : ""}` };
+  }
+  if (from === "sector") {
+    const sector = searchParams.get("sector") ?? "";
+    return { from, label: sector ? `Sector: ${sector}` : "Sectors", href: sector ? `/sectors/${encodeURIComponent(sector)}` : "/sectors" };
+  }
+  if (from === "finding") {
+    const finding = searchParams.get("finding") ?? "";
+    return { from, label: "Finding", href: finding ? `/signals/${encodeURIComponent(finding)}` : "/signals" };
+  }
+  return null;
+}
+
+function withContext(href: string | null, context: BriefingContextValue): string | null {
+  if (!href || !context) return href;
+  const glue = href.includes("?") ? "&" : "?";
+  if (context.from === "search") {
+    const q = context.href.includes("?q=") ? decodeURIComponent(context.href.split("?q=")[1] ?? "") : "";
+    return `${href}${glue}from=search${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+  }
+  if (context.from === "sector") {
+    const sector = context.href.split("/sectors/")[1];
+    return `${href}${glue}from=sector${sector ? `&sector=${encodeURIComponent(decodeURIComponent(sector))}` : ""}`;
+  }
+  const finding = context.href.split("/signals/")[1];
+  return `${href}${glue}from=finding${finding ? `&finding=${encodeURIComponent(decodeURIComponent(finding))}` : ""}`;
+}
+
+function reportFindingItems(findings: GraphFinding[], context: BriefingContextValue): RelatedItem[] {
+  return findings.map((finding, index) => ({
+    id: `report-finding:${finding.title}:${index}`,
+    title: finding.title,
+    type: "Finding",
+    href: withContext(findingHref(finding.title), context),
+    description: finding.summary,
+    meta: finding.references?.length ? `${finding.references.length} evidence record${finding.references.length === 1 ? "" : "s"}` : finding.confidence,
+    relationship: "report includes finding",
+    strength: "supported",
+    source: finding.sector?.name ?? finding.related_sectors?.[0]?.name ?? null,
+  }));
+}
+
+function externalSourceRefs(refs: ReportDetail["source_references"]) {
+  return refs.filter((ref) => ref.url);
 }

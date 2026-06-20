@@ -4,12 +4,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.database import get_session
 from api.models.scheduler_log import SchedulerLog
+from api.schemas import SchedulerHistoryResponse, SchedulerStatusResponse, SchedulerTriggerResponse
 from api.scheduler import JOB_RUNNERS, SOURCE_CONFIGS, scheduler
 
 router = APIRouter(prefix="/api/scheduler", tags=["scheduler"])
@@ -22,7 +23,7 @@ def _job_next_run(job_id: str) -> str | None:
     return None
 
 
-@router.get("/status")
+@router.get("/status", response_model=SchedulerStatusResponse)
 async def scheduler_status(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """All jobs with last run result and next scheduled run."""
     jobs = []
@@ -60,7 +61,7 @@ async def scheduler_status(session: AsyncSession = Depends(get_session)) -> dict
     }
 
 
-@router.post("/trigger/{job_id}")
+@router.post("/trigger/{job_id}", response_model=SchedulerTriggerResponse)
 async def trigger_job(job_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
     """Manually trigger an ingest job by ID. Runs in background."""
     if job_id not in JOB_RUNNERS:
@@ -76,10 +77,10 @@ async def trigger_job(job_id: str, background_tasks: BackgroundTasks) -> dict[st
     }
 
 
-@router.get("/history")
+@router.get("/history", response_model=SchedulerHistoryResponse)
 async def job_history(
     job_id: str | None = None,
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Recent run history across all jobs or filtered by job_id."""

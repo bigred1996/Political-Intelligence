@@ -1,148 +1,213 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, money, recordHref, type SearchResponse } from "@/lib/api";
-import { Eyebrow, Panel, SkeletonBlock, SourceTag } from "@/components/ui";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { api, money, type SearchHit, type SearchResponse } from "@/lib/api";
+import { OriginalSourceLink } from "@/components/ui";
+import { recordHref, sourceLabel } from "@/lib/navigation";
 
-export default function SearchPage() {
+/* Ask Nessus — research workspace wired to /api/search. Faithful to
+   nessus_research_workspace_ask_nessus, now with live results. */
+
+export default function AskNessusPage() {
   return (
     <Suspense fallback={null}>
-      <SearchView />
+      <AskNessus />
     </Suspense>
   );
 }
 
-function SearchView() {
-  const params = useSearchParams();
+const SUGGESTIONS = [
+  "Pipeline incidents involving TransCanada since 2020",
+  "$1M+ IT contracts awarded to Telus",
+  "Telecom lobbying ahead of the spectrum auction",
+  "Who sponsored Bill C-27?",
+];
+
+function AskNessus() {
   const router = useRouter();
-  const q = params.get("q") ?? "";
-  const [input, setInput] = useState(q);
+  const params = useSearchParams();
+  const urlQ = params.get("q") ?? "";
+  const [input, setInput] = useState(urlQ);
+  const [query, setQuery] = useState(urlQ);
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => setInput(q), [q]);
-  useEffect(() => {
-    if (!q) { setData(null); return; }
-    let alive = true;
-    setLoading(true); setError(null);
-    api<SearchResponse>(`/api/search?answer=true&limit=40&q=${encodeURIComponent(q)}`)
-      .then((d) => alive && setData(d))
-      .catch((e) => alive && setError(String(e)))
-      .finally(() => alive && setLoading(false));
-    return () => { alive = false; };
-  }, [q]);
+  const run = useCallback((q: string) => {
+    setQuery(q);
+    setLoading(true);
+    setError(null);
+    setData(null);
+    api<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}`)
+      .then(setData)
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const EXAMPLES = [
-    "federal contracts over $1 million for IT services",
-    "pipeline incidents involving TransCanada",
-    "lobbying on telecommunications",
-    "pollutant releases by facilities in Alberta",
-  ];
+  useEffect(() => {
+    if (urlQ) run(urlQ);
+  }, [urlQ, run]);
+
+  const submit = (q: string) => {
+    if (!q.trim()) return;
+    setInput(q);
+    router.push(`/search?q=${encodeURIComponent(q.trim())}`);
+    run(q.trim());
+  };
+
+  const sources = data ? Object.entries(data.counts.by_source).sort((a, b) => b[1] - a[1]).slice(0, 6) : [];
 
   return (
-    <div>
-      <section className="bg-panel border-b border-line map-grid">
-        <div className="mx-auto max-w-[1320px] px-4 py-10">
-          <Eyebrow>Ask Polaris</Eyebrow>
-          <h1 className="text-2xl md:text-3xl font-semibold text-fg-bright mt-2 max-w-2xl leading-tight">
-            Query the entire federal record.
-          </h1>
-          <p className="text-fg-dim mt-2 max-w-xl text-sm">
-            A planner turns plain English into filters, then fuses exact matches across every source
-            with semantic search. <span className="text-brass-bright">★ both</span> = matched both ways.
-          </p>
-          <form
-            onSubmit={(e) => { e.preventDefault(); if (input.trim()) router.push(`/search?q=${encodeURIComponent(input.trim())}`); }}
-            className="mt-6 flex flex-col sm:flex-row gap-2.5 max-w-2xl"
-          >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              aria-label="Search query"
-              placeholder="e.g. pipeline incidents in Alberta since 2020"
-              className="flex-1 bg-canvas border border-line rounded px-4 py-3 text-fg placeholder:text-fg-dim outline-none focus:border-brass/60 transition-colors mono text-sm"
-            />
-            <button type="submit" className="rounded bg-brass text-canvas font-semibold px-6 py-3 hover:bg-brass-bright transition-colors cursor-pointer">Search</button>
-          </form>
-          {!q && (
-            <div className="flex flex-wrap gap-2 mt-4">
-              {EXAMPLES.map((ex) => (
-                <button key={ex} onClick={() => router.push(`/search?q=${encodeURIComponent(ex)}`)} className="mono text-xs border border-line text-fg-dim rounded px-3 py-1.5 hover:border-brass/60 hover:text-fg transition-colors cursor-pointer">
-                  {ex}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <div className="mx-auto max-w-[1320px] px-4 py-6">
-        {error && <p className="text-fg-dim">Search failed. {error}</p>}
-        {loading && (
-          <div className="space-y-2.5 max-w-3xl">
-            <SkeletonBlock className="h-20 rounded" />
-            {Array.from({ length: 5 }).map((_, i) => <SkeletonBlock key={i} className="h-12 rounded" />)}
-          </div>
-        )}
-
-        {!loading && data && (
-          <div className="grid lg:grid-cols-3 gap-3">
-            <div className="lg:col-span-2 space-y-3">
-              {data.answer && (
-                <Panel title="Synthesis" className="border-l-2 border-l-brass">
-                  <p className="text-[15px] text-fg/90 leading-relaxed whitespace-pre-wrap">{data.answer}</p>
-                </Panel>
-              )}
-              <div className="mono text-xs text-fg-dim">
-                {data.counts.returned} results · {data.counts.structured} exact, {data.counts.semantic} semantic
-                {data.plan?.planner ? ` · planner: ${data.plan.planner}` : ""}
-              </div>
-              <div className="space-y-2">
-                {data.results.map((h, i) => {
-                  const href = recordHref(h.table, h.pk);
-                  return (
-                  <div key={i} className="panel p-3 hover:border-brass/40 transition-colors">
-                    <div className="flex items-center gap-2 mb-1">
-                      <SourceTag>{h.source}</SourceTag>
-                      {h.match === "both" && <span className="mono text-[10px] text-brass-bright font-semibold">★ BOTH</span>}
-                      {h.match === "semantic" && <span className="mono text-[10px] text-fg-dim">SEMANTIC</span>}
-                      {h.date && <span className="mono text-[10px] text-fg-dim ml-auto">{h.date}</span>}
-                    </div>
-                    {href ? (
-                      <Link href={href} className="text-sm text-fg hover:text-brass-bright font-medium">{h.title}</Link>
-                    ) : (
-                      <span className="text-sm text-fg font-medium">{h.title}</span>
-                    )}
-                    {h.snippet && <p className="text-xs text-fg-dim mt-1 leading-snug">{h.snippet}</p>}
-                    <div className="flex items-center gap-3 mt-1">
-                      {h.amount ? <span className="mono text-xs text-brass">{money(h.amount)}</span> : null}
-                      {href && <Link href={href} className="mono text-[10px] text-fg-dim hover:text-brass-bright">view connections →</Link>}
-                      {h.url && <a href={h.url} target="_blank" rel="noopener noreferrer" className="mono text-[10px] text-fg-dim hover:text-fg">source ↗</a>}
-                    </div>
-                  </div>
-                  );
-                })}
-                {!data.results.length && <p className="text-sm text-fg-dim">No matching records.</p>}
-              </div>
-            </div>
-            <aside>
-              <Panel title="Results by source">
-                <ul className="space-y-1.5 text-sm">
-                  {Object.entries(data.counts.by_source || {}).sort((a, b) => b[1] - a[1]).map(([src, n]) => (
-                    <li key={src} className="flex justify-between">
-                      <span className="text-fg">{src}</span>
-                      <span className="mono text-fg-dim">{n}</span>
-                    </li>
+    <div className="animate-rise -m-margin-mobile md:-m-margin-desktop">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] min-h-[calc(100vh-4rem)]">
+        {/* Chat canvas */}
+        <div className="flex flex-col bg-surface border-r border-outline-variant relative">
+          <div className="flex-1 px-margin-mobile md:px-margin-desktop py-8 space-y-8 overflow-y-auto">
+            {!query ? (
+              <div className="max-w-2xl mx-auto text-center pt-16">
+                <div className="w-12 h-12 rounded-lg bg-primary text-on-primary flex items-center justify-center mx-auto mb-4">
+                  <span className="material-symbols-outlined text-[28px]">forum</span>
+                </div>
+                <h2 className="font-headline-md text-headline-md text-primary mb-2">Ask Nessus</h2>
+                <p className="font-body-lg text-body-lg text-on-surface-variant mb-8">Query the intelligence database, synthesize recent legislation, or analyze lobbying activity across every federal source.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                  {SUGGESTIONS.map((s) => (
+                    <button key={s} onClick={() => submit(s)} className="px-4 py-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md text-on-surface hover:border-primary transition-colors text-left">
+                      {s}
+                    </button>
                   ))}
-                </ul>
-              </Panel>
-            </aside>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* User message */}
+                <div className="flex flex-col items-end gap-1">
+                  <div className="bg-surface-container-high rounded-lg rounded-tr-sm px-5 py-3 max-w-3xl text-on-surface font-body-md text-body-md leading-relaxed border border-outline-variant/30 shadow-sm">{query}</div>
+                </div>
+
+                {/* Response */}
+                <div className="flex flex-col items-start gap-3">
+                  <div className="flex items-center gap-2 ml-1">
+                    <div className="w-6 h-6 rounded-sm bg-primary flex items-center justify-center text-on-primary"><span className="material-symbols-outlined text-[14px]">psychology</span></div>
+                    <span className="font-label-caps text-label-caps text-primary tracking-wider uppercase">Nessus Analysis</span>
+                  </div>
+
+                  {loading && (
+                    <div className="bg-surface-bright border border-outline-variant rounded-lg w-full max-w-4xl p-4 flex items-center gap-3 text-on-surface-variant">
+                      <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                      <span className="font-data-tabular text-data-tabular">Searching every source…</span>
+                    </div>
+                  )}
+
+                  {error && <div className="bg-error-container/40 border border-error/20 rounded-lg p-4 text-on-error-container max-w-4xl">{error}</div>}
+
+                  {data && (
+                    <div className="bg-surface-container-lowest border border-outline-variant rounded-lg rounded-tl-sm p-6 max-w-4xl shadow-sm text-on-surface space-y-5 w-full">
+                      <p className="font-memo-body text-memo-body leading-relaxed text-on-surface">
+                        {data.answer || `Found ${data.counts.returned} matching records across ${Object.keys(data.counts.by_source).length} sources for "${data.query}".`}
+                      </p>
+                      <div className="space-y-3">
+                        <h4 className="font-label-caps text-label-caps text-on-surface-variant uppercase border-b border-outline-variant/50 pb-1">Top Evidence</h4>
+                        <div className="space-y-2">
+                          {data.results.slice(0, 8).map((r, i) => <HitRow key={i} hit={r} query={data.query} />)}
+                          {data.results.length === 0 && <p className="font-body-md text-body-md text-on-surface-variant">No records matched. Try a broader query.</p>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="h-8" />
+              </>
+            )}
           </div>
-        )}
+
+          {/* Input */}
+          <div className="sticky bottom-0 bg-gradient-to-t from-surface via-surface to-transparent pt-10 pb-6 px-margin-mobile md:px-margin-desktop">
+            <form
+              className="max-w-4xl mx-auto"
+              onSubmit={(e) => { e.preventDefault(); submit(input); }}
+            >
+              <div className="relative bg-surface-container-lowest border border-outline-variant rounded-lg shadow-sm flex items-end p-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+                <button type="button" className="p-2 text-on-surface-variant hover:text-primary transition-colors mb-1 rounded-md hover:bg-surface-container-low"><span className="material-symbols-outlined">attach_file</span></button>
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(input); } }}
+                  className="w-full bg-transparent border-none focus:ring-0 resize-none max-h-32 min-h-[44px] py-3 px-3 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant/60 outline-none"
+                  placeholder="Ask Nessus about policy, legislation, or intelligence…"
+                  rows={1}
+                />
+                <button type="submit" className="p-2 bg-primary text-on-primary rounded-lg ml-2 hover:bg-primary-container transition-colors mb-1 shadow-sm flex items-center justify-center h-10 w-10"><span className="material-symbols-outlined text-[20px]">arrow_upward</span></button>
+              </div>
+              <div className="flex justify-between items-center mt-2 px-1">
+                <span className="text-[11px] font-label-caps text-on-surface-variant flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-primary" /> Nessus Intelligence Engine</span>
+                <span className="text-[11px] font-data-tabular text-on-surface-variant">Shift + Enter for new line</span>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {/* Evidence rail */}
+        <aside className="hidden lg:flex flex-col bg-surface-bright border-l border-outline-variant overflow-y-auto">
+          <div className="p-4 border-b border-outline-variant/50 flex items-center gap-2">
+            <span className="material-symbols-outlined text-on-surface-variant text-lg">info</span>
+            <h3 className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Context &amp; Evidence</h3>
+          </div>
+          <div className="p-4 space-y-6">
+            <div className="space-y-3">
+              <h4 className="font-label-caps text-label-caps text-on-surface-variant">Active Sources</h4>
+              <div className="space-y-2">
+                {sources.length === 0 && <p className="font-data-tabular text-[12px] text-on-surface-variant">Run a query to see which sources matched.</p>}
+                {sources.map(([src, n]) => (
+                  <div key={src} className="bg-surface-container-lowest border border-outline-variant rounded p-2.5 flex items-center justify-between">
+                    <span className="font-data-tabular text-[13px] font-medium text-on-surface capitalize">{src.replace(/_/g, " ")}</span>
+                    <span className="font-data-tabular text-[12px] text-on-surface-variant">{n}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {data && (
+              <div className="space-y-3">
+                <h4 className="font-label-caps text-label-caps text-on-surface-variant">Query Plan</h4>
+                <div className="bg-surface-container-lowest border border-outline-variant rounded p-2.5 font-data-tabular text-[12px] text-on-surface-variant space-y-1">
+                  <div>Planner: <span className="text-on-surface">{data.plan.planner ?? "deterministic"}</span></div>
+                  <div>Structured: <span className="text-on-surface">{data.counts.structured}</span> · Semantic: <span className="text-on-surface">{data.counts.semantic}</span></div>
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   );
+}
+
+function HitRow({ hit, query }: { hit: SearchHit; query: string }) {
+  const href = recordHref(hit.table, hit.pk);
+  const internalHref = href ? `${href}?from=search&q=${encodeURIComponent(query)}` : null;
+  const readableSource = sourceLabel(hit.table ?? hit.source, hit.source);
+  const inner = (
+    <div className="flex items-start gap-3 p-2.5 rounded border border-outline-variant/50 bg-surface-container-low hover:bg-surface-container-high transition-colors">
+      <span className="material-symbols-outlined text-[18px] text-primary mt-0.5">{hit.match === "both" ? "verified" : "description"}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">{readableSource}</span>
+          {hit.date && <span className="font-data-tabular text-[11px] text-on-surface-variant">{hit.date}</span>}
+          {hit.amount ? <span className="font-data-tabular text-[11px] text-primary ml-auto">{money(hit.amount)}</span> : null}
+        </div>
+        <p className="font-body-md text-body-md text-on-surface leading-snug truncate">{hit.title}</p>
+        {hit.snippet && <p className="text-[12px] text-on-surface-variant line-clamp-1">{hit.snippet}</p>}
+      </div>
+    </div>
+  );
+  return internalHref ? (
+    <div>
+      <Link href={internalHref} className="block focus-ring rounded">{inner}</Link>
+      {hit.url ? (
+        <OriginalSourceLink href={hit.url} source={readableSource} className="ml-8 mt-1 text-[11px] font-data-tabular text-on-surface-variant hover:text-primary" />
+      ) : null}
+    </div>
+  ) : inner;
 }

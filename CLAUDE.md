@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-**Polaris Intelligence** — a Canadian political due-diligence platform. It bulk-ingests federal open-data sources into a DB, then surfaces them through a premium **Next.js client app** (`web/`, the product) plus a FastAPI backend. **The product is positioned industry-first, not company-first** — every data point is read through the lens of the *industry* it touches and the *political players* who shape it.
+**Nessus Intelligence** — a Canadian political due-diligence platform. It bulk-ingests federal open-data sources into a DB, then surfaces them through a premium **Next.js client app** (`web/`, the product) plus a FastAPI backend. **The product is positioned industry-first, not company-first** — every data point is read through the lens of the *industry* it touches and the *political players* who shape it.
 
 Core capabilities: (1) **sector & region intelligence** — roll up cross-source political-risk signals by industry (and province), with deterministic cross-source "connections" and time-series — the client-app centerpiece; (2) **entity intelligence** — one synthesized cross-source profile per company; (3) **universal record detail** — pull up ANY individual record (every contract, bill, lobby notice, donation, incident…) at `/records/{table}/{pk}` with its industry impact, relevant political players, and full cross-source connection graph; (4) **politicians / political players** — a directory + profile per MP with photos; (5) **risk reports** — score four dimensions (0–10) and draft a 9-section report via Claude, analyst-reviewed, served as branded HTML/PDF; (6) **unified hybrid search** over every individual record. **Entity resolution across sources is the moat.** The repo has two front-ends: the `web/` client app (the product) and the legacy `frontend/index.html` ops console (now at `/internal`).
 
@@ -97,7 +97,7 @@ The sector/entity evidence record dicts (`_bills`/`_regulations`/`_tribunal`/`_a
 
 ### The ingest architecture
 
-Polaris **does not scrape per request**. It bulk-ingests government open-data files once (triggered via API or scheduler), normalizes every entity name via `pipeline/entity_resolver.normalize()`, and stores in SQLite. Per-company queries hit the DB only.
+Nessus **does not scrape per request**. It bulk-ingests government open-data files once (triggered via API or scheduler), normalizes every entity name via `pipeline/entity_resolver.normalize()`, and stores in SQLite. Per-company queries hit the DB only.
 
 There are **two tiers of sources**, and which one you touch depends on the source:
 
@@ -201,7 +201,7 @@ The premium client app — **Next.js 16 (App Router) + React 19 + Tailwind v4**.
 - **Theming is CSS-based (Tailwind v4):** all tokens live in `app/globals.css` `@theme` — there is **no `tailwind.config`**. ⚠️ Changing an `@theme` token *value* requires `rm -rf web/.next` + restart; HMR serves stale compiled CSS otherwise (this has bitten twice).
 - **App shell** (`app/layout.tsx`): `AppTopBar` / (`AppSidebar` + scrolling `main`) / `AppTicker`, wrapping every page (`h-screen overflow-hidden`, content scrolls in the middle). Components in `components/app-*.tsx`.
 - **Two visual surfaces:** (1) the **dark terminal workspace** — neutral near-black canvas, brass as the single brand accent, functional green/amber/red, IBM Plex Mono numerics (`mono` class); (2) the **report "deliverable"** at `/briefings/[id]` only — light parchment + Playfair serif, using the `navy`/`parchment` brand tokens + `.briefing-prose`. Don't reuse the dark `Scorecard` on the light reader (it has its own `LightScorecard`).
-- **Pages** are client components fetching via `lib/api.ts` (typed fetchers) + `lib/use-api.ts` (`useApi` hook): `/` (Overview dashboard), `/sectors` + `/sectors/[slug]` (the centerpiece, province-filterable), `/entities` + `/entities/[canonical]`, `/records/[table]/[pk]` (universal record detail), `/politicians` + `/politicians/[slug]`, `/search` (Ask Polaris), `/briefings` + `/briefings/[id]`. `lib/api.ts` also exports `recordHref()` (build `/records` links) and `partyColor()`.
+- **Pages** are client components fetching via `lib/api.ts` (typed fetchers) + `lib/use-api.ts` (`useApi` hook): `/` (Overview dashboard), `/sectors` + `/sectors/[slug]` (the centerpiece, province-filterable), `/entities` + `/entities/[canonical]`, `/records/[table]/[pk]` (universal record detail), `/politicians` + `/politicians/[slug]`, `/search` (Ask Nessus), `/briefings` + `/briefings/[id]`. `lib/api.ts` also exports `recordHref()` (build `/records` links) and `partyColor()`.
 - **MP photos** are served from `web/public/mp/{slug}.jpg` (downloaded local — openparliament hotlink-blocks images), referenced via the DB `photo_url`.
 - **Data-viz** (hand-built SVG, minimal deps — d3 utilities only, React-19-safe): `components/dataviz.tsx` — `CanadaMap` (d3-geo choropleth rendering `public/canada-provinces.json`; province full-names→2-letter via `NAME2CODE`), `TrendArea`, `TrendBars`, `BarList`, `RadialNetwork`. `components/charts.tsx` — `RiskGauge`, `Scorecard`, `ConnectionCard`. `components/ui.tsx` — `Panel`, `Eyebrow`, `RiskBadge`, etc.
 

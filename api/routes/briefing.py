@@ -17,6 +17,7 @@ from api.database import get_session
 from api.models.donation import Bill
 from api.models.regulation import GazetteEntry
 from api.models.source_record import SourceRecord
+from api.schemas import BriefingResponse
 from pipeline.sector_mapper import list_sectors
 
 router = APIRouter(prefix="/api", tags=["briefing"])
@@ -33,7 +34,7 @@ def _dedupe(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-@router.get("/briefing")
+@router.get("/briefing", response_model=BriefingResponse)
 async def briefing(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Three categorized streams — legislation, regulation, operations.
 

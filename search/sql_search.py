@@ -1,4 +1,4 @@
-"""Unified structured search across every Polaris table.
+"""Unified structured search across every Nessus table.
 
 Where semantic search finds records by *meaning*, this finds them by *exact
 predicate* — keyword, entity (canonical), date range, dollar floor — across all
@@ -86,6 +86,10 @@ SPECS: list[TableSpec] = [
         ["bill_number", "title_en", "sponsor", "status"],
         title_fn=lambda r: f"{_g(r,'bill_number')} — {_g(r,'title_en')[:90]}",
         date_col="introduced_date",
+        url_fn=lambda r: (
+            f"https://www.parl.ca/legisinfo/en/bill/{_g(r,'parliament')}/{_g(r,'bill_number').lower()}"
+            if _g(r, "parliament") and _g(r, "bill_number") else None
+        ),
         snippet_fn=lambda r: f"{_g(r,'status')} · {_g(r,'sponsor')}",
         record_type="bill",
     ),
@@ -112,6 +116,16 @@ SPECS: list[TableSpec] = [
         entity_col="appointee_name", canonical_col="canonical_name",
         date_col="appointment_date",
         snippet_fn=lambda r: _g(r, "organization"), record_type="appointment",
+    ),
+    TableSpec(
+        "api.models.politician:HansardMention", "hansard_mentions",
+        ["keyword", "speaker", "excerpt"],
+        title_fn=lambda r: f"{_g(r,'speaker') or 'House intervention'} — {_g(r,'keyword')}",
+        entity_col="speaker", canonical_col="canonical_name",
+        date_col="speech_date",
+        url_fn=lambda r: _g(r, "speech_url") or None,
+        snippet_fn=lambda r: _g(r, "excerpt")[:160],
+        record_type="hansard_mention",
     ),
     TableSpec(
         "api.models.source_record:SourceRecord", "source_records",
@@ -225,5 +239,5 @@ async def structured_search(
 
 
 # Source-name sets used for routing source_records filtering.
-BREADTH_SOURCES = {"statcan", "iaac", "cer", "npri", "transport", "geospatial", "gc_news"}
+BREADTH_SOURCES = {"statcan", "iaac", "cer", "npri", "transport", "geospatial", "gc_news", "social_statements", "public_statements"}
 EMBED_AND_NPRI = BREADTH_SOURCES

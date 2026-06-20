@@ -1,13 +1,15 @@
 """GIC Appointments routes — ingest and search Governor in Council appointments."""
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.cache import invalidate_workspace_caches
 from api.database import get_session
 from api.models.appointment import Appointment
+from api.schemas import IngestStartedResponse, SourceSearchResponse, StatsResponse
 from pipeline.entity_resolver import normalize
 from pipeline.ingest import fetch_appointment_rows
 
@@ -27,27 +29,28 @@ async def _run_appointment_ingest(max_rows: int) -> None:
             for r in rows[i : i + batch_size]:
                 session.add(Appointment(**r))
             await session.commit()
+    invalidate_workspace_caches("manual_appointments_ingest")
 
 
-@router.post("/ingest")
+@router.post("/ingest", response_model=IngestStartedResponse)
 async def ingest_appointments(body: IngestRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(_run_appointment_ingest, body.max_rows)
     return {"status": "started", "max_rows": body.max_rows}
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=StatsResponse)
 async def appointments_stats(session: AsyncSession = Depends(get_session)):
     total = (await session.execute(select(func.count(Appointment.id)))).scalar_one()
     unique_orgs = (await session.execute(select(func.count(func.distinct(Appointment.organization))))).scalar_one()
     return {"total_records": total, "unique_organizations": unique_orgs}
 
 
-@router.get("/search")
+@router.get("/search", response_model=SourceSearchResponse)
 async def search_appointments(
-    q: str,
-    limit: int = 50,
+    q: str = Query(..., min_length=1, max_length=255),
+    limit: int = Query(default=50, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
-):
+) -> dict:
     canonical = normalize(q)
     res = await session.execute(
         select(Appointment)

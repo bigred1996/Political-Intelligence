@@ -130,7 +130,7 @@ _PLAN_TOOL = {
 }
 
 _SYSTEM = (
-    "You are the query planner for Polaris, a Canadian political due-diligence platform. "
+    "You are the query planner for Nessus, a Canadian political due-diligence platform. "
     "Translate the user's natural-language question into a search plan over these federal "
     "data sources: " + ", ".join(KNOWN_SOURCES) + ". "
     "Pick source filters only when the question clearly targets specific sources; otherwise "

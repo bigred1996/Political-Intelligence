@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Bill C-27 - Evidence Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;700&amp;family=Source+Serif+4:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#eceef0",
+                        "on-tertiary-container": "#929292",
+                        "inverse-surface": "#2d3133",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "tertiary-container": "#2a2b2b",
+                        "inverse-primary": "#b7c7eb",
+                        "surface-dim": "#d8dadc",
+                        "on-surface-variant": "#44474d",
+                        "surface-bright": "#f7f9fb",
+                        "surface-container-high": "#e6e8ea",
+                        "surface": "#f7f9fb",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#091b37",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#b7c7eb",
+                        "outline": "#75777e",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-secondary-fixed": "#0b1c30",
+                        "tertiary-fixed": "#e3e2e2",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "primary-fixed": "#d7e2ff",
+                        "on-surface": "#191c1e",
+                        "on-primary-fixed-variant": "#374765",
+                        "secondary-fixed": "#d3e4fe",
+                        "secondary-container": "#d0e1fb",
+                        "on-secondary-container": "#54647a",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#464747",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e0e3e5",
+                        "secondary": "#505f76",
+                        "on-error": "#ffffff",
+                        "primary": "#041632",
+                        "outline-variant": "#c5c6ce",
+                        "primary-container": "#1b2b48",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed-dim": "#c6c6c6",
+                        "on-primary-container": "#8393b5",
+                        "surface-container-low": "#f2f4f6",
+                        "surface-container-highest": "#e0e3e5",
+                        "background": "#f7f9fb",
+                        "on-background": "#191c1e",
+                        "surface-tint": "#4f5e7e",
+                        "tertiary": "#151717"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "density-compact": "8px",
+                        "container-max": "1440px",
+                        "unit": "4px",
+                        "margin-desktop": "40px",
+                        "gutter": "24px",
+                        "density-comfortable": "16px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["\"Source Serif 4\""],
+                        "headline-md": ["\"Source Serif 4\""],
+                        "display-lg": ["\"Source Serif 4\""],
+                        "body-md": ["Public Sans"],
+                        "body-lg": ["Public Sans"],
+                        "label-caps": ["Public Sans"],
+                        "data-tabular": ["Public Sans"],
+                        "memo-body": ["\"Source Serif 4\""]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-md": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "data-tabular": ["13px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "memo-body": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        
+        .zebra-row:nth-child(even) {
+            background-color: rgba(4, 22, 50, 0.02);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased selection:bg-primary selection:text-on-primary min-h-screen flex flex-col md:flex-row">
+<!-- TopNavBar (Mobile Only) -->
+<header class="md:hidden flex justify-between items-center w-full px-margin-mobile h-16 sticky top-0 z-50 bg-surface text-primary border-b border-outline-variant">
+<div class="text-headline-sm font-headline-sm font-bold text-primary tracking-tight">Polaris</div>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-on-surface cursor-pointer" data-icon="search">search</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-on-surface cursor-pointer" data-icon="menu">menu</span>
+</div>
+</header>
+<!-- SideNavBar (Desktop Only) -->
+<nav class="hidden md:flex flex-col h-screen fixed left-0 top-0 w-64 p-density-comfortable border-r border-outline-variant bg-surface-container-low text-primary z-40">
+<div class="mb-8">
+<h1 class="text-headline-sm font-headline-sm font-bold text-primary tracking-tight">Polaris</h1>
+<div class="text-label-caps font-label-caps text-on-surface-variant mt-2 uppercase">Intelligence Center</div>
+</div>
+<div class="flex-grow space-y-2">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-body-md font-body-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Briefing</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-body-md font-body-md bg-secondary-container text-on-secondary-container font-semibold scale-[0.98] transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="visibility" style="font-variation-settings: 'FILL' 1;">visibility</span>
+<span>Watchlists</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-body-md font-body-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="domain">domain</span>
+<span>Sectors</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-body-md font-body-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+<span>Search</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-body-md font-body-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span>Reports</span>
+</a>
+</div>
+<div class="mt-auto pt-8 border-t border-outline-variant space-y-2">
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-body-md font-body-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 p-margin-mobile md:p-margin-desktop w-full max-w-container-max mx-auto">
+<!-- Breadcrumb & Actions -->
+<div class="flex justify-between items-center mb-8">
+<div class="flex items-center gap-2 text-body-md font-body-md text-on-surface-variant">
+<a class="hover:text-primary transition-colors" href="#">Watchlists</a>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<a class="hover:text-primary transition-colors" href="#">Tech &amp; Data Privacy</a>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="text-on-surface font-medium">Bill C-27</span>
+</div>
+<div class="flex gap-3">
+<button class="h-8 px-4 rounded border border-outline text-on-surface font-body-md text-body-md hover:bg-surface-container-high transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="share">share</span>
+                    Share
+                </button>
+<button class="h-8 px-4 rounded bg-primary text-on-primary font-body-md text-body-md hover:opacity-90 transition-opacity flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="open_in_new">open_in_new</span>
+                    Primary Source
+                </button>
+</div>
+</div>
+<!-- Header Section -->
+<header class="mb-12">
+<div class="flex items-center gap-3 mb-4">
+<span class="px-2 py-1 bg-primary/10 text-primary font-label-caps text-label-caps rounded uppercase tracking-wider">Active Legislation</span>
+<span class="px-2 py-1 bg-surface-variant text-on-surface font-label-caps text-label-caps rounded uppercase tracking-wider">Federal</span>
+</div>
+<h1 class="font-display-lg text-display-lg text-on-surface mb-4 max-w-4xl">Digital Charter Implementation Act, 2022</h1>
+<p class="font-memo-body text-memo-body text-on-surface-variant max-w-3xl leading-relaxed">
+                An Act to enact the Consumer Privacy Protection Act, the Personal Information and Data Protection Tribunal Act and the Artificial Intelligence and Data Act and to make consequential and related amendments to other Acts.
+            </p>
+</header>
+<!-- Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column: Primary Analysis (8 cols) -->
+<div class="lg:col-span-8 space-y-gutter">
+<!-- Status Tracker Bento -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow">
+<h2 class="font-headline-sm text-headline-sm text-on-surface mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="account_balance">account_balance</span>
+                        Parliamentary Status
+                    </h2>
+<div class="relative">
+<!-- Progress Line -->
+<div class="absolute top-5 left-4 right-4 h-[2px] bg-surface-variant z-0"></div>
+<div class="absolute top-5 left-4 w-1/2 h-[2px] bg-primary z-0"></div>
+<!-- Stages -->
+<div class="relative z-10 flex justify-between">
+<!-- Completed -->
+<div class="flex flex-col items-center gap-3 w-24">
+<div class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center border-4 border-surface-container-lowest">
+<span class="material-symbols-outlined text-[20px]">check</span>
+</div>
+<div class="text-center">
+<div class="font-label-caps text-label-caps text-on-surface uppercase">1st Reading</div>
+<div class="font-data-tabular text-data-tabular text-on-surface-variant mt-1">Jun 16, '22</div>
+</div>
+</div>
+<!-- Completed -->
+<div class="flex flex-col items-center gap-3 w-24">
+<div class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center border-4 border-surface-container-lowest">
+<span class="material-symbols-outlined text-[20px]">check</span>
+</div>
+<div class="text-center">
+<div class="font-label-caps text-label-caps text-on-surface uppercase">2nd Reading</div>
+<div class="font-data-tabular text-data-tabular text-on-surface-variant mt-1">Apr 24, '23</div>
+</div>
+</div>
+<!-- Active -->
+<div class="flex flex-col items-center gap-3 w-24">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center border-4 border-surface-container-lowest ring-2 ring-primary ring-offset-2">
+<span class="material-symbols-outlined text-[20px]">hourglass_empty</span>
+</div>
+<div class="text-center">
+<div class="font-label-caps text-label-caps text-primary uppercase font-bold">Committee</div>
+<div class="font-data-tabular text-data-tabular text-on-surface-variant mt-1">INDU</div>
+</div>
+</div>
+<!-- Pending -->
+<div class="flex flex-col items-center gap-3 w-24">
+<div class="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center border-4 border-surface-container-lowest">
+<span class="material-symbols-outlined text-[20px]">pending</span>
+</div>
+<div class="text-center opacity-50">
+<div class="font-label-caps text-label-caps text-on-surface uppercase">Report</div>
+<div class="font-data-tabular text-data-tabular text-on-surface-variant mt-1">Pending</div>
+</div>
+</div>
+<!-- Pending -->
+<div class="flex flex-col items-center gap-3 w-24">
+<div class="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center border-4 border-surface-container-lowest">
+<span class="material-symbols-outlined text-[20px]">pending</span>
+</div>
+<div class="text-center opacity-50">
+<div class="font-label-caps text-label-caps text-on-surface uppercase">3rd Reading</div>
+<div class="font-data-tabular text-data-tabular text-on-surface-variant mt-1">Pending</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Memo Content -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow">
+<div class="bg-surface-container-low px-8 py-4 border-b border-outline-variant flex justify-between items-center">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Commercial Impact Summary</h2>
+<span class="font-data-tabular text-data-tabular text-on-surface-variant">Last Updated: Oct 12, 2023</span>
+</div>
+<div class="p-8 prose max-w-none font-memo-body text-memo-body text-on-surface space-y-6">
+<p>
+                            Bill C-27 represents the most significant overhaul of Canadian federal privacy legislation in decades. For enterprise technology firms, data brokers, and consumer-facing organizations, the proposed <strong>Consumer Privacy Protection Act (CPPA)</strong> introduces stringent new consent requirements and algorithmic transparency mandates.
+                        </p>
+<div class="flex items-start gap-4 p-4 bg-primary/5 rounded border-l-4 border-primary my-6">
+<span class="material-symbols-outlined text-primary mt-1" data-icon="lightbulb">lightbulb</span>
+<p class="m-0 text-body-lg font-body-lg text-on-surface font-medium">
+                                Materiality Note: The introduction of the Artificial Intelligence and Data Act (AIDA) within this omnibus bill creates immediate compliance unknowns for generative AI deployers, lacking clear regulatory definitions for "high-impact" systems.
+                            </p>
+</div>
+<p>
+                            Financial penalties for non-compliance are severe, capping at the higher of $25,000,000 or 5% of gross global revenue for the preceding financial year. Organizations must begin auditing data lineage and algorithmic decision-making models immediately to prepare for the transition period post-Royal Assent.
+                        </p>
+</div>
+</section>
+<!-- Entity Relationship Map Placeholder -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow h-96 relative overflow-hidden flex flex-col">
+<h2 class="font-headline-sm text-headline-sm text-on-surface mb-4 flex items-center gap-2 z-10">
+<span class="material-symbols-outlined text-primary" data-icon="hub">hub</span>
+                        Entity Relationships
+                    </h2>
+<div class="flex-grow bg-surface-container-low rounded border border-outline-variant relative">
+<!-- Abstract visualization placeholder -->
+<div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(#041632 1px, transparent 1px); background-size: 20px 20px;"></div>
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center flex-col gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[48px] opacity-50" data-icon="schema">schema</span>
+<span class="font-body-md text-body-md">Interactive relationship graph loading...</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Sidebar Data (4 cols) -->
+<div class="lg:col-span-4 space-y-gutter">
+<!-- AI Risk Profile Bento -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow">
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Risk Profile</h2>
+<span class="px-2 py-1 bg-surface-container-high rounded text-label-caps font-label-caps text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="smart_toy">smart_toy</span>
+                            AI Gen
+                        </span>
+</div>
+<div class="space-y-6">
+<!-- Risk Item 1 -->
+<div>
+<div class="flex justify-between text-body-sm font-body-sm mb-1">
+<span class="text-on-surface font-medium">Regulatory Burden</span>
+<span class="text-error font-medium">High</span>
+</div>
+<div class="h-2 w-full bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-error w-[85%]"></div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 text-sm leading-snug">New requirements for algorithmic impact assessments require specialized compliance infrastructure.</p>
+</div>
+<!-- Risk Item 2 -->
+<div>
+<div class="flex justify-between text-body-sm font-body-sm mb-1">
+<span class="text-on-surface font-medium">Compliance Timeline</span>
+<span class="text-[#b45309] font-medium">Medium</span>
+</div>
+<div class="h-2 w-full bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-[#b45309] w-[60%]"></div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 text-sm leading-snug">Expected 18-24 month transition period post-assent provides moderate runway for implementation.</p>
+</div>
+<!-- Risk Item 3 -->
+<div>
+<div class="flex justify-between text-body-sm font-body-sm mb-1">
+<span class="text-on-surface font-medium">Lobbying Activity</span>
+<span class="text-error font-medium">High</span>
+</div>
+<div class="h-2 w-full bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-error w-[95%]"></div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 text-sm leading-snug">Unprecedented volume of registrations targeting INDU committee members regarding AIDA provisions.</p>
+</div>
+</div>
+</section>
+<!-- Key Entities Data Grid -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow">
+<div class="p-6 border-b border-outline-variant">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Active Committees</h2>
+</div>
+<div class="w-full overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="py-3 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Committee</th>
+<th class="py-3 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Meetings</th>
+</tr>
+</thead>
+<tbody class="font-data-tabular text-data-tabular text-on-surface">
+<tr class="border-b border-outline-variant zebra-row hover:bg-surface-container-low transition-colors cursor-pointer">
+<td class="py-3 px-6">INDU (Industry and Tech)</td>
+<td class="py-3 px-6 text-right">42</td>
+</tr>
+<tr class="border-b border-outline-variant zebra-row hover:bg-surface-container-low transition-colors cursor-pointer">
+<td class="py-3 px-6">ETHI (Access to Info &amp; Privacy)</td>
+<td class="py-3 px-6 text-right">18</td>
+</tr>
+<tr class="border-b border-outline-variant zebra-row hover:bg-surface-container-low transition-colors cursor-pointer">
+<td class="py-3 px-6">JUST (Justice and Human Rights)</td>
+<td class="py-3 px-6 text-right">5</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+</div>
+</main>
+</body></html>

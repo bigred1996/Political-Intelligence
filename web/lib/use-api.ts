@@ -12,8 +12,11 @@ export function useApi<T>(path: string | null): { data: T | null; loading: boole
   useEffect(() => {
     if (!path) return;
     let alive = true;
-    setLoading(true);
-    setError(null);
+    queueMicrotask(() => {
+      if (!alive) return;
+      setLoading(true);
+      setError(null);
+    });
     api<T>(path)
       .then((d) => alive && setData(d))
       .catch((e) => alive && setError(String(e)))

@@ -1,4 +1,4 @@
-"""Semantic vector index over Polaris's text-bearing records.
+"""Semantic vector index over Nessus's text-bearing records.
 
 What gets embedded (and why this subset): semantic search earns its keep on
 free-text records where meaning matters — bills, gazette regulations, news,
@@ -32,7 +32,7 @@ VECTORS_PATH = INDEX_DIR / "vectors.npy"
 META_PATH = INDEX_DIR / "meta.json"
 
 # Breadth sources (in source_records) that carry embeddable text.
-EMBED_SOURCES = ["statcan", "iaac", "cer", "transport", "geospatial", "gc_news"]
+EMBED_SOURCES = ["statcan", "iaac", "cer", "transport", "geospatial", "gc_news", "social_statements", "public_statements"]
 
 _cache: dict[str, Any] = {"vectors": None, "meta": None, "mtime": None}
 

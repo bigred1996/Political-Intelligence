@@ -1,35 +1,158 @@
 @import "tailwindcss";
 
-/* ── Polaris terminal system ─────────────────────────────────────────────
-   Dark, dense, numeric. Deep-navy canvas, brass as the structural/brand
-   accent, functional green/amber/red for data direction & risk. The brand
-   parchment + serif tokens below are kept ONLY for the client-facing report
-   "deliverable" (the /briefings/[id] reader).                              */
+/* ── Nessus Intelligence — "Intelligence Grade" design system ───────────
+   Exact replication of the designer's Tailwind config: Material-Design
+   token names (primary = Parliament Navy #041632), Public Sans for the
+   interface, Source Serif 4 for headlines/memos, tonal-layer cards with a
+   soft metallic border. Token names match the mockup class strings verbatim
+   (text-on-surface-variant, bg-surface-container-low, font-display-lg, …). */
 @theme {
-  /* Terminal canvas — neutral near-black charcoal (no blue cast) */
-  --color-canvas: #0a0b0e;
-  --color-panel: #131419;
-  --color-panel-2: #1b1d23;
-  --color-line: #262931;
-  --color-line-soft: #1a1c22;
-  --color-fg: #c9cdd6;
-  --color-fg-bright: #f4f6f9;
-  --color-fg-dim: #787e8a;
+  /* Primary — Parliament Navy */
+  --color-primary: #041632;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #1b2b48;
+  --color-on-primary-container: #8393b5;
+  --color-primary-fixed: #d7e2ff;
+  --color-primary-fixed-dim: #b7c7eb;
+  --color-on-primary-fixed: #091b37;
+  --color-on-primary-fixed-variant: #374765;
+  --color-inverse-primary: #b7c7eb;
 
-  /* Brass single brand accent + functional data colors */
-  --color-brass: #c79a45;
-  --color-brass-bright: #e6c074;
-  --color-brass-700: #9a7d36;
-  --color-up: #3ecf8e;
-  --color-down: #f0584d;
-  --color-warn: #e3a93a;
+  /* Secondary — Slate */
+  --color-secondary: #505f76;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #d0e1fb;
+  --color-on-secondary-container: #54647a;
+  --color-secondary-fixed: #d3e4fe;
+  --color-secondary-fixed-dim: #b7c8e1;
+  --color-on-secondary-fixed: #0b1c30;
+  --color-on-secondary-fixed-variant: #38485d;
 
-  /* Risk scale — functional, tuned for legibility on near-black */
-  --color-risk-low: #3ecf8e;
-  --color-risk-med: #e3a93a;
-  --color-risk-high: #f0584d;
+  /* Tertiary — near-black */
+  --color-tertiary: #151717;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #2a2b2b;
+  --color-on-tertiary-container: #929292;
+  --color-tertiary-fixed: #e3e2e2;
+  --color-tertiary-fixed-dim: #c6c6c6;
 
-  /* Brand "deliverable" palette (reports / print) */
+  /* Error — oxblood */
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  /* Surfaces (tonal layers) */
+  --color-surface: #f7f9fb;
+  --color-surface-dim: #d8dadc;
+  --color-surface-bright: #f7f9fb;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f4f6;
+  --color-surface-container: #eceef0;
+  --color-surface-container-high: #e6e8ea;
+  --color-surface-container-highest: #e0e3e5;
+  --color-surface-variant: #e0e3e5;
+  --color-surface-tint: #4f5e7e;
+  --color-on-surface: #191c1e;
+  --color-on-surface-variant: #44474d;
+  --color-inverse-surface: #2d3133;
+  --color-inverse-on-surface: #eff1f3;
+
+  --color-outline: #75777e;
+  --color-outline-variant: #c5c6ce;
+  --color-background: #f7f9fb;
+  --color-on-background: #191c1e;
+
+  /* Soft metallic hairline used on card borders */
+  --color-hairline: #e2e8f0;
+
+  /* Fonts (named families used by the mockups) */
+  --font-sans: var(--font-public-sans);
+  --font-display: var(--font-source-serif);
+  --font-mono: var(--font-mono-data);
+  --font-display-lg: var(--font-source-serif);
+  --font-headline-md: var(--font-source-serif);
+  --font-headline-sm: var(--font-source-serif);
+  --font-memo-body: var(--font-source-serif);
+  --font-body-lg: var(--font-public-sans);
+  --font-body-md: var(--font-public-sans);
+  --font-body-sm: var(--font-public-sans);
+  --font-label-caps: var(--font-public-sans);
+  --font-data-tabular: var(--font-public-sans);
+
+  /* Type scale (size + companion line-height / weight / tracking) */
+  --text-display-lg: 48px;
+  --text-display-lg--line-height: 56px;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-lg--font-weight: 600;
+  --text-headline-md: 32px;
+  --text-headline-md--line-height: 40px;
+  --text-headline-md--font-weight: 600;
+  --text-headline-sm: 24px;
+  --text-headline-sm--line-height: 32px;
+  --text-headline-sm--font-weight: 600;
+  --text-memo-body: 18px;
+  --text-memo-body--line-height: 28px;
+  --text-memo-body--font-weight: 400;
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body-lg--font-weight: 400;
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--font-weight: 400;
+  --text-body-sm: 12px;
+  --text-body-sm--line-height: 16px;
+  --text-label-caps: 11px;
+  --text-label-caps--line-height: 16px;
+  --text-label-caps--letter-spacing: 0.05em;
+  --text-label-caps--font-weight: 700;
+  --text-data-tabular: 13px;
+  --text-data-tabular--line-height: 18px;
+  --text-data-tabular--letter-spacing: 0.01em;
+  --text-data-tabular--font-weight: 500;
+
+  /* Named spacing tokens */
+  --spacing-unit: 4px;
+  --spacing-density-compact: 8px;
+  --spacing-density-comfortable: 16px;
+  --spacing-gutter: 24px;
+  --spacing-margin-mobile: 16px;
+  --spacing-margin-desktop: 40px;
+
+  /* ── Back-compat aliases (so not-yet-rebuilt pages stay on-palette) ── */
+  --color-canvas: #f7f9fb;
+  --color-panel: #ffffff;
+  --color-panel-2: #f2f4f6;
+  --color-line: #e2e8f0;
+  --color-line-soft: #eef1f5;
+  --color-fg: #44474d;
+  --color-fg-bright: #191c1e;
+  --color-fg-dim: #75777e;
+  --color-brass: #041632;
+  --color-brass-bright: #1b2b48;
+  --color-brass-700: #041632;
+  --color-up: #059669;
+  --color-down: #ba1a1a;
+  --color-warn: #d97706;
+  --color-risk-low: #059669;
+  --color-risk-med: #d97706;
+  --color-risk-high: #ba1a1a;
+  --color-ink-surface: #1b2b48;
+  --color-ink-2: #22304d;
+  --color-ink-3: #2c3a56;
+  --color-ink-fg: #c6d2e8;
+  --color-ink-fg-dim: #8393b5;
+  --color-ink-fg-faint: #5f6f91;
+  --color-accent-on-ink: #b7c7eb;
+  --color-accent-soft: #d0e1fb;
+  --color-clay-soft: #ffdad6;
+  --color-amber-soft: #fef3c7;
+  --color-info: #505f76;
+  --color-info-soft: #d0e1fb;
+  --color-muted: #75777e;
+  --color-muted-2: #8a8d94;
+
+  /* Brand "deliverable" palette (reports / print) — kept for /briefings */
   --color-navy: #0b1d36;
   --color-navy-700: #122845;
   --color-navy-600: #1b3458;
@@ -37,108 +160,149 @@
   --color-parchment-2: #ece5d4;
   --color-paper: #fbf9f3;
   --color-slate: #6b7177;
-  --color-ink: #111111;
+  --color-ink: #191c1e;
   --color-red: #7b1e1e;
-
-  --font-display: var(--font-playfair);
-  --font-sans: var(--font-source);
-  --font-mono: var(--font-mono-data);
 }
 
-:root {
-  --background: var(--color-canvas);
-  --foreground: var(--color-fg);
+/* Base element resets live in @layer base so Tailwind utilities (in the
+   later `utilities` layer) always win — an UNLAYERED `a { color: inherit }`
+   would otherwise override every `text-*` color utility on links. */
+@layer base {
+  * { box-sizing: border-box; }
+
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+  body {
+    background: var(--color-background);
+    color: var(--color-on-surface);
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-feature-settings: "kern", "liga";
+  }
+
+  a { color: inherit; }
 }
 
-* { box-sizing: border-box; }
+/* Editorial serif helper */
+.font-display, .serif { font-family: var(--font-display), Georgia, "Times New Roman", serif; }
 
-html {
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+/* "mono"/data type — the design uses Public Sans tabular, not a monospace */
+.mono { font-family: var(--font-data-tabular), system-ui, sans-serif; font-feature-settings: "tnum"; letter-spacing: 0.01em; }
+
+/* Material Symbols */
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  line-height: 1;
+  vertical-align: middle;
+  user-select: none;
+}
+.material-symbols-outlined[data-weight="fill"],
+.material-symbols-outlined.fill { font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24; }
+
+/* ── Cards (Level-1 surface + Level-2 hover lift) ── */
+.card-level-1 { background-color: var(--color-surface-container-lowest); border: 1px solid var(--color-hairline); }
+.card-level-2 { transition: box-shadow 0.2s ease, border-color 0.2s ease; }
+.card-level-2:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-color: var(--color-primary); }
+
+.glass-panel {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(226,232,240,0.8);
 }
 
-body {
-  background: var(--color-canvas);
-  color: var(--color-fg);
-  font-family: var(--font-sans), system-ui, sans-serif;
-  font-feature-settings: "kern", "liga", "tnum";
-}
+.zebra-row:nth-child(even) { background-color: rgba(4,22,50,0.02); }
 
-/* Numeric / data type */
-.mono { font-family: var(--font-mono), ui-monospace, monospace; font-feature-settings: "tnum"; }
+.status-chip-red   { background-color: rgba(186,26,26,0.10); color: #ba1a1a; }
+.status-chip-amber { background-color: rgba(245,158,11,0.10); color: #d97706; }
+.status-chip-green { background-color: rgba(16,185,129,0.10); color: #059669; }
 
-/* Terminal panel: thin-bordered module with an optional header bar */
+/* ── Back-compat component classes mapped to the new card look ── */
 .panel {
-  background: var(--color-panel);
-  border: 1px solid var(--color-line);
-  border-radius: 6px;
+  background: var(--color-surface-container-lowest);
+  border: 1px solid var(--color-hairline);
+  border-radius: 0.5rem;
+  box-shadow: none;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .panel-head {
   display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--color-line);
-  background: linear-gradient(180deg, var(--color-panel-2), var(--color-panel));
+  min-height: 44px;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-surface-container-low);
+  border-radius: 0.5rem 0.5rem 0 0;
 }
+.panel-dark { background: var(--color-primary-container); color: var(--color-on-primary); border: 1px solid var(--color-primary-container); border-radius: 0.5rem; }
+.panel-accent { background: var(--color-primary); color: #fff; border-radius: 0.5rem; }
+.signal-card { background: var(--color-surface-container-lowest); border: 1px solid var(--color-hairline); border-radius: 0.5rem; }
+.app-shell { background: var(--color-background); }
 
-/* Eyebrow / module label */
 .eyebrow {
-  font-family: var(--font-mono), monospace;
+  font-family: var(--font-label-caps), system-ui, sans-serif;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.625rem;
-  font-weight: 600;
-  color: var(--color-brass-bright);
+  letter-spacing: 0.05em;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  color: var(--color-on-surface-variant);
 }
 
-/* Faint grid texture for header/hero strips */
+.control {
+  min-height: 38px;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 0.25rem;
+  background: var(--color-surface-container-low);
+  color: var(--color-on-surface);
+}
+
 .map-grid {
   background-image:
-    linear-gradient(var(--color-line-soft) 1px, transparent 1px),
-    linear-gradient(90deg, var(--color-line-soft) 1px, transparent 1px);
-  background-size: 26px 26px;
+    radial-gradient(var(--color-outline-variant) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: 0.2;
 }
+.sector-hero { background: var(--color-background); position: relative; }
+.sector-hero::after { content: none; }
+.sector-hero > * { position: relative; z-index: 1; }
 
-a { color: inherit; }
+/* Scrollbar */
+.main-scroll::-webkit-scrollbar, ::-webkit-scrollbar { width: 8px; height: 8px; }
+.main-scroll::-webkit-scrollbar-track, ::-webkit-scrollbar-track { background: transparent; }
+.main-scroll::-webkit-scrollbar-thumb, ::-webkit-scrollbar-thumb { background: #d8dadc; border-radius: 4px; }
+.main-scroll::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:hover { background: #c5c6ce; }
+.main-scroll { scrollbar-width: thin; scrollbar-color: #d8dadc transparent; }
+
+.focus-ring:focus-visible, a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+  outline-offset: 2px;
+}
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
-@keyframes fade-rise {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+@keyframes fade-rise { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 .animate-rise { animation: fade-rise 0.3s ease both; }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 .skeleton {
-  background: linear-gradient(90deg, var(--color-panel) 25%, var(--color-panel-2) 37%, var(--color-panel) 63%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
-  border-radius: 4px;
+  background: linear-gradient(90deg, var(--color-surface-container-low) 25%, var(--color-surface-container) 37%, var(--color-surface-container-low) 63%);
+  background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; border-radius: 4px;
 }
 
-/* ── Client report "deliverable" surface (kept on the brand style guide) ── */
-.deliverable h1, .deliverable h2, .deliverable h3, .deliverable h4, .deliverable .font-display {
-  font-family: var(--font-display), Georgia, serif;
-}
+/* ── Client report "deliverable" surface (kept for /briefings) ── */
+.deliverable h1, .deliverable h2, .deliverable h3, .deliverable h4, .deliverable .font-display { font-family: var(--font-display), Georgia, serif; }
 .briefing-prose { color: var(--color-ink); font-size: 15px; line-height: 1.7; }
 .briefing-prose p { margin: 0 0 0.9rem; }
 .briefing-prose strong { color: var(--color-navy); font-weight: 600; }
 .briefing-prose ul { margin: 0 0 0.9rem 1.1rem; list-style: disc; }
 .briefing-prose li { margin: 0.2rem 0; }
-.briefing-prose a { color: var(--color-brass-700); text-decoration: underline; }
+.briefing-prose a { color: var(--color-primary); text-decoration: underline; }
 .briefing-prose table { width: 100%; border-collapse: collapse; margin: 0.6rem 0 1rem; font-size: 13.5px; }
-.briefing-prose th { text-align: left; color: var(--color-slate); font-weight: 500; text-transform: uppercase;
-  letter-spacing: 0.04em; font-size: 11px; padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, var(--color-slate) 25%, transparent); }
+.briefing-prose th { text-align: left; color: var(--color-slate); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, var(--color-slate) 25%, transparent); }
 .briefing-prose td { padding: 7px 8px; border-bottom: 1px solid color-mix(in srgb, var(--color-slate) 12%, transparent); }
 .briefing-prose h3, .briefing-prose h4 { font-family: var(--font-display), serif; color: var(--color-navy); margin: 1.2rem 0 0.5rem; }

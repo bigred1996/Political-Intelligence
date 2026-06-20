@@ -1,25 +1,24 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Playfair_Display, Source_Sans_3 } from "next/font/google";
+import { Public_Sans, Source_Serif_4, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppTopBar } from "@/components/app-topbar";
-import { AppTicker } from "@/components/app-ticker";
 
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
+const sourceSerif = Source_Serif_4({
+  variable: "--font-source-serif",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["400", "600", "700"],
   display: "swap",
 });
 
-const sourceSans = Source_Sans_3({
-  variable: "--font-source",
+const publicSans = Public_Sans({
+  variable: "--font-public-sans",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
-const mono = IBM_Plex_Mono({
+const mono = JetBrains_Mono({
   variable: "--font-mono-data",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
@@ -27,9 +26,9 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Polaris — Political Intelligence Terminal",
+  title: "Nessus — Intelligence Platform",
   description:
-    "Premium Canadian political intelligence: sector, region and entity risk decoded across federal data.",
+    "Nessus Intelligence: institutional-grade Canadian political & regulatory intelligence — sector, region and entity risk decoded across federal data.",
 };
 
 export default function RootLayout({
@@ -38,15 +37,22 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${playfair.variable} ${sourceSans.variable} ${mono.variable} h-full`}
+      className={`${sourceSerif.variable} ${publicSans.variable} ${mono.variable} h-full`}
     >
-      <body className="h-screen flex flex-col overflow-hidden bg-canvas text-fg">
-        <AppTopBar />
-        <div className="flex flex-1 min-h-0">
-          <AppSidebar />
-          <main className="flex-1 overflow-y-auto">{children}</main>
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+        />
+      </head>
+      <body className="h-screen overflow-hidden bg-background text-on-surface app-shell flex">
+        <AppSidebar />
+        <div className="flex flex-col flex-1 min-w-0 h-screen">
+          <AppTopBar />
+          <main className="flex-1 overflow-y-auto main-scroll p-margin-mobile md:p-margin-desktop">
+            <div className="mx-auto w-full max-w-[1440px]">{children}</div>
+          </main>
         </div>
-        <AppTicker />
       </body>
     </html>
   );

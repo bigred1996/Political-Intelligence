@@ -6,7 +6,7 @@ export function SiteFooter() {
       <div className="mx-auto max-w-[1320px] px-4 py-5 flex flex-col sm:flex-row items-center gap-3 justify-between">
         <div className="flex items-center gap-2 text-brass-bright">
           <CompassMark size={18} />
-          <span className="text-fg text-sm font-semibold">POLARIS</span>
+          <span className="text-fg text-sm font-semibold">NESSUS</span>
         </div>
         <p className="mono uppercase tracking-[0.16em] text-[10px] text-fg-dim">
           Political Intelligence · Strategic Advantage

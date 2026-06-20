@@ -1,4 +1,4 @@
-# Polaris — Data Source Checklist
+# Nessus — Data Source Checklist
 
 Status legend: ✅ live (real data in DB) · 🟡 partial/stub · ⬜ not started · 🔴 blocked
 

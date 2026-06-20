@@ -24,6 +24,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
+from api.schemas import RecordDetailResponse
 from pipeline.impact import industry_impact, relevant_players, resolve_sector
 from pipeline.sector_mapper import sector_for_entity
 from search.sql_search import SPECS, _g, _import_model
@@ -40,6 +41,9 @@ _ALIASES = {
     "tribunal_decisions": "tribunal",
     "lobbying_records": "lobbying",
     "lobby": "lobbying",
+    "social_statements": "source_records",
+    "public_statements": "source_records",
+    "social_posts": "source_records",
 }
 
 # Human labels for the source/table keys.
@@ -49,6 +53,19 @@ _LABELS = {
     "ocl_registrations": "Lobbying registrations", "bills": "Bills & legislation",
     "gazette": "Canada Gazette", "tribunal": "Tribunal decisions",
     "appointments": "GIC appointments", "source_records": "Breadth sources",
+    "hansard_mentions": "Hansard mentions",
+}
+
+_SOURCE_RECORD_LABELS = {
+    "social_statements": "Public statement",
+    "public_statements": "Public statement",
+    "gc_news": "Government news release",
+    "cer": "CER operations record",
+    "npri": "NPRI release record",
+    "iaac": "Impact assessment record",
+    "statcan": "StatCan dataset",
+    "transport": "Transport catalogue record",
+    "geospatial": "Geospatial catalogue record",
 }
 
 # Column names that hold a verbose blob we render compactly, not as a plain field.
@@ -97,6 +114,7 @@ def _short(spec, row) -> dict[str, Any]:
         rtype = _g(row, "record_type") or "breadth"
     return {
         "table": table, "pk": row.id, "source": src, "record_type": rtype,
+        "type_label": _SOURCE_RECORD_LABELS.get(src) if table == "source_records" else _LABELS.get(table, table.title()),
         "title": spec.title_fn(row)[:160],
         "date": _g(row, spec.date_col) if spec.date_col else None,
         "amount": getattr(row, spec.amount_col, None) if spec.amount_col else None,
@@ -176,7 +194,7 @@ def _timeline(groups: list[dict[str, Any]], this: dict[str, Any]) -> list[dict[s
     return items[:24]
 
 
-@router.get("/{table}/{pk}")
+@router.get("/{table}/{pk}", response_model=RecordDetailResponse)
 async def get_record(table: str, pk: int, session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     spec, key = _spec_for(table)
     if not spec:
@@ -194,10 +212,12 @@ async def get_record(table: str, pk: int, session: AsyncSession = Depends(get_se
     if spec.source == "source_records":
         src = _g(row, "source") or "breadth"
         rtype = _g(row, "record_type") or "breadth"
+    type_label = _SOURCE_RECORD_LABELS.get(src) if spec.source == "source_records" else None
 
     record = {
         "title": spec.title_fn(row),
         "source": src, "record_type": rtype,
+        "type_label": type_label,
         "entity": entity_name or None, "canonical": canonical or None,
         "date": _g(row, spec.date_col) if spec.date_col else None,
         "amount": getattr(row, spec.amount_col, None) if spec.amount_col else None,

@@ -1,4 +1,4 @@
-# Polaris Intelligence
+# Nessus Intelligence
 
 Canadian political due-diligence platform. Enter a company → pull federal data
 (lobbying, contracts, donations, bills) → score political risk → draft a 9-section

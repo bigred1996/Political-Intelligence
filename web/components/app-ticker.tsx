@@ -37,7 +37,7 @@ export function AppTicker() {
           </span>
         ))}
       </div>
-      <span className="mono text-fg-dim/60 ml-auto shrink-0 hidden sm:inline">POLARIS · Source: Government of Canada open data</span>
+      <span className="mono text-fg-dim/60 ml-auto shrink-0 hidden sm:inline">NESSUS · Source: Government of Canada open data</span>
     </footer>
   );
 }

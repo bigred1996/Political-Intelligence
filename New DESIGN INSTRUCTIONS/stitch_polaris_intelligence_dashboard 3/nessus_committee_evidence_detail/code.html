@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Evidence Detail - Committee Transcript</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;700&amp;family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#eceef0",
+                        "on-tertiary-container": "#929292",
+                        "inverse-surface": "#2d3133",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "tertiary-container": "#2a2b2b",
+                        "inverse-primary": "#b7c7eb",
+                        "surface-dim": "#d8dadc",
+                        "on-surface-variant": "#44474d",
+                        "surface-bright": "#f7f9fb",
+                        "surface-container-high": "#e6e8ea",
+                        "surface": "#f7f9fb",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#091b37",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#b7c7eb",
+                        "outline": "#75777e",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-secondary-fixed": "#0b1c30",
+                        "tertiary-fixed": "#e3e2e2",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "primary-fixed": "#d7e2ff",
+                        "on-surface": "#191c1e",
+                        "on-primary-fixed-variant": "#374765",
+                        "secondary-fixed": "#d3e4fe",
+                        "secondary-container": "#d0e1fb",
+                        "on-secondary-container": "#54647a",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#464747",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e0e3e5",
+                        "secondary": "#505f76",
+                        "on-error": "#ffffff",
+                        "primary": "#041632",
+                        "outline-variant": "#c5c6ce",
+                        "primary-container": "#1b2b48",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed-dim": "#c6c6c6",
+                        "on-primary-container": "#8393b5",
+                        "surface-container-low": "#f2f4f6",
+                        "surface-container-highest": "#e0e3e5",
+                        "background": "#f7f9fb",
+                        "on-background": "#191c1e",
+                        "surface-tint": "#4f5e7e",
+                        "tertiary": "#151717"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "density-compact": "8px",
+                        "container-max": "1440px",
+                        "unit": "4px",
+                        "margin-desktop": "40px",
+                        "gutter": "24px",
+                        "density-comfortable": "16px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["\"Source Serif 4\""],
+                        "headline-md": ["\"Source Serif 4\""],
+                        "display-lg": ["\"Source Serif 4\""],
+                        "body-md": ["Public Sans"],
+                        "body-lg": ["Public Sans"],
+                        "label-caps": ["Public Sans"],
+                        "data-tabular": ["Public Sans"],
+                        "memo-body": ["\"Source Serif 4\""]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-md": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "data-tabular": ["13px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "memo-body": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col md:flex-row antialiased">
+<!-- SideNavBar (Desktop) -->
+<nav class="hidden md:flex flex-col h-screen fixed left-0 top-0 w-64 bg-surface-container-low dark:bg-surface-container border-r border-outline-variant p-density-comfortable z-40">
+<div class="mb-8">
+<div class="flex items-center gap-3">
+<img class="w-8 h-8 rounded-full object-cover shadow-sm border border-outline-variant" data-alt="A small, high-tech looking system status indicator icon in sleek corporate modern style. It features a glowing metallic blue core surrounded by precise, minimalist silver rings. The background is a clean, abstract data mesh in soft greys, projecting an authoritative intelligence aesthetic. The lighting is crisp and studio-quality." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUyUcIeq0CkSdXUXV2G2MxO2Cl7ogF4zyQSCaIIfj8ucZNUYAgKyAUgbz66_qf7XjeyWxYjuUh-1SqOBtj1ICQNlNnjKvGLpPM3Z6N338n_hv8USBjxI5z6AuKiMDWApUbzQAUaWfqv4r1d6HGcntrX2KlWsrY17gH3El9uLkSSGq0JUgelw23dGthsNJoZQ6ZAARlXNmX_2MuDGv8iRcF33FdQ8R7la7mOtoWfsYX2hdF1EwZfrCUDt9YNiU7GUrn0_wgDnutAI8"/>
+<div>
+<h2 class="text-label-caps font-label-caps text-primary tracking-tight font-bold">Intelligence Center</h2>
+<p class="text-body-md font-body-md text-on-surface-variant text-[10px]">Source Health: Optimal</p>
+</div>
+</div>
+</div>
+<button class="mb-6 w-full bg-primary text-on-primary py-2 px-4 rounded font-body-md text-sm font-medium hover:bg-primary-container hover:text-on-primary-container transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+            New Research
+        </button>
+<div class="flex-1 overflow-y-auto">
+<ul class="space-y-1">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all rounded-lg text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+                        Briefing
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all rounded-lg text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="visibility">visibility</span>
+                        Watchlists
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 bg-secondary-container text-on-secondary-container font-semibold rounded-lg text-body-md font-body-md scale-[0.98] transition-transform" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="domain">domain</span>
+                        Sectors
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all rounded-lg text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="search">search</span>
+                        Search
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all rounded-lg text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="description">description</span>
+                        Reports
+                    </a>
+</li>
+</ul>
+</div>
+<div class="mt-auto pt-4 border-t border-outline-variant">
+<ul class="space-y-1">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all rounded-lg text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+                        Settings
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all rounded-lg text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="help">help</span>
+                        Support
+                    </a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 bg-background min-h-screen">
+<!-- TopNavBar (Responsive adaptation - Desktop Top Bar) -->
+<header class="bg-surface border-b border-outline-variant flex justify-between items-center w-full px-margin-desktop h-16 sticky top-0 z-30">
+<div class="flex items-center gap-4">
+<span class="text-headline-sm font-headline-sm font-bold text-primary tracking-tight md:hidden">Polaris</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-label-caps font-label-caps text-on-surface-variant hover:bg-surface-container-low transition-colors py-4" href="#">Live Feed</a>
+<a class="text-label-caps font-label-caps text-on-surface-variant hover:bg-surface-container-low transition-colors py-4" href="#">Daily Memo</a>
+<a class="text-label-caps font-label-caps text-primary border-b-2 border-primary font-bold py-4 opacity-80 transition-all" href="#">Sector Watch</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-2 top-1.5 text-on-surface-variant text-[18px]">search</span>
+<input class="bg-surface-container-low border border-outline-variant rounded-full py-1 pl-8 pr-4 text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-64 transition-all" placeholder="Search evidence..." type="text"/>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<button class="p-1 hover:bg-surface-container-low rounded-full transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="sensors">sensors</span></button>
+<button class="p-1 hover:bg-surface-container-low rounded-full transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="history">history</span></button>
+<button class="p-1 hover:bg-surface-container-low rounded-full transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="notifications">notifications</span></button>
+</div>
+<img alt="Analyst Profile" class="w-8 h-8 rounded-full border border-outline-variant ml-2 object-cover" data-alt="Professional corporate headshot of a senior intelligence analyst. They are wearing a dark navy blazer over a crisp white shirt, exuding authority and precision. The background is a slightly blurred modern office space with cool-toned lighting, reinforcing the corporate modern intelligence aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBglsvK9W2SQlnF9bVSK2v7kEt38R_6RXlCyqIKMVZDmsdFFh5eyAeaaCVbIvDozEl1pPK3UQom_3GxJH8Is0FyLtrpjlkE1Iefpkx1WfCovGYVhh2FgQqtE5eoQAaDn7HM1u8575adJFzr-Gntms583ll0-UEvBk374FJEQ-FHHy51aGQ0ZMWchIQaHouR7nsIHqSZ5JocKU2Px0JTzb-4L_Ih4SvhUID6drpDzyultsn95uKyl05GVisC8EQmpGqaoNmyuQu08mA"/>
+</div>
+</header>
+<!-- Page Content -->
+<div class="max-w-[1440px] mx-auto px-margin-mobile md:px-margin-desktop py-8">
+<!-- Breadcrumbs & Meta -->
+<div class="flex items-center gap-2 text-label-caps font-label-caps text-on-surface-variant mb-6">
+<a class="hover:text-primary transition-colors" href="#">SECTORS</a>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<a class="hover:text-primary transition-colors" href="#">FINANCE &amp; TECH</a>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-on-surface">HEARING TRAN-2023-09</span>
+</div>
+<!-- Header Section -->
+<header class="mb-gutter flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+<div>
+<h1 class="text-display-lg font-display-lg text-primary mb-3">Senate Sub-Committee on Digital Currency Regulation</h1>
+<div class="flex flex-wrap items-center gap-4 text-body-md text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px]">calendar_today</span>
+<span>October 12, 2023</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span>09:00 AM - 14:30 PM EST</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px]">location_on</span>
+<span>Dirksen Senate Office Building, Room 538</span>
+</div>
+<div class="px-2 py-0.5 bg-error-container text-on-error-container text-[11px] font-bold rounded uppercase tracking-wider border border-error/20">
+                            High Impact Risk
+                        </div>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 bg-surface text-primary border border-outline-variant rounded font-body-md text-sm font-medium hover:bg-surface-container-low transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                        Export PDF
+                    </button>
+<button class="px-4 py-2 bg-primary text-on-primary rounded font-body-md text-sm font-medium hover:bg-primary-container transition-colors flex items-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">share</span>
+                        Share Evidence
+                    </button>
+</div>
+</header>
+<!-- Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column: Context & Participants (4 cols) -->
+<div class="lg:col-span-4 space-y-gutter">
+<!-- Participants & Influence Ratings -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden shadow-sm">
+<div class="bg-surface-container-low px-4 py-3 border-b border-outline-variant flex justify-between items-center">
+<h3 class="text-label-caps font-label-caps text-on-surface-variant">KEY PARTICIPANTS</h3>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">groups</span>
+</div>
+<div class="p-0">
+<ul class="divide-y divide-outline-variant">
+<!-- Participant 1 -->
+<li class="p-4 hover:bg-surface-bright transition-colors">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h4 class="text-body-md font-bold text-primary">Sen. Elizabeth Warren (D-MA)</h4>
+<p class="text-[12px] text-on-surface-variant">Committee Chair</p>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[10px] uppercase font-bold text-on-surface-variant mb-1">Influence</span>
+<div class="flex gap-0.5">
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-2">
+<span class="px-1.5 py-0.5 bg-surface-container text-on-surface-variant text-[10px] rounded border border-outline-variant">Hostile Stance</span>
+<span class="px-1.5 py-0.5 bg-surface-container text-on-surface-variant text-[10px] rounded border border-outline-variant">Focus: Consumer Protection</span>
+</div>
+</li>
+<!-- Participant 2 -->
+<li class="p-4 hover:bg-surface-bright transition-colors">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h4 class="text-body-md font-bold text-primary">Brian Armstrong</h4>
+<p class="text-[12px] text-on-surface-variant">CEO, Coinbase (Witness)</p>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[10px] uppercase font-bold text-on-surface-variant mb-1">Influence</span>
+<div class="flex gap-0.5">
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+<div class="w-1.5 h-3 bg-surface-variant rounded-sm"></div>
+<div class="w-1.5 h-3 bg-surface-variant rounded-sm"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-2">
+<span class="px-1.5 py-0.5 bg-surface-container text-on-surface-variant text-[10px] rounded border border-outline-variant">Defensive</span>
+<span class="px-1.5 py-0.5 bg-surface-container text-on-surface-variant text-[10px] rounded border border-outline-variant">Focus: Innovation Drain</span>
+</div>
+</li>
+<!-- Participant 3 -->
+<li class="p-4 hover:bg-surface-bright transition-colors">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h4 class="text-body-md font-bold text-primary">Sen. Cynthia Lummis (R-WY)</h4>
+<p class="text-[12px] text-on-surface-variant">Committee Member</p>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[10px] uppercase font-bold text-on-surface-variant mb-1">Influence</span>
+<div class="flex gap-0.5">
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+<div class="w-1.5 h-3 bg-primary rounded-sm"></div>
+<div class="w-1.5 h-3 bg-surface-variant rounded-sm"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-2">
+<span class="px-1.5 py-0.5 bg-surface-container text-on-surface-variant text-[10px] rounded border border-outline-variant">Favorable Stance</span>
+<span class="px-1.5 py-0.5 bg-surface-container text-on-surface-variant text-[10px] rounded border border-outline-variant">Focus: Regulatory Clarity</span>
+</div>
+</li>
+</ul>
+</div>
+</section>
+<!-- AI Breakdown & Silent Signals -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden shadow-sm relative">
+<!-- Subtle background pattern for AI sections -->
+<div class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: radial-gradient(#041632 1px, transparent 1px); background-size: 16px 16px;"></div>
+<div class="bg-surface-container-low px-4 py-3 border-b border-outline-variant flex justify-between items-center relative z-10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-secondary">memory</span>
+<h3 class="text-label-caps font-label-caps text-on-surface-variant">POLARIS SYNTHESIS</h3>
+</div>
+</div>
+<div class="p-4 space-y-6 relative z-10">
+<!-- Sentiment Exchange Breakdown -->
+<div>
+<h4 class="text-body-md font-bold text-on-surface mb-3 flex items-center justify-between">
+                                    Exchange Sentiment
+                                    <span class="text-[11px] font-normal text-on-surface-variant">Based on 142 turns</span>
+</h4>
+<div class="w-full h-2 bg-surface-variant rounded-full flex overflow-hidden mb-2">
+<div class="bg-[#ba1a1a] h-full" style="width: 45%;"></div>
+<div class="bg-secondary-fixed h-full" style="width: 25%;"></div>
+<div class="bg-primary h-full" style="width: 30%;"></div>
+</div>
+<div class="flex justify-between text-[11px] font-medium text-on-surface-variant">
+<div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-[#ba1a1a]"></div> Hostile (45%)</div>
+<div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-secondary-fixed"></div> Neutral (25%)</div>
+<div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-primary"></div> Favorable (30%)</div>
+</div>
+</div>
+<hr class="border-outline-variant"/>
+<!-- Silent Signals -->
+<div>
+<div class="flex items-center justify-between mb-3">
+<h4 class="text-body-md font-bold text-on-surface">Silent Signals</h4>
+<div class="group relative cursor-help">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">info</span>
+<div class="hidden group-hover:block absolute bottom-full right-0 mb-2 w-48 p-2 bg-inverse-surface text-inverse-on-surface text-[11px] rounded shadow-lg z-20">
+                                            Topics anticipated by Polaris models that were notably avoided during the hearing.
+                                        </div>
+</div>
+</div>
+<ul class="space-y-2">
+<li class="flex items-start gap-2 text-body-md">
+<span class="material-symbols-outlined text-[18px] text-secondary mt-0.5">visibility_off</span>
+<div>
+<span class="font-medium text-on-surface">Offshore Tax Shelters</span>
+<p class="text-[12px] text-on-surface-variant">Expected 85% probability of mention; 0 mentions observed.</p>
+</div>
+</li>
+<li class="flex items-start gap-2 text-body-md">
+<span class="material-symbols-outlined text-[18px] text-secondary mt-0.5">visibility_off</span>
+<div>
+<span class="font-medium text-on-surface">Specific SEC Enforcement Actions</span>
+<p class="text-[12px] text-on-surface-variant">Witness consistently deflected to broad jurisdictional arguments.</p>
+</div>
+</li>
+</ul>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Transcript View (8 cols) -->
+<div class="lg:col-span-8 flex flex-col h-[calc(100vh-12rem)] min-h-[600px]">
+<!-- Transcript Controls -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-t-lg p-3 flex flex-wrap items-center justify-between gap-4 shadow-sm border-b-0 relative z-10">
+<div class="flex items-center gap-2 flex-1 min-w-[200px]">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-2.5 top-2 text-on-surface-variant text-[18px]">search</span>
+<input class="w-full bg-surface border border-outline-variant rounded py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Search within transcript..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="form-checkbox h-4 w-4 text-primary border-outline rounded focus:ring-primary focus:ring-offset-surface-container-lowest bg-surface" type="checkbox"/>
+<span class="text-[12px] font-medium text-on-surface-variant">Highlight Material Statements</span>
+</label>
+<div class="h-4 w-px bg-outline-variant"></div>
+<div class="flex items-center gap-1">
+<button class="p-1 hover:bg-surface-container rounded text-on-surface-variant transition-colors" title="Filter by speaker"><span class="material-symbols-outlined text-[18px]">filter_list</span></button>
+<button class="p-1 hover:bg-surface-container rounded text-on-surface-variant transition-colors" title="Transcript settings"><span class="material-symbols-outlined text-[18px]">tune</span></button>
+</div>
+</div>
+</div>
+<!-- Transcript Canvas -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-b-lg flex-1 overflow-y-auto p-6 md:p-8 relative">
+<div class="max-w-3xl mx-auto space-y-8 font-memo-body text-memo-body">
+<!-- Timestamp marker -->
+<div class="flex items-center justify-center gap-4 my-8 opacity-50">
+<div class="h-px bg-outline-variant flex-1"></div>
+<span class="text-data-tabular font-data-tabular text-on-surface-variant">10:14 AM EST</span>
+<div class="h-px bg-outline-variant flex-1"></div>
+</div>
+<!-- Exchange 1 -->
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-12 pt-1">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center border border-outline-variant font-bold text-sm text-primary">
+                                        EW
+                                    </div>
+</div>
+<div>
+<h5 class="text-[13px] font-bold text-on-surface mb-1 font-body-md">Sen. Warren <span class="text-on-surface-variant font-normal">00:45:12</span></h5>
+<p class="text-on-surface leading-relaxed">
+                                        Mr. Armstrong, you've stated repeatedly that your platform complies with existing financial regulations. Yet, the SEC's recent Wells Notice suggests significant discrepancies regarding unregistered securities. How do you reconcile your public statements with the regulator's findings?
+                                    </p>
+</div>
+</div>
+<!-- Exchange 2 (Material Statement) -->
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-12 pt-1">
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center border border-outline-variant font-bold text-sm text-on-secondary-container">
+                                        BA
+                                    </div>
+</div>
+<div>
+<h5 class="text-[13px] font-bold text-on-surface mb-1 font-body-md">Mr. Armstrong <span class="text-on-surface-variant font-normal">00:45:38</span></h5>
+<p class="text-on-surface leading-relaxed">
+                                        Senator, we have engaged with the SEC in good faith for years. We do not list securities. 
+                                        <!-- Highlighted Material Statement -->
+<span class="bg-primary/10 border-l-2 border-primary pl-2 py-0.5 inline-block my-1 rounded-r">
+                                            The core issue is that the SEC is attempting to retroactively apply century-old case law to a novel technology class without initiating formal rulemaking. We are prepared to litigate this point exhaustively.
+                                        </span>
+</p>
+<!-- Inline Polaris Note -->
+<div class="mt-3 ml-2 border border-secondary-fixed rounded bg-surface-bright p-3 text-[13px] font-body-md flex items-start gap-2">
+<span class="material-symbols-outlined text-[16px] text-primary mt-0.5">policy</span>
+<div>
+<span class="font-bold text-primary block mb-0.5">Materiality Note: Litigation Threat</span>
+<p class="text-on-surface-variant">Explicit commitment to litigation over settlement. High likelihood of protracted legal battle impacting sector regulatory timelines.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Exchange 3 -->
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-12 pt-1">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center border border-outline-variant font-bold text-sm text-primary">
+                                        CL
+                                    </div>
+</div>
+<div>
+<h5 class="text-[13px] font-bold text-on-surface mb-1 font-body-md">Sen. Lummis <span class="text-on-surface-variant font-normal">00:46:15</span></h5>
+<p class="text-on-surface leading-relaxed">
+                                        Following up on that, Mr. Armstrong, isn't it true that other jurisdictions, notably the EU with MiCA, have managed to establish clear frameworks that protect consumers while keeping innovation onshore?
+                                    </p>
+</div>
+</div>
+<!-- Exchange 4 -->
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-12 pt-1">
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center border border-outline-variant font-bold text-sm text-on-secondary-container">
+                                        BA
+                                    </div>
+</div>
+<div>
+<h5 class="text-[13px] font-bold text-on-surface mb-1 font-body-md">Mr. Armstrong <span class="text-on-surface-variant font-normal">00:46:28</span></h5>
+<p class="text-on-surface leading-relaxed">
+                                        Yes, Senator. The lack of clarity here is driving capital and talent overseas. We need Congress to act where the regulators have chosen regulation by enforcement.
+                                    </p>
+</div>
+</div>
+<!-- Timestamp marker -->
+<div class="flex items-center justify-center gap-4 my-8 opacity-50">
+<div class="h-px bg-outline-variant flex-1"></div>
+<span class="text-data-tabular font-data-tabular text-on-surface-variant">10:22 AM EST</span>
+<div class="h-px bg-outline-variant flex-1"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>
