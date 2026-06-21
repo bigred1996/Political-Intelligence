@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, money, type SearchHit, type SearchResponse } from "@/lib/api";
 import { OriginalSourceLink } from "@/components/ui";
@@ -105,9 +105,9 @@ function AskNessus() {
 
                   {data && (
                     <div className="bg-surface-container-lowest border border-outline-variant rounded-lg rounded-tl-sm p-6 max-w-4xl shadow-sm text-on-surface space-y-5 w-full">
-                      <p className="font-memo-body text-memo-body leading-relaxed text-on-surface">
-                        {data.answer || `Found ${data.counts.returned} matching records across ${Object.keys(data.counts.by_source).length} sources for "${data.query}".`}
-                      </p>
+                      <AnswerMarkdown
+                        text={data.answer || `Found ${data.counts.returned} matching records across ${Object.keys(data.counts.by_source).length} sources for "${data.query}".`}
+                      />
                       <div className="space-y-3">
                         <h4 className="font-label-caps text-label-caps text-on-surface-variant uppercase border-b border-outline-variant/50 pb-1">Top Evidence</h4>
                         <div className="space-y-2">
@@ -210,4 +210,114 @@ function HitRow({ hit, query }: { hit: SearchHit; query: string }) {
       ) : null}
     </div>
   ) : inner;
+}
+
+/* Lightweight, dependency-free markdown renderer for the synthesized answer.
+   Handles headings, bold, inline code, bullet lists, and pipe tables — enough
+   for the Claude-generated due-diligence summaries without pulling in react-markdown. */
+function renderInline(text: string, keyBase: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const regex = /\*\*(.+?)\*\*|`([^`]+?)`/g;
+  let last = 0;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index));
+    if (m[1] !== undefined) {
+      nodes.push(<strong key={`${keyBase}-b${i}`} className="font-semibold text-on-surface">{m[1]}</strong>);
+    } else if (m[2] !== undefined) {
+      nodes.push(<code key={`${keyBase}-c${i}`} className="font-data-tabular text-[0.88em] bg-surface-container px-1 py-0.5 rounded">{m[2]}</code>);
+    }
+    last = m.index + m[0].length;
+    i++;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
+}
+
+function MarkdownTable({ rows, idx }: { rows: string[]; idx: number }) {
+  const cells = rows.map((r) => r.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim()));
+  const isSep = (r: string[]) => r.every((c) => /^:?-{2,}:?$/.test(c));
+  const header = cells[0] ?? [];
+  const body = cells.slice(1).filter((r) => !isSep(r));
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left border-collapse font-memo-body text-[0.92em]">
+        <thead>
+          <tr className="border-b border-outline-variant">
+            {header.map((c, ci) => (
+              <th key={ci} className="py-1.5 pr-4 font-label-caps text-label-caps uppercase text-on-surface-variant">{renderInline(c, `th${idx}-${ci}`)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((r, ri) => (
+            <tr key={ri} className="border-b border-outline-variant/40">
+              {r.map((c, ci) => (
+                <td key={ci} className="py-1.5 pr-4 align-top text-on-surface">{renderInline(c, `td${idx}-${ri}-${ci}`)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AnswerMarkdown({ text }: { text: string }) {
+  const lines = text.replace(/\r/g, "").split("\n");
+  const blocks: ReactNode[] = [];
+  let para: string[] = [];
+  let list: string[] = [];
+  const flushPara = () => {
+    if (para.length) {
+      const k = blocks.length;
+      blocks.push(<p key={`p${k}`} className="font-memo-body text-memo-body leading-relaxed text-on-surface">{renderInline(para.join(" "), `p${k}`)}</p>);
+      para = [];
+    }
+  };
+  const flushList = () => {
+    if (list.length) {
+      const k = blocks.length;
+      const items = list;
+      blocks.push(
+        <ul key={`u${k}`} className="list-disc pl-5 space-y-1 font-memo-body text-memo-body text-on-surface">
+          {items.map((li, li2) => <li key={li2}>{renderInline(li, `u${k}-${li2}`)}</li>)}
+        </ul>,
+      );
+      list = [];
+    }
+  };
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    if (!line) { flushPara(); flushList(); i++; continue; }
+    if (line.startsWith("|")) {
+      flushPara(); flushList();
+      const tbl: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) { tbl.push(lines[i].trim()); i++; }
+      blocks.push(<MarkdownTable key={`t${blocks.length}`} rows={tbl} idx={blocks.length} />);
+      continue;
+    }
+    const heading = line.match(/^(#{1,4})\s+(.*)$/);
+    if (heading) {
+      flushPara(); flushList();
+      const level = heading[1].length;
+      const content = renderInline(heading[2], `h${blocks.length}`);
+      const k = blocks.length;
+      blocks.push(
+        level <= 2
+          ? <h3 key={`h${k}`} className="font-display text-lg font-semibold text-on-surface pt-1">{content}</h3>
+          : <h4 key={`h${k}`} className="font-label-caps text-label-caps uppercase tracking-wide text-on-surface-variant pt-1">{content}</h4>,
+      );
+      i++; continue;
+    }
+    const bullet = line.match(/^[-*]\s+(.*)$/);
+    if (bullet) { flushPara(); list.push(bullet[1]); i++; continue; }
+    flushList();
+    para.push(line);
+    i++;
+  }
+  flushPara(); flushList();
+  return <div className="space-y-3">{blocks}</div>;
 }

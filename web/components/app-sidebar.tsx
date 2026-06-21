@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation";
 type Item = { href: string; label: string; icon: string };
 
 const NAV: Item[] = [
-  { href: "/", label: "Briefing", icon: "newspaper" },
-  { href: "/dashboard", label: "Dashboard", icon: "space_dashboard" },
+  { href: "/", label: "Dashboard", icon: "space_dashboard" },
+  { href: "/dashboard", label: "Brief", icon: "newspaper" },
   { href: "/signals", label: "Live Feed", icon: "rss_feed" },
   { href: "/sectors", label: "Sectors", icon: "category" },
   { href: "/watchlists", label: "Watchlists", icon: "visibility" },

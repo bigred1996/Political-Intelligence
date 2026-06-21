@@ -165,15 +165,17 @@ function InvestigationContext({ context }: { context: NonNullable<EntityContextV
 }
 
 function entityEvidence(entity: EntityProfile): EvidenceRef[] {
+  const ev = entity.evidence as Partial<Record<string, { records?: EvidenceRef[] }>>;
+  const recs = (key: string): EvidenceRef[] => ev[key]?.records ?? [];
   return [
-    ...entity.evidence.contracts.records,
-    ...entity.evidence.lobbying.records,
-    ...entity.evidence.donations.records,
-    ...entity.evidence.bills.records,
-    ...entity.evidence.regulations.records,
-    ...entity.evidence.tribunal_decisions.records,
-    ...entity.evidence.appointments.records,
-    ...entity.evidence.breadth.records,
+    ...recs("contracts"),
+    ...recs("lobbying"),
+    ...recs("donations"),
+    ...recs("bills"),
+    ...recs("regulations"),
+    ...recs("tribunal_decisions"),
+    ...recs("appointments"),
+    ...recs("breadth"),
   ];
 }
 

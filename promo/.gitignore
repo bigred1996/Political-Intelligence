@@ -1,0 +1,6 @@
+# Heavy / generated artifacts — do not commit
+node_modules/
+.pw-browsers/
+out/
+public/shots/
+public/music.wav

@@ -18,7 +18,7 @@ export default function Dashboard() {
   return (
     <div className="animate-rise">
       <div className="mb-gutter">
-        <h1 className="font-display-lg text-display-lg text-primary">Intelligence Dashboard</h1>
+        <h1 className="font-display-lg text-display-lg text-primary">Intelligence Brief</h1>
         <p className="font-body-lg text-body-lg text-on-surface-variant mt-unit">
           Live operational view across the Canadian regulatory landscape.
         </p>
