@@ -32,7 +32,8 @@ VECTORS_PATH = INDEX_DIR / "vectors.npy"
 META_PATH = INDEX_DIR / "meta.json"
 
 # Breadth sources (in source_records) that carry embeddable text.
-EMBED_SOURCES = ["statcan", "iaac", "cer", "transport", "geospatial", "gc_news", "social_statements", "public_statements"]
+EMBED_SOURCES = ["statcan", "iaac", "cer", "transport", "geospatial", "gc_news", "social_statements",
+                 "public_statements", "cer_applications", "gazette_notices", "orders_in_council"]
 
 _cache: dict[str, Any] = {"vectors": None, "meta": None, "mtime": None}
 

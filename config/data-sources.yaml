@@ -487,37 +487,51 @@ sources:
     health_status: stale
 
   - id: iaac
-    name: Impact Assessment Agency of Canada (catalogue)
+    name: Impact Assessment Agency of Canada — Project Registry
     jurisdiction: federal
     publisher: Impact Assessment Agency of Canada
     category: major_projects
-    base_url: "https://open.canada.ca/data/en/dataset/5f676365-2a0f-4195-b174-40b0b5156579"
-    access_method: ckan
-    license: "Open Government Licence – Canada"
+    base_url: "https://iaac-aeic.gc.ca/050/evaluations"
+    access_method: scrape
+    license: "Open Government Licence – Canada (web-accessible registry content)"
     terms_url: "https://open.canada.ca/en/open-government-licence-canada"
-    robots_url: "https://open.canada.ca/robots.txt"
+    robots_url: "https://iaac-aeic.gc.ca/robots.txt"
     commercial_reuse_reviewed: true
     full_text_storage_allowed: true
     attribution_required: true
     enabled: true
-    connector: "pipeline/breadth.py:fetch_iaac_records"
+    connector: "pipeline/connector_iaac.py:fetch_iaac_project_records"
     implementation_status: working_incomplete
-    backfill_strategy: "CKAN catalogue fetch — 200 dataset-metadata rows"
-    incremental_strategy: "none — full replace weekly; falls back to catalogue if the primary resource moves/breaks"
-    check_frequency: "weekly, Mon 4am ET"
-    last_checked: "2026-06-15T14:57:00Z"
-    last_successful_import: "2026-06-15T14:57:06Z"
+    backfill_strategy: >-
+      GOAL 8 (2026-06-22): replaced the dead CKAN screenings-CSV path with a real
+      project-registry crawl. robots.txt explicitly DISALLOWS the search-results
+      pagination (?SrchPg=) but PUBLISHES two sitemaps for exactly this purpose
+      (sitemaps/projects, sitemaps/documents) — used instead of scraping search.
+      Projects sitemap: 6,389 project URLs (confirmed live). Each project page
+      carries a clean <meta name=...> block (Proponent, Status, Assessment Type,
+      Location, Province, Modified Date) plus Key Documents + Comment Periods
+      lists — the per-project "document inventory" Goal 8 asks for. Checkpointed,
+      oldest-reference-number-first (ascending, for resumable <=-checkpoint
+      correctness — see module docstring on why NOT recency-biased). Real run
+      2026-06-22: first chunk of 300 projects, 376 records (300 projects + 66
+      documents + 10 comment periods), 0 gaps, ~34 min.
+    incremental_strategy: "upsert by external_id; checkpointed per-project crawl resumes across calls"
+    check_frequency: "weekly, Mon 4am ET (one ~300-project chunk per run — see known_limitations)"
+    last_checked: "2026-06-22T18:01:46Z"
+    last_successful_import: "2026-06-22T18:01:46Z"
     last_source_change: null
-    checkpoint_state: none
-    rate_limit: "none enforced"
-    raw_data_path: "not retained"
+    checkpoint_state: "iaac_projects (per-project-ref checkpoint, see data/checkpoints/) — 300/6,389 done"
+    rate_limit: "5s/request — robots.txt 'Crawl-delay: 5' for general bots"
+    raw_data_path: "data/raw/iaac/iaac_projects/..."
     known_limitations:
-      - "CATALOGUE ONLY — no actual project registry (proponents, status, decisions, conditions, timelines) — needs a dedicated connector against the IAAC project registry, not the open.canada.ca dataset catalogue"
-      - "the original screenings CSV resource is dead; current 200 rows are dataset-metadata fallback"
-      - "REAL FINDING 2026-06-21 (found building pipeline/catalogue_discovery.py against this same org): open.canada.ca's WAF rejects an org-filtered package_search (?fq=organization:iaac-aeic) when sent with this project's self-identifying User-Agent ('Mozilla/5.0 (compatible; Nessus/1.0; ...)', the exact string pipeline/breadth.py's _HEADERS uses) — HTTP 200 but an HTML 'Request Rejected' page instead of JSON. A generic browser UA or no override works every time, confirmed by toggling only the UA on an identical request. fetch_iaac_records doesn't use fq=organization: today so it isn't hit by this specific case, but ckan_org_catalog()'s plain keyword search uses the same flagged UA — worth knowing if this or other breadth jobs ever show unexplained empty results."
+      - "5s/request crawl-delay makes full 6,389-project coverage ~9 hours — max_rows=0 deliberately means ONE BOUNDED CHUNK (300) per call, not uncapped, unlike every other connector in this registry; full coverage accrues over ~22 weekly runs unless manually run with a larger max_rows. Only 300/6,389 done as of 2026-06-22 (~5%)."
+      - "geospatial files NOT captured — the project page's 'Data Files' link (a filtered registry search, /exploration?projDocs={ref}&datafiles=true) was identified during research but not implemented; Goal 8 explicitly asks for this and it remains an open gap"
+      - "switching this entry from upsert=replace to upsert=upsert (required for checkpointed crawling) left 200 stale rows from the old dead-CKAN-catalogue fallback (record_type=dataset) in the DB until manually cleaned up 2026-06-22 — a one-time migration artifact of the mode change, not a recurring bug"
+      - "the documents sitemap (50,000+ URLs) is discovered (URL list only) but not deep-crawled per-document — each project's own Key Documents panel (already fetched for free) is the practical per-project document inventory; a dedicated full document-level crawl is a separate future pass"
+      - "REAL FINDING 2026-06-21 (found building pipeline/catalogue_discovery.py against this same org): open.canada.ca's WAF rejects this project's old self-identifying User-Agent on org-filtered CKAN queries — irrelevant to this entry now that it no longer uses CKAN, kept here as institutional memory since it's the same org"
     priority: P1
-    responsible_parser: "pipeline/breadth.py"
-    health_status: stale
+    responsible_parser: "pipeline/connector_iaac.py"
+    health_status: healthy
 
   - id: cer
     name: Canada Energy Regulator — Pipeline Incidents
@@ -549,6 +563,137 @@ sources:
       - "regulatory-DOCUMENT systems (hearing files) intentionally not scraped per spec policy — would need confirmed permission first"
     priority: P1
     responsible_parser: "pipeline/breadth.py"
+    health_status: healthy
+
+  - id: cer_applications
+    name: Canada Energy Regulator — Applications, Proceedings & Decisions
+    jurisdiction: federal
+    publisher: Canada Energy Regulator
+    category: major_projects
+    base_url: "https://www.cer-rec.gc.ca/en/applications-hearings/view-applications-projects/"
+    access_method: scrape
+    license: "Crown copyright — public CER website content"
+    terms_url: "https://www.cer-rec.gc.ca/en/terms/index.html"
+    robots_url: "https://www.cer-rec.gc.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/connector_cer_applications.py:fetch_cer_application_records"
+    implementation_status: working
+    backfill_strategy: >-
+      GOAL 8 (2026-06-22): the regulatory-DOCUMENT system (REGDOCS,
+      docs2.cer-rec.gc.ca) is correctly NOT scraped — its robots.txt is a flat
+      `Disallow: /`, confirmed live. www.cer-rec.gc.ca (a different host) has no
+      such restriction and publishes a static HTML "Applications and projects"
+      index plus an archive page, grouped under headings ("Pipelines over 40 km",
+      "Tolls/Tariffs applications", "Decision issued" — CER's own decided-vs-active
+      bucket) that double as category/status. REGDOCS filing numbers (e.g.
+      "C36307") are stored as citation links only, never mirrored. Real run
+      2026-06-22: 110 applications/proceedings/decisions, 0 gaps, 91s.
+    incremental_strategy: "upsert by external_id; full re-walk each trigger (~120 pages, ~1 min — cheap enough not to chunk)"
+    check_frequency: "weekly, Tue 4:30am ET"
+    last_checked: "2026-06-22T16:17:50Z"
+    last_successful_import: "2026-06-22T16:17:50Z"
+    last_source_change: null
+    checkpoint_state: "cer_applications"
+    rate_limit: "0.5s/request (self-imposed; no robots.txt limit found on this host)"
+    raw_data_path: "data/raw/cer/cer_applications/..."
+    known_limitations:
+      - "a brand-new application whose slug sorts alphabetically BEFORE the checkpoint high-water mark could be missed by a LEFT-INCOMPLETE chunked walk — not a live risk at the intended full-re-walk-per-trigger operational pattern (see module docstring), but real if this connector is ever deliberately chunked across calls"
+      - "proceeding_number is extracted from the title text (regex), not a structured CER field — covers the common hearing-order-code-in-title cases (RH-/OH-/MH-/XG-/MO-/XO- prefixes) seen live, not guaranteed exhaustive"
+      - "REAL BUG caught and fixed 2026-06-22 (found wiring up front-end links, not by a test): the fetch wrapper originally tagged every row source='cer' — the SAME id the pre-existing pipeline-incidents connector uses — co-mingling 110 real rows into the incidents bucket and breaking this connector's own upsert tracking. Fixed to source='cer_applications'; the 110 already-inserted rows were migrated in place (UPDATE, not re-fetched); regression test added."
+    priority: P1
+    responsible_parser: "pipeline/connector_cer_applications.py"
+    health_status: healthy
+
+  - id: gazette_notices
+    name: Canada Gazette — Per-Instrument Notices
+    jurisdiction: federal
+    publisher: "Privy Council Office / Canada Gazette Directorate"
+    category: regulatory
+    base_url: "https://gazette.gc.ca/rp-pr/p1/2026/index-eng.html"
+    access_method: scrape
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: null
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/connector_gazette_notices.py:fetch_gazette_notice_records"
+    implementation_status: working
+    backfill_strategy: >-
+      GOAL 8 (2026-06-22): goes one layer deeper than connector_gazette_archive.py
+      (Goal 7's issue-level archive, 2,742 issues/0 gaps) — parses each issue's own
+      TOC page into per-instrument rows. Part I: <h2> section ("Commissions",
+      "Proposed Regulations", "Government notices", ...) > <h3> dept > <h4> act >
+      <li><a> item; the Commissions section is literally where CRTC/CITT/CBSA/CRA/PSC
+      publish their own decisions/orders/"Notices of consultation" — this IS Goal
+      8's "regulator announcements" and "consultation notices", sourced from the
+      Gazette rather than one scraper per regulator. Part II: flat
+      SOR (final_regulation) / SI (statutory_instrument, incl. many Orders in
+      Council) list. RIAS is NOT a separate TOC entry — proposed_regulation rows
+      carry likely_has_rias:true as a documented policy-based inference, not a
+      scraped fact (see module docstring).
+    incremental_strategy: "upsert by external_id; checkpointed per-part (gazette_notices_p1/p2), full historical re-walk is cheap (~2,742 issues, ~0.3s each)"
+    check_frequency: "weekly, Sat 8:30am ET"
+    last_checked: "2026-06-22T16:30:00Z"
+    last_successful_import: "2026-06-22T16:30:00Z"
+    last_source_change: null
+    checkpoint_state: "gazette_notices_p1, gazette_notices_p2"
+    rate_limit: "0.3s/request (self-imposed; matches connector_gazette_archive)"
+    raw_data_path: "data/raw/canada-gazette/gazette_notices_p{1,2}/..."
+    known_limitations:
+      - "REAL BUG caught and fixed 2026-06-22: the first real run double-prefixed an already-absolute html_url from _parse_year_index ('https://gazette.gc.ca' + 'https://gazette.gc.ca/...'), producing a DNS failure on every single page — 10 consecutive gaps tripped the circuit breaker before one real row landed. Fixed; regression test added (test_backfill_fetches_the_year_indexs_own_absolute_html_url)."
+      - "only issues with an HTML edition are covered (the directorate's own ~5-year HTML retention window) — older PDF-only issues are out of scope for this text-pattern parser, same boundary connector_gazette_archive documents"
+      - "RIAS is inferred, not independently verified per-instrument — would need one extra fetch per proposed-regulation instrument page to confirm"
+    priority: P1
+    responsible_parser: "pipeline/connector_gazette_notices.py"
+    health_status: healthy
+
+  - id: orders_in_council
+    name: Orders in Council (1990-present)
+    jurisdiction: federal
+    publisher: Privy Council Office
+    category: regulatory
+    base_url: "https://orders-in-council.canada.ca/"
+    access_method: scrape
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: null
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/connector_orders_in_council.py:fetch_oic_records"
+    implementation_status: working
+    backfill_strategy: >-
+      GOAL 8 (2026-06-22): DATA_CHECKLIST.md previously concluded GIC
+      Appointments/Orders in Council had "no working access path at all" — true
+      for CKAN (404, and no PCO dataset in the catalogue either), but
+      orders-in-council.canada.ca's own dedicated search portal (explicitly
+      covering "1990 to the present") turns out to be a real, working, completely
+      unrestricted (no robots.txt at all, confirmed 404) PHP session-based search:
+      POST date-range criteria to index.php (a honeypot field must stay empty),
+      follow the 302 to results.php, then walk results.php?pageNum=N until a page
+      returns zero rows. Each row already has the FULL record inline — P.C.
+      number, date, dept, act, subject, full Précis, attachment PDF link — no
+      second per-record fetch needed. Walked per calendar year, each with its own
+      checkpoint (same independent-stream pattern as connector_house_votes).
+    incremental_strategy: "upsert by external_id; checkpointed per-year (oic_{year}), full re-walk of 1990-present is ~3,500 pages at 0.4s (~25 min)"
+    check_frequency: "weekly, Sun 5am ET"
+    last_checked: "2026-06-22T17:00:00Z"
+    last_successful_import: "2026-06-22T17:00:00Z"
+    last_source_change: null
+    checkpoint_state: "oic_{year} per calendar year, 1990-present"
+    rate_limit: "0.4s/request (self-imposed; no robots.txt at all on this host)"
+    raw_data_path: "data/raw/orders-in-council/oic_{year}/..."
+    known_limitations:
+      - "REAL BUGS caught and fixed 2026-06-22: a Department/Act cell spanning two acts via an embedded <br/>, and a Registration cell with <strong> formatting, each silently dropped the WHOLE row under a naive [^<]* cell pattern — fixed with a tag-tolerant cell pattern that stops only at true td/tr/table boundaries; regression tests added."
+      - "this also functionally unblocks the previously-blocked GIC Appointments source (orders-in-council.canada.ca IS the real GIC-appointment-OIC source) — not yet cross-linked into the appointments_weekly job, which still points at its own (separately blocked) CKAN dataset"
+    priority: P1
+    responsible_parser: "pipeline/connector_orders_in_council.py"
     health_status: healthy
 
   - id: npri

@@ -21,6 +21,7 @@ import structlog
 from apscheduler.triggers.cron import CronTrigger
 
 from pipeline import breadth
+from pipeline import connector_cer_applications, connector_gazette_notices, connector_iaac, connector_orders_in_council
 
 log = structlog.get_logger()
 
@@ -57,10 +58,11 @@ CONNECTORS: list[SourceConnector] = [
     ),
     SourceConnector(
         id="iaac", name="Impact Assessment Agency (IAAC)", category="Major Projects",
-        fetch=breadth.fetch_iaac_records,
+        fetch=connector_iaac.fetch_iaac_project_records,
         trigger=CronTrigger(day_of_week="mon", hour=4, minute=0, timezone="America/Toronto"),
-        cadence="weekly", upsert="replace", embed=True, typical_rows=2000,
-        description="Federal impact-assessment project registry — project-level political risk.",
+        cadence="weekly", upsert="upsert", embed=True, typical_rows=300,
+        description="IAAC project registry — proponent/status/location/documents per project "
+                     "(Goal 8; checkpointed, ~300 new projects/week toward full 6,389-project coverage).",
     ),
     SourceConnector(
         id="cer", name="Canada Energy Regulator (CER)", category="Major Projects",
@@ -68,6 +70,31 @@ CONNECTORS: list[SourceConnector] = [
         trigger=CronTrigger(day_of_week="tue", hour=4, minute=0, timezone="America/Toronto"),
         cadence="weekly", upsert="replace", embed=True, typical_rows=2500,
         description="CER-regulated pipeline incidents by company, substance and location.",
+    ),
+    SourceConnector(
+        id="cer_applications", name="CER Applications, Proceedings & Decisions", category="Major Projects",
+        fetch=connector_cer_applications.fetch_cer_application_records,
+        trigger=CronTrigger(day_of_week="tue", hour=4, minute=30, timezone="America/Toronto"),
+        cadence="weekly", upsert="upsert", embed=True, typical_rows=120,
+        description="CER applications/hearings index — applicant, category, proceeding number, "
+                     "decision status, REGDOCS filing reference (Goal 8).",
+    ),
+    SourceConnector(
+        id="gazette_notices", name="Canada Gazette — Notices", category="Regulatory",
+        fetch=connector_gazette_notices.fetch_gazette_notice_records,
+        trigger=CronTrigger(day_of_week="sat", hour=8, minute=30, timezone="America/Toronto"),
+        cadence="weekly", upsert="upsert", embed=True, typical_rows=2742,
+        description="Per-instrument Gazette notices: proposed/final regulations, statutory "
+                     "instruments (incl. many Orders in Council), regulator notices and "
+                     "consultations from the Commissions section (Goal 8).",
+    ),
+    SourceConnector(
+        id="orders_in_council", name="Orders in Council", category="Regulatory",
+        fetch=connector_orders_in_council.fetch_oic_records,
+        trigger=CronTrigger(day_of_week="sun", hour=5, minute=0, timezone="America/Toronto"),
+        cadence="weekly", upsert="upsert", embed=True, typical_rows=3500,
+        description="Every P.C. number from orders-in-council.canada.ca, 1990-present — "
+                     "department, act, subject, full précis, attachment link (Goal 8).",
     ),
     SourceConnector(
         id="npri", name="National Pollutant Release Inventory (NPRI)", category="Environment",
