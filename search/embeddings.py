@@ -11,8 +11,9 @@ graph is initialized once per process.
 """
 from __future__ import annotations
 
+import os
 import threading
-from typing import Iterable
+from pathlib import Path
 
 import numpy as np
 import structlog
@@ -21,6 +22,12 @@ log = structlog.get_logger()
 
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 DIM = 384
+
+# Without an explicit cache_dir, fastembed defaults to /tmp/fastembed_cache,
+# which gets wiped on reboot — defeating the "one-time download" design (see
+# CLAUDE.md: "Embedding model | ~/.cache/huggingface | One-time local BGE-small
+# download"). Persist it where the rest of the docs say it lives.
+CACHE_DIR = Path(os.getenv("FASTEMBED_CACHE_DIR", os.path.expanduser("~/.cache/huggingface")))
 
 _model = None
 _lock = threading.Lock()
@@ -32,8 +39,9 @@ def _get_model():
         with _lock:
             if _model is None:
                 from fastembed import TextEmbedding
-                log.info("embedding_model_loading", model=MODEL_NAME)
-                _model = TextEmbedding(MODEL_NAME)
+                CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                log.info("embedding_model_loading", model=MODEL_NAME, cache_dir=str(CACHE_DIR))
+                _model = TextEmbedding(MODEL_NAME, cache_dir=str(CACHE_DIR))
                 log.info("embedding_model_ready", model=MODEL_NAME)
     return _model
 

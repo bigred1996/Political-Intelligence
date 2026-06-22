@@ -142,6 +142,11 @@ async def _ensure_donations_cache() -> Path:
             with open(DONATIONS_CACHE, "wb") as fh:
                 async for chunk in resp.aiter_bytes():
                     fh.write(chunk)
+
+    from pipeline.raw_storage import save_raw
+    save_raw("elections-canada", "donations_quarterly", "od_cntrbtn_audt_e.zip",
+              DONATIONS_CACHE.read_bytes(), source_url=DONATIONS_ZIP_URL)
+
     return DONATIONS_CACHE
 
 
@@ -188,9 +193,25 @@ async def fetch_donation_rows(max_rows: int = 50000) -> list[dict[str, Any]]:
     return out
 
 
-OCL_COMMS_URL = "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip"
+OCL_COMMS_DATASET = "a34eb330-7136-4f5e-9f5f-3ba41df58b06"  # "Monthly Communication Reports" on open.canada.ca
+OCL_COMMS_URL_FALLBACK = "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip"
 OCL_COMMS_CACHE = CACHE_DIR / "ocl_communications.zip"
 _OCL_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+
+async def _resolve_ocl_comms_url() -> str:
+    """Resolve the communications ZIP URL via CKAN — same rot risk as the
+    registrations ZIP (see _resolve_ocl_reg_url), just not yet broken."""
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.get(f"{CKAN_API}/package_show", params={"id": OCL_COMMS_DATASET})
+            r.raise_for_status()
+            for res in r.json()["result"]["resources"]:
+                if (res.get("format") or "").upper() == "CSV":
+                    return res["url"]
+    except Exception as exc:
+        log.warning("ocl_comms_url_resolve_failed", error=str(exc))
+    return OCL_COMMS_URL_FALLBACK
 
 
 async def _ensure_ocl_cache() -> Path:
@@ -198,6 +219,7 @@ async def _ensure_ocl_cache() -> Path:
     if OCL_COMMS_CACHE.exists() and OCL_COMMS_CACHE.stat().st_size > 1_000_000:
         return OCL_COMMS_CACHE
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    OCL_COMMS_URL = await _resolve_ocl_comms_url()
     log.info("ocl_download_start", url=OCL_COMMS_URL)
     headers = {"User-Agent": _OCL_UA, "Accept": "*/*"}
     async with httpx.AsyncClient(timeout=180, headers=headers, follow_redirects=True) as c:
@@ -207,6 +229,11 @@ async def _ensure_ocl_cache() -> Path:
                 async for chunk in resp.aiter_bytes():
                     fh.write(chunk)
     log.info("ocl_download_done", size=OCL_COMMS_CACHE.stat().st_size)
+
+    from pipeline.raw_storage import save_raw
+    save_raw("lobbying", "ocl_monthly", "communications_ocl_cal.zip",
+              OCL_COMMS_CACHE.read_bytes(), source_url=OCL_COMMS_URL)
+
     return OCL_COMMS_CACHE
 
 
@@ -339,8 +366,7 @@ def _pick(row: dict, keys: list[str]) -> str:
     return ""
 
 
-async def fetch_grant_rows(max_rows: int = 30000) -> list[dict[str, Any]]:
-    """Pull federal Grants & Contributions records from open.canada.ca."""
+async def _resolve_grants_url() -> str:
     # Search for the CSV resource in the grants dataset.
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as c:
         r = await c.get(f"{CKAN_API}/package_show", params={"id": GRANTS_DATASET})
@@ -355,30 +381,38 @@ async def fetch_grant_rows(max_rows: int = 30000) -> list[dict[str, Any]]:
         else:
             resources = r.json()["result"]["resources"]
 
-    url = None
-    for res in resources:
-        fmt = (res.get("format") or "").upper()
-        name = (res.get("name") or "").lower()
-        if fmt == "CSV" and ("grant" in name or "contrib" in name):
-            url = res["url"]
-            break
-    if not url:
-        # Take first CSV
-        for res in resources:
-            if (res.get("format") or "").upper() == "CSV":
-                url = res["url"]
-                break
-    if not url:
+    # Pick by size, not "first match" — this dataset also publishes a tiny
+    # "Nothing to Report" placeholder CSV whose name matches the same
+    # grant/contrib keywords as the real ~2GB resource, and used to win just
+    # by appearing first in the CKAN response.
+    candidates = [
+        res for res in resources
+        if (res.get("format") or "").upper() == "CSV"
+        and ("grant" in (res.get("name") or "").lower() or "contrib" in (res.get("name") or "").lower())
+    ]
+    if not candidates:
+        candidates = [res for res in resources if (res.get("format") or "").upper() == "CSV"]
+    if not candidates:
         raise ValueError("No CSV resource found in grants dataset")
+    return max(candidates, key=lambda res: res.get("size") or 0)["url"]
 
+
+async def iter_grant_rows(max_rows: int = 0) -> AsyncIterator[dict[str, Any]]:
+    """Stream federal Grants & Contributions rows, normalized and ready for DB
+    insert. Yields one mapped dict at a time so a full-corpus (~2.25GB CSV)
+    ingest never holds the whole dataset in memory — same risk class as
+    contracts/donations, fixed 2026-06-22 (was fetch_grant_rows, which
+    materialized everything into a list; see DATA_CHECKLIST.md "Goal 6").
+    max_rows<=0 → full.
+    """
+    url = await _resolve_grants_url()
     log.info("grants_ingest_start", url=url, max_rows=max_rows)
-    out: list[dict[str, Any]] = []
     async for row in stream_csv_rows(url, max_rows):
         name = _pick(row, _GRANTS_HEADER_MAP["recipient_name"])
         if not name:
             continue
         raw_val = _pick(row, _GRANTS_HEADER_MAP["agreement_value"])
-        out.append({
+        yield {
             "ref_number": _pick(row, _GRANTS_HEADER_MAP["ref_number"]) or None,
             "recipient_name": name,
             "canonical_name": normalize(name),
@@ -392,7 +426,13 @@ async def fetch_grant_rows(max_rows: int = 30000) -> list[dict[str, Any]]:
             "agreement_start": _pick(row, _GRANTS_HEADER_MAP["agreement_start"]) or None,
             "agreement_end": _pick(row, _GRANTS_HEADER_MAP["agreement_end"]) or None,
             "description": _pick(row, _GRANTS_HEADER_MAP["description"]) or None,
-        })
+        }
+
+
+async def fetch_grant_rows(max_rows: int = 30000) -> list[dict[str, Any]]:
+    """List wrapper around iter_grant_rows (routes/tests/small callers).
+    Prefer the iterator for large/full ingests."""
+    out = [r async for r in iter_grant_rows(max_rows)]
     log.info("grants_ingest_parsed", count=len(out))
     return out
 
@@ -600,14 +640,37 @@ async def fetch_crtc_decisions(max_entries: int = 200) -> list[dict[str, Any]]:
 
 
 # ── OCL Registrations ─────────────────────────────────────────────────────────
-OCL_REG_URL = "https://lobbycanada.gc.ca/media/mqbbmaqk/registrations_oct_cal.zip"
+OCL_REG_DATASET = "70ef2117-1095-4d77-80eb-b87f2bada2a4"  # "Lobbying Registrations" on open.canada.ca
+OCL_REG_URL_FALLBACK = "https://lobbycanada.gc.ca/media/mqbbmaqk/registrations_oct_cal.zip"
 OCL_REG_CACHE = CACHE_DIR / "ocl_registrations.zip"
+
+
+async def _resolve_ocl_reg_url() -> str:
+    """Resolve the registrations ZIP URL via CKAN rather than hardcoding it.
+
+    lobbycanada.gc.ca rotates the media-asset path component (it moved from
+    /media/mqbbmaqk/ to /media/zwcjycef/ at some point, breaking the old
+    hardcoded URL) — same class of rot as the other CKAN-catalogued bulk files
+    in this module. Falls back to the last known-good hardcoded URL if the
+    CKAN lookup itself fails.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.get(f"{CKAN_API}/package_show", params={"id": OCL_REG_DATASET})
+            r.raise_for_status()
+            for res in r.json()["result"]["resources"]:
+                if (res.get("format") or "").upper() == "CSV":
+                    return res["url"]
+    except Exception as exc:
+        log.warning("ocl_reg_url_resolve_failed", error=str(exc))
+    return OCL_REG_URL_FALLBACK
 
 
 async def _ensure_ocl_reg_cache() -> Path:
     if OCL_REG_CACHE.exists() and OCL_REG_CACHE.stat().st_size > 1_000_000:
         return OCL_REG_CACHE
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    OCL_REG_URL = await _resolve_ocl_reg_url()
     log.info("ocl_reg_download_start", url=OCL_REG_URL)
     headers = {"User-Agent": _OCL_UA, "Accept": "*/*"}
     async with httpx.AsyncClient(timeout=360, headers=headers, follow_redirects=True) as c:
@@ -620,6 +683,12 @@ async def _ensure_ocl_reg_cache() -> Path:
                 async for chunk in resp.aiter_bytes():
                     fh.write(chunk)
     log.info("ocl_reg_download_done", size=OCL_REG_CACHE.stat().st_size if OCL_REG_CACHE.exists() else 0)
+
+    if OCL_REG_CACHE.exists():
+        from pipeline.raw_storage import save_raw
+        save_raw("lobbying", "ocl_registrations", "registrations_enregistrements_ocl_cal.zip",
+                  OCL_REG_CACHE.read_bytes(), source_url=OCL_REG_URL)
+
     return OCL_REG_CACHE
 
 
@@ -640,35 +709,53 @@ async def fetch_ocl_registration_rows(max_rows: int = 0) -> list[dict[str, Any]]
             names = zf.namelist()
             log.info("ocl_reg_zip_contents", files=names)
 
-            # Find the primary registration export
-            primary = next((n for n in names if "primary" in n.lower() or "registration" in n.lower()), None)
+            # Find the primary registration export. Every file in this ZIP has
+            # "registration" in its name (Beneficiaries, GovtFunding, SubjectMatters,
+            # etc. are all "Registration_*Export.csv" too) so "primary" must be
+            # checked first, or the wrong-schema file wins by being first in the zip.
+            primary = next((n for n in names if "primary" in n.lower()), None)
+            if not primary:
+                primary = next((n for n in names if "registration" in n.lower()), None)
             if not primary:
                 primary = names[0]
 
+            def _clean(val: str | None) -> str | None:
+                v = (val or "").strip()
+                return v if v and v.lower() != "null" else None
+
             with zf.open(primary) as f:
                 for row in csv.DictReader(io.TextIOWrapper(f, encoding="latin-1")):
-                    client = (row.get("EN_CLIENT_ORG_CORP_NM_AN") or row.get("CLIENT_ORG") or "").strip()
-                    if not client:
+                    # Real column names per Registration_PrimaryExport.csv (verified
+                    # 2026-06-21) — the previous names (REG_NUM, CLIENT_ORG, STATUS,
+                    # EFFECTIVE_DATE, FIRM_NAME, ...) never matched any header in the
+                    # actual export, so every row used to get skipped or stored blank.
+                    client = _clean(row.get("EN_CLIENT_ORG_CORP_NM_AN"))
+                    reg_num = _clean(row.get("REG_NUM_ENR"))
+                    if not client or not reg_num:  # reg_num is the dedup/unique key
                         continue
-                    reg_num = (row.get("REG_NUM") or row.get("REGISTRATION_NUM") or "").strip()
                     registrant = (
-                        f"{row.get('RGSTRNT_1ST_NM_PRENOM_DCLRNT','').strip()} "
-                        f"{row.get('RGSTRNT_LAST_NM_DCLRNT','').strip()}"
+                        f"{(row.get('RGSTRNT_1ST_NM_PRENOM_DCLRNT') or '').strip()} "
+                        f"{(row.get('RGSTRNT_LAST_NM_DCLRNT') or '').strip()}"
                     ).strip()
                     out.append({
                         "registration_num": reg_num,
                         "client_org": client,
                         "canonical_name": normalize(client),
                         "registrant_name": registrant or None,
-                        "firm_name": (row.get("FIRM_NAME") or row.get("REG_FIRM_NM") or "").strip() or None,
-                        "registration_type": (row.get("REG_TYPE_ENR") or "").strip() or None,
-                        "status": (row.get("STATUS") or "").strip() or None,
-                        "effective_date": (row.get("EFFECTIVE_DATE") or row.get("EFF_DATE") or "").strip() or None,
-                        "end_date": (row.get("END_DATE") or "").strip() or None,
+                        "firm_name": _clean(row.get("EN_FIRM_NM_FIRME_AN")),
+                        "registration_type": _clean(row.get("REG_TYPE_ENR")),
+                        # Primary export has no direct status column; would need to
+                        # derive from END_DATE_FIN (blank = active) or join another
+                        # export file — left None rather than guessing.
+                        "status": None,
+                        "effective_date": _clean(row.get("EFFECTIVE_DATE_VIGUEUR")),
+                        "end_date": _clean(row.get("END_DATE_FIN")),
+                        # subject matters / federal benefits / private interests live
+                        # in separate export files within the same ZIP, not joined yet.
                         "subject_matters": [],
-                        "federal_benefits": (row.get("FEDERAL_BENEFITS") or row.get("FED_BENEFIT") or "").strip() or None,
-                        "private_interests": (row.get("PRIVATE_INTEREST") or "").strip() or None,
-                        "government_funding": (row.get("GOV_FUNDING") or "").strip() or None,
+                        "federal_benefits": None,
+                        "private_interests": None,
+                        "government_funding": _clean(row.get("GOVT_FUND_IND_FIN_GOUV")),
                     })
                     if max_rows and len(out) >= max_rows:
                         break

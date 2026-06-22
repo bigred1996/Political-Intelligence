@@ -4,6 +4,7 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.0
 python-dotenv==1.0.0
+apscheduler==3.11.2
 
 # Database
 sqlalchemy==2.0.36
@@ -25,6 +26,9 @@ playwright==1.48.0         # for JS-heavy government sites
 pydantic==2.9.0
 pydantic-settings==2.5.0
 pandas==2.2.3              # for CSV processing (Elections Canada bulk data)
+
+# Search
+fastembed==0.5.1           # local BGE-small embeddings for semantic search (no API key, CPU-only)
 
 # PDF generation
 weasyprint==62.3

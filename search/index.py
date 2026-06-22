@@ -89,27 +89,63 @@ async def _collect_documents(session) -> list[dict[str, Any]]:
     return docs
 
 
-async def build_index(session) -> dict[str, Any]:
-    """(Re)build the semantic index from the DB. Returns a summary dict."""
+async def build_index(session, *, full: bool = False) -> dict[str, Any]:
+    """(Re)build the semantic index from the DB. Returns a summary dict.
+
+    Incremental by default: a document's embedding only depends on its
+    `f"{title}. {snippet}"` text, so any (table, pk) whose text is byte-identical
+    to what's already in the on-disk index gets its existing vector reused
+    instead of being re-embedded. Only new or changed documents hit the model.
+
+    This matters at this corpus's scale: a full re-embed of ~24k documents on
+    CPU took 40+ minutes (see DATA_CHECKLIST.md "search-reindex performance"),
+    and this function is called synchronously after every embedded-source
+    ingest — including gc_news, which runs daily and typically adds only a
+    handful of new rows. Pass full=True to force a complete re-embed (e.g.
+    after switching embedding models, where old vectors are no longer valid).
+    """
     docs = await _collect_documents(session)
     INDEX_DIR.mkdir(parents=True, exist_ok=True)
     if not docs:
         np.save(VECTORS_PATH, np.zeros((0, DIM), dtype="float32"))
         META_PATH.write_text("[]")
         _cache.update(vectors=None, meta=None, mtime=None)
-        return {"documents": 0}
+        return {"documents": 0, "embedded": 0, "reused": 0}
 
     texts = [f"{d['title']}. {d['snippet']}" for d in docs]
-    log.info("index_build_start", documents=len(docs))
-    vectors = embed_texts(texts)
+
+    old_vectors, old_meta = (None, None) if full else _load()
+    old_lookup: dict[tuple[str, Any], tuple[int, str]] = {}
+    if old_meta:
+        for i, d in enumerate(old_meta):
+            old_lookup[(d["table"], d["pk"])] = (i, f"{d['title']}. {d['snippet']}")
+
+    vectors = np.zeros((len(docs), DIM), dtype="float32")
+    to_embed_idx: list[int] = []
+    to_embed_texts: list[str] = []
+    for i, (d, text) in enumerate(zip(docs, texts)):
+        old = old_lookup.get((d["table"], d["pk"]))
+        if old is not None and old[1] == text:
+            vectors[i] = old_vectors[old[0]]
+        else:
+            to_embed_idx.append(i)
+            to_embed_texts.append(text)
+
+    reused = len(docs) - len(to_embed_texts)
+    log.info("index_build_start", documents=len(docs), to_embed=len(to_embed_texts), reused=reused)
+    if to_embed_texts:
+        new_vecs = embed_texts(to_embed_texts)
+        for idx, vec in zip(to_embed_idx, new_vecs):
+            vectors[idx] = vec
+
     np.save(VECTORS_PATH, vectors)
     META_PATH.write_text(json.dumps(docs))
     _cache.update(vectors=None, meta=None, mtime=None)  # force reload
-    log.info("index_build_done", documents=len(docs), dim=vectors.shape[1])
+    log.info("index_build_done", documents=len(docs), embedded=len(to_embed_texts), reused=reused, dim=vectors.shape[1])
     by_source: dict[str, int] = {}
     for d in docs:
         by_source[d["source"]] = by_source.get(d["source"], 0) + 1
-    return {"documents": len(docs), "by_source": by_source}
+    return {"documents": len(docs), "embedded": len(to_embed_texts), "reused": reused, "by_source": by_source}
 
 
 def _load() -> tuple[np.ndarray | None, list[dict] | None]:

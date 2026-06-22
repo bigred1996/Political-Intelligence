@@ -31,7 +31,13 @@ from pipeline.ingest import _to_float  # reuse the money parser
 log = structlog.get_logger()
 
 CKAN_API = "https://open.canada.ca/data/api/3/action"
-_UA = "Mozilla/5.0 (compatible; Nessus/1.0; +https://polaris.intelligence)"
+# open.canada.ca's WAF intermittently rejects requests carrying a
+# self-identifying bot User-Agent (confirmed twice in one session, 2026-06-21:
+# once building pipeline/catalogue_discovery.py's org-filtered queries, once
+# right here on a plain package_show call that had worked earlier the same
+# session — toggling only the UA on an otherwise identical request fixed both).
+# A generic browser UA has been reliable every time it's been tried.
+_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 _HEADERS = {"User-Agent": _UA, "Accept": "*/*"}
 
 
@@ -291,10 +297,16 @@ def _bil(row: dict[str, str], *needles: str) -> str:
 async def fetch_npri_records(max_rows: int = 200000) -> list[dict[str, Any]]:
     """NPRI facility-level pollutant releases — who releases what, where, how much.
 
-    NPRI publishes per-year facility files; some "CSV" resources are actually
-    HTML catalogue pages or zipped XLSX, so we try CSV resources newest-first and
-    keep the first that yields real rows. Falls back to the NPRI catalogue if none
-    parse. Capped by default (a representative slice pending a full background run).
+    NPRI's CKAN dataset only catalogues single-year facility files (2020-2024
+    as of 2026-06-21 — the "full historical back to 1993" bulk archive exists
+    as a separate dataset but ECCC has moved its Data Mart to a JS SPA whose
+    underlying file-serving API wasn't found via static-HTML reachability
+    probes; not attempted here, see DATA_CHECKLIST.md "Goal 6"). This pulls
+    EVERY catalogued year (previously just the first/newest, pre-2026-06-21),
+    so a multi-year history accumulates instead of one snapshot. Some "CSV"
+    resources are actually HTML catalogue pages or zipped XLSX, so each year
+    is independently guarded by _stream_csv's content-sniffing and skipped if
+    it doesn't parse, rather than aborting the whole fetch.
     """
     pkg = await _ckan_package(NPRI_DATASET)
     resources = (pkg or {}).get("resources", [])
@@ -305,6 +317,7 @@ async def fetch_npri_records(max_rows: int = 200000) -> list[dict[str, Any]]:
 
     out: list[dict[str, Any]] = []
     for url in csv_urls:
+        year_rows = 0
         async for row in _stream_csv(url, max_rows):
             company = _bil(row, "company") or _bil(row, "entreprise")
             facility = _bil(row, "facility", "name") or _bil(row, "installation")
@@ -330,8 +343,8 @@ async def fetch_npri_records(max_rows: int = 200000) -> list[dict[str, Any]]:
                 "url": "https://pollution-waste.canada.ca/national-release-inventory/",
                 "raw": {"substance": substance, "facility": facility, "year": year, "units": units},
             })
-        if out:
-            break  # first resource that produced rows wins
+            year_rows += 1
+        log.info("npri_year_parsed", url=url[-60:], rows=year_rows)
     if not out:
         log.warning("npri_rows_empty_fallback_catalog")
         return await ckan_org_catalog("national pollutant release inventory", "npri", max_datasets=100)

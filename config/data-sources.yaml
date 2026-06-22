@@ -1,0 +1,1435 @@
+# Nessus — Data Source Registry
+#
+# Machine-readable companion to DATA_CATALOG.md (full source universe) and
+# DATA_CHECKLIST.md (short build tracker + "Ingestion audit — 2026-06-21").
+# Generated 2026-06-21 from a live audit of this working copy's polaris.db,
+# scheduler_log, pipeline/ingest.py, pipeline/breadth.py, pipeline/connectors.py,
+# and api/scheduler.py — not from documentation claims alone.
+#
+# IMPORTANT — licensing fields are honest, not aspirational:
+#   `license` / `terms_url` are populated where there is a well-established,
+#   citable public licence (e.g. open.canada.ca CKAN datasets all publish under
+#   the Open Government Licence – Canada). Anywhere this repo has been pulling
+#   data WITHOUT a confirmed licence review, `commercial_reuse_reviewed: false`
+#   and the relevant fields say `unreviewed` — that is a real gap, not a
+#   placeholder to ignore. Per the ingestion spec's own rule ("a source must
+#   not be enabled until its access method and reuse conditions have been
+#   documented"), several sources below are live in the DB today despite
+#   `commercial_reuse_reviewed: false`. That mismatch is flagged deliberately
+#   so it gets resolved, not hidden.
+#
+# Schema per source:
+#   id                          stable source id (matches scheduler job_id / connector id where one exists)
+#   name                        human label
+#   jurisdiction                federal | provincial | municipal | international
+#   publisher                   department/agency/site that publishes the data
+#   category                    UI/grouping category
+#   base_url                    primary access endpoint or dataset landing page
+#   access_method               api | rss | ckan | bulk_csv | bulk_zip | sdmx | scrape | third_party_api | key_required
+#   license                     citable licence name, or "unreviewed"
+#   terms_url                   URL of the terms/licence, or null
+#   robots_url                  conventional robots.txt URL for the domain (existence not yet verified for most)
+#   commercial_reuse_reviewed   true | false — has anyone actually checked this is OK for Nessus's commercial use?
+#   full_text_storage_allowed   true | false | null (null = not applicable, e.g. numeric/structured-only sources)
+#   attribution_required        true | false | null
+#   enabled                     true | false — is a connector actually wired into the scheduler today?
+#   connector                   file:function implementing the fetch, or "none"
+#   implementation_status       working | working_incomplete | present_but_broken | wired_not_triggered |
+#                                missing | blocked_licensing | blocked_technical | needs_investigation | placeholder
+#   backfill_strategy           how the initial/full load happens (or "not designed")
+#   incremental_strategy        how repeat runs avoid re-importing everything (or "none — full replace every run")
+#   check_frequency             cron cadence as configured today, or proposed cadence if not yet built
+#   last_checked                last time the connector ran at all (ok or error), from scheduler_log, or null
+#   last_successful_import      last successful run, from scheduler_log, or null
+#   last_source_change          last known change at the SOURCE (not our DB) — null everywhere; no source has
+#                                change-detection (ETag/Last-Modified/checksum) implemented yet (see DATA_CHECKLIST.md)
+#   checkpoint_state            cursor/page/offset/since-date state retained between runs, or "none"
+#   rate_limit                  known or self-imposed rate limit, or "none enforced"
+#   raw_data_path               where the original unmodified payload is kept on disk, or "not retained"
+#   known_limitations           list of concrete caveats
+#   priority                    P1 (core) .. P5 (deferred/disabled by policy)
+#   responsible_parser          primary source file
+#   health_status               healthy | stale | error | unknown | not_applicable
+
+sources:
+
+  # ── Tier 1 — core analytics sources (hand-wired, typed tables) ──────────────
+
+  - id: contracts_monthly
+    name: Federal Contracts — Proactive Disclosure (>$10k)
+    jurisdiction: federal
+    publisher: Public Services and Procurement Canada
+    category: procurement
+    base_url: "https://open.canada.ca/data/en/dataset/d8f85d91-7dec-4fd1-8055-483b77225d8b"
+    access_method: ckan
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://open.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/ingest.py:iter_contract_rows"
+    implementation_status: working_incomplete
+    backfill_strategy: "standalone `scripts/run_ingest.py contracts_monthly` (streamed, batched inserts) — proven, 1,155,000 rows loaded"
+    incremental_strategy: "none — full delete-then-reinsert every run (`_stream_load`); 2026-06-21: _stream_load now wraps failures in StreamLoadError so a mid-stream drop reports real partial-progress instead of 0 (see api/scheduler.py), but this connector's recurring SCHEDULED trigger itself is still unproven"
+    check_frequency: "monthly (3rd of month, 2am ET)"
+    last_checked: "2026-06-15T15:07:19Z"
+    last_successful_import: "2026-06-15 (standalone backfill only — the scheduled job has never succeeded)"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "the one logged scheduled-job attempt (2026-06-15) failed with an empty error string in scheduler_log — re-verified 2026-06-21 that CURRENT code can't produce that (every _log_finish('error', ...) call site formats f'{type(exc).__name__}: {exc}', never empty), so this was either older code or a non-exception failure path; the underlying question — does the scheduled trigger actually complete — is still unanswered, just not for the reason originally suspected"
+      - "full reinsert resets ingested_at on every row each run — no real first-seen signal"
+      - "no contract-amendment/value-history tracking"
+    priority: P1
+    responsible_parser: "pipeline/ingest.py"
+    health_status: unknown
+
+  - id: donations_quarterly
+    name: Elections Canada — Political Contributions
+    jurisdiction: federal
+    publisher: Elections Canada
+    category: political_finance
+    base_url: "https://www.elections.ca/fin/oda/od_cntrbtn_audt_e.zip"
+    access_method: bulk_zip
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.elections.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: null
+    enabled: true
+    connector: "pipeline/ingest.py:iter_donation_rows"
+    implementation_status: working_incomplete
+    backfill_strategy: "manual trigger (triggered_by=manual), full ZIP download + stream parse — 6,230,381 rows loaded"
+    incremental_strategy: "none — full delete-then-reinsert every run; cache re-downloads full 2.2GB CSV. 2026-06-21: _stream_load now reports real partial-progress on a mid-stream failure instead of 0 (StreamLoadError), but the recurring SCHEDULED trigger itself is still unproven — only manual runs have ever succeeded"
+    check_frequency: "quarterly (Jan/Apr/Jul/Oct 6th); daily+ during an election period per spec — not yet implemented"
+    last_checked: "2026-06-15T17:45:29Z"
+    last_successful_import: "2026-06-15T18:06:23Z (manual trigger; the scheduled cron path is unverified)"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "./data/cache/donations_ec.zip (cache, not an immutable per-run archive)"
+    known_limitations:
+      - "no Elections Canada terms-of-use review on file — commercial_reuse_reviewed is honestly false despite 6.2M rows live"
+      - "corporate donations banned federally since 2007 — historical pre-ban corporate records need flagging, not yet done"
+      - "one prior attempt failed with 'database or disk is full' — disk headroom must be checked before every run"
+    priority: P1
+    responsible_parser: "pipeline/ingest.py"
+    health_status: unknown
+
+  - id: ocl_monthly
+    name: OCL Lobbying — Monthly Communication Reports
+    jurisdiction: federal
+    publisher: Office of the Commissioner of Lobbying
+    category: lobbying
+    base_url: "https://open.canada.ca/data/en/dataset/a34eb330-7136-4f5e-9f5f-3ba41df58b06 (CSV resolved live via CKAN; hardcoded ZIP URL kept only as fallback)"
+    access_method: ckan
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://lobbycanada.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: null
+    enabled: true
+    connector: "pipeline/ingest.py:fetch_ocl_communication_rows (+ _resolve_ocl_comms_url, added 2026-06-21)"
+    implementation_status: working_incomplete
+    backfill_strategy: "full ZIP download (browser User-Agent required — site 403s the default UA) — 362,805 rows loaded (corrected 2026-06-21 by real count(*); the previously-cited 694,152 was max(id), inflated by repeated delete-then-reinsert cycles not reusing SQLite autoincrement ids)"
+    incremental_strategy: "none — full delete-then-reinsert on source=='OCL Monthly Communications' every run"
+    check_frequency: "monthly (4th of month, 3am ET); spec wants daily checks + a full reconciliation after the monthly deadline — not implemented"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced; requires Mozilla/Chrome UA spoofing to avoid a 403"
+    raw_data_path: "./data/cache/ocl_communications.zip (cache only)"
+    known_limitations:
+      - "no scheduler_log entries at all for this job despite 362,805 live rows (real count(*), corrected 2026-06-21 — see backfill_strategy) — loaded via standalone script outside the logged path"
+      - "a SEPARATE legacy path exists (scrapers/ocl.py, live search + scrapers/sample_data.py fallback) that is NOT wired to the scheduler — needs_investigation, likely safe to retire but unconfirmed"
+      - "subject-matter codes stored raw, no human-readable label lookup"
+      - "2026-06-21: URL was hardcoded and one path-rotation away from breaking exactly like ocl_registrations did — fixed to resolve via CKAN dataset a34eb330 with the old URL as fallback, but not yet re-verified with a full live re-download (the cached ZIP still satisfies the cache check)"
+    priority: P1
+    responsible_parser: "pipeline/ingest.py"
+    health_status: unknown
+
+  - id: ocl_registrations
+    name: OCL Lobbying — Registrations
+    jurisdiction: federal
+    publisher: Office of the Commissioner of Lobbying
+    category: lobbying
+    base_url: "https://open.canada.ca/data/en/dataset/70ef2117-1095-4d77-80eb-b87f2bada2a4 (CSV resolved live via CKAN)"
+    access_method: ckan
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://lobbycanada.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: null
+    enabled: true
+    connector: "pipeline/ingest.py:fetch_ocl_registration_rows (production path, used by api/scheduler.py) -- ALSO pipeline/connector_ocl_registrations.py:OCLRegistrationsConnector (new shared-interface proof-of-concept, added 2026-06-21, not wired into the scheduler, run standalone only so far)"
+    implementation_status: working_incomplete
+    backfill_strategy: "full ZIP download (82.8MB), dedup-by-registration_num on insert — RUN FOR REAL 2026-06-21: 166,564 rows loaded. Independently re-verified via OCLRegistrationsConnector.backfill() the same day: parsed=172,566, valid=166,564 (exact match), added=0 (idempotent against the same live DB)."
+    incremental_strategy: "existence-check upsert by registration_num + DB unique constraint — verified idempotent (ran twice, no duplicates) but is an N+1 query (one SELECT per row, ~3.5 min for 166k rows). OCLRegistrationsConnector.discover() now captures the live Last-Modified header but nothing acts on it yet -- still no real conditional-fetch anywhere."
+    check_frequency: "registered as the `ocl_registrations` job; no cron trigger configured in SOURCE_CONFIGS today — runs only on manual trigger"
+    last_checked: "2026-06-21T23:15:02Z"
+    last_successful_import: "2026-06-21T23:16:31Z (OCLRegistrationsConnector.backfill(), 112s, added=0 since all 166,564 rows already existed)"
+    last_source_change: "2026-06-15T10:01:49Z (Last-Modified header from the live resource, captured by discover() 2026-06-21)"
+    checkpoint_state: "data/checkpoints/ocl_registrations.json (written by OCLRegistrationsConnector; the production scheduler path still has none)"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/lobbying/ocl_registrations/<year>/<month>/<day>/<run_id>-<checksum8>/ — immutable, checksummed, manifest-tracked (pipeline/raw_storage.py, wired 2026-06-21; ./data/cache/ocl_registrations.zip remains as a separate in-process reuse cache, not the provenance copy)"
+    known_limitations:
+      - "NEW 2026-06-21, via OCLRegistrationsConnector.validate() (stricter than the production path's bare 'continue' skip): 6,002 of 172,566 rows in the live file (3.5%) have no client organization name and are unusable. The production fetch function already silently dropped these with zero record; the new connector quarantines them with a reason at data/quarantine/lobbying/ocl_registrations/<run_id>/rejected_rows.json instead."
+      - "FIXED 2026-06-21 — three real bugs found on first real trigger: (1) hardcoded URL had rotted (mqbbmaqk -> zwcjycef path), now resolved live via CKAN; (2) file-picker matched the first of 13 files containing \"registration\" in its name instead of specifically the Primary export, silently parsing the wrong schema; (3) column names (REG_NUM, CLIENT_ORG, STATUS, EFFECTIVE_DATE, FIRM_NAME) were stale guesses that don't exist in the real header — fixed to the verified real names (REG_NUM_ENR, EN_CLIENT_ORG_CORP_NM_AN, EFFECTIVE_DATE_VIGUEUR, EN_FIRM_NM_FIRME_AN, etc.)"
+      - "status, federal_benefits, private_interests, subject_matters are still None/[] — those fields live in OTHER export files inside the same ZIP (Beneficiaries, GovtFunding, SubjectMatters) that aren't joined in yet, not a bug, just incomplete"
+      - "spec wants registration VERSIONS preserved (history, not overwrite) — current model has no version table; re-running this job would currently just skip all 166,564 existing rows (existence check), so a genuine amendment wouldn't be captured as a new version either"
+    priority: P1
+    responsible_parser: "pipeline/ingest.py"
+    health_status: healthy
+
+  - id: bills_daily
+    name: Bills & Legislation — LEGISinfo
+    jurisdiction: federal
+    publisher: Library of Parliament / Parliament of Canada
+    category: parliament
+    base_url: "https://www.parl.ca/legisinfo/en/bills/json"
+    access_method: api
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.parl.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: null
+    enabled: true
+    connector: "pipeline/ingest.py:fetch_bill_rows"
+    implementation_status: working
+    backfill_strategy: "full JSON array fetch (no pagination on this endpoint) — current Parliament only, 185 bills"
+    incremental_strategy: "none — full delete-then-reinsert every run; cheap enough (185 rows) that this is low-risk"
+    check_frequency: "daily, 6am ET"
+    last_checked: "2026-06-19T10:00:00Z"
+    last_successful_import: "2026-06-19T10:00:10Z"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "current Parliament only — historical Parliaments not ingested"
+      - "no committee-stage detail, no per-bill vote outcomes, no status timeline beyond latest snapshot"
+      - "one test exists (test_bill_records_derive_legisinfo_original_source_url) but it tests URL derivation only, not the fetch/ingest path"
+    priority: P1
+    responsible_parser: "pipeline/ingest.py"
+    health_status: healthy
+
+  - id: gazette_weekly
+    name: Canada Gazette (Part I + II)
+    jurisdiction: federal
+    publisher: Privy Council Office
+    category: regulation
+    base_url: "https://gazette.gc.ca/rss/p1-eng.xml"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://gazette.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/ingest.py:fetch_gazette_entries"
+    implementation_status: working
+    backfill_strategy: "full RSS pull (Part I + Part II feeds) — 638 entries"
+    incremental_strategy: "upsert by guid — skips entries already present; closest thing to real incrementality in this codebase"
+    check_frequency: "weekly, Sat 8am ET"
+    last_checked: "2026-06-15T14:25:05Z"
+    last_successful_import: "2026-06-15T14:25:06Z (rows_added=0 — entries pre-existed)"
+    last_source_change: null
+    checkpoint_state: "implicit — guid-existence check substitutes for a real cursor"
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "RSS feeds only carry recent entries — no historical backfill mechanism beyond what's currently published"
+      - "description capped at 2000 chars; department extracted via regex, may misparse"
+      - "exceptions are caught and logged as warnings then skipped — failures could go unnoticed"
+    priority: P1
+    responsible_parser: "pipeline/ingest.py"
+    health_status: healthy
+
+  - id: parliament_seed
+    name: MPs / Parliamentarians — openparliament.ca
+    jurisdiction: federal
+    publisher: "openparliament.ca (third-party aggregator of Parliament/Hansard data)"
+    category: parliament
+    base_url: "https://api.openparliament.ca"
+    access_method: third_party_api
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://api.openparliament.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: null
+    enabled: true
+    connector: "api/scheduler.py:_run_parliament_seed"
+    implementation_status: working
+    backfill_strategy: "one-time seed (343 MPs), supplemented by scripts/enrich_politicians.py and scripts/download_mp_photos.py"
+    incremental_strategy: "unclear — never appears in scheduler_log; likely run ad hoc, not on the registered cron"
+    check_frequency: "registered as a scheduler job; cadence not confirmed against actual recurring need (MP roster changes infrequently)"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained (MP photos ARE retained, downloaded to web/public/mp/ — openparliament hotlink-blocks images)"
+    known_limitations:
+      - "openparliament.ca is a third-party project, not an official Government of Canada source — no terms-of-use review on file"
+      - "this is the SAME dependency used by hansard_search below — a single upstream outage affects both"
+      - "openparliament sometimes returns year 4043 on date fields (known bug, filtered client-side to 1990-2035)"
+    priority: P1
+    responsible_parser: "api/scheduler.py"
+    health_status: unknown
+
+  - id: hansard_search
+    name: Hansard — Sector-Keyword Speech Mentions (openparliament.ca)
+    jurisdiction: federal
+    publisher: "openparliament.ca"
+    category: parliament
+    base_url: "https://api.openparliament.ca"
+    access_method: third_party_api
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://api.openparliament.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: null
+    enabled: true
+    connector: "scripts/deepen_hansard.py / api/scheduler.py:_run_hansard_search"
+    implementation_status: working_incomplete
+    backfill_strategy: "keyword sweep per sector — 217 mentions to date"
+    incremental_strategy: "none — re-runs the keyword sweep each time"
+    check_frequency: "daily (registered job)"
+    last_checked: "2026-06-19T11:30:00Z"
+    last_successful_import: "2026-06-19T11:30:11Z"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "openparliament full-text search is noisy — keyword sweeps return heavily overlapping results across keywords, so unique-row yield is low (~41 mentions noted in CLAUDE.md, 217 now)"
+      - "no House-division/individual-MP-vote ingestion at all yet — speeches only"
+      - "no committee witness testimony"
+    priority: P1
+    responsible_parser: "pipeline/ingest.py / scripts/deepen_hansard.py"
+    health_status: healthy
+
+  - id: appointments_weekly
+    name: GIC Appointments
+    jurisdiction: federal
+    publisher: Privy Council Office (via open.canada.ca)
+    category: government_structure
+    base_url: "https://open.canada.ca/data/en/dataset/58b10b98-acab-458a-9e7a-fc1a1c2b1a58"
+    access_method: ckan
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://open.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/ingest.py:fetch_appointment_rows"
+    implementation_status: blocked_technical
+    backfill_strategy: "not run — see known_limitations, the source itself is unreachable as currently coded"
+    incremental_strategy: "FIXED 2026-06-21: _run_appointments now deletes-before-insert (same pattern as bills/contracts/donations); verified with a passing idempotency test. The duplicate-accumulation bug itself is fixed, but the connector can't actually fetch anything to test it against real data."
+    check_frequency: "weekly, Mon 7am ET"
+    last_checked: "2026-06-21T22:12:56Z"
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "TRIGGERED FOR REAL 2026-06-21, FAILED CLEANLY: ValueError: No CSV resource found in GIC appointments dataset. The hardcoded CKAN dataset id (58b10b98-...) 404s, and a CKAN package_search under the Privy Council Office's own org (pco-bcp) returns zero appointments-related datasets — GIC Appointments most likely isn't published via the open.canada.ca CKAN catalogue at all."
+      - "real source is probably orders-in-council.canada.ca (confirmed reachable, HTML search portal) — a fundamentally different access pattern than the rest of this module's CKAN-bulk-CSV connectors; needs a proper connector-design pass (find export/pagination capability, or accept HTML scraping), not a one-line URL fix"
+      - "appointee name field has several column-name variants across the source CSV; some rows may have blank names — unverified against real data since nothing has ever been fetched"
+    priority: P3
+    responsible_parser: "pipeline/ingest.py"
+    health_status: error
+
+  - id: grants_quarterly
+    name: Grants & Contributions
+    jurisdiction: federal
+    publisher: "varies by department (via open.canada.ca)"
+    category: spending
+    base_url: "https://open.canada.ca/data/en/dataset/432527ab-7aac-45b5-81d6-7597107a7013"
+    access_method: ckan
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://open.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/ingest.py:iter_grant_rows (converted from list-returning fetch_grant_rows 2026-06-22)"
+    implementation_status: working
+    backfill_strategy: "FULL UNCAPPED BACKFILL RUN FOR REAL 2026-06-22 via the production scheduler path: 1,148,041 real rows (up from a 3,000-row capped test 2026-06-21). 22 years covered (2005-2026, plus one 1899 Excel-epoch-placeholder anomaly). Raw 2.25GB CSV preserved byte-for-byte via save_raw_streamed, checksum confirmed against the CKAN-reported size (2,256,228,144 bytes, exact match)."
+    incremental_strategy: "FIXED 2026-06-21: dedup bug (delete-before-insert) and resource-picker bug (was grabbing the 24KB placeholder file). FIXED 2026-06-22: fetch_grant_rows converted to a true streaming iter_grant_rows (was materializing the whole list in memory — the exact risk flagged the day before); _run_grants now goes through _stream_load like contracts/donations. No longer capped, no longer a memory risk."
+    check_frequency: "quarterly (Jan/Apr/Jul/Oct 5th)"
+    last_checked: "2026-06-22T00:07:49Z"
+    last_successful_import: "2026-06-22T00:15:53Z (1,148,041 rows, 485s, via scripts/run_ingest.py grants_quarterly)"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/proactive-disclosure/grants_quarterly/<year>/<month>/<day>/<run_id>-<checksum8>/grants.csv — preserved 2026-06-22 via save_raw_streamed"
+    known_limitations:
+      - "header-name mapping has a fallback for column-name variance across the source CSV — confirmed working against real data now (verified 2026-06-21/22)"
+      - "1899-12-30 date anomaly present in agreement_start, same Excel-epoch-placeholder pattern found in contracts_monthly the same day — likely a shared upstream data-quality issue across Proactive Disclosure datasets generally, not source-specific. Not fixed."
+    priority: P2
+    responsible_parser: "pipeline/ingest.py"
+    health_status: healthy
+
+  - id: tribunal_decisions
+    name: Tribunal Decisions — CRTC (+ Competition Bureau placeholder)
+    jurisdiction: federal
+    publisher: "CRTC"
+    category: regulation
+    base_url: "https://crtc.gc.ca/eng/publications/reports/BroadcastDecisions/rss.xml"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://crtc.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/ingest.py:fetch_crtc_decisions"
+    implementation_status: blocked_technical
+    backfill_strategy: "designed: RSS pull, 200-entry cap, dedup-by-(decision_number, body) — TRIGGERED FOR REAL 2026-06-21, returned 0 rows (see known_limitations)"
+    incremental_strategy: "existence-check upsert by (decision_number, body) — good pattern, untestable until the feed URLs work again"
+    check_frequency: "registered as `tribunal_decisions`; spec wants daily for active proceedings — cadence not yet tuned"
+    last_checked: "2026-06-21T22:46:22Z"
+    last_successful_import: "2026-06-21T22:46:23Z (status=ok, rows_added=0 — feed returned HTML, not RSS; run twice today, both times in seconds total — see known_limitations re: the reindex fix)"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "TRIGGERED FOR REAL 2026-06-21: both the BroadcastDecisions and TelecomDecisions RSS URLs currently return HTML, not RSS (crtc_rss_returned_html logged for both, exactly the documented gotcha) — the connector handled this correctly (no crash, no garbage data), but it means CRTC has likely restructured their site and the feed URLs need rediscovery. Not attempted (open-ended hunt, out of scope for this pass)."
+      - "this job's success path calls _rebuild_search_index() — on the FIRST trigger today that took 40+ minutes before being killed by hand; after fixing it (see search_reindex_performance in this registry), re-running this exact job end-to-end took 3.4 seconds total. The CRTC-feed problem above is real and still open; the reindex problem that made it look like THIS connector hung is fixed."
+      - "Competition Bureau, CER hearings/decisions, and IRB are NOT covered — CRTC only"
+      - "outcome/parties fields are NULL — not parsed from the feed"
+    priority: P1
+    responsible_parser: "pipeline/ingest.py"
+    health_status: unknown
+
+  # ── Tier 2 — breadth sources (declarative registry → source_records) ────────
+
+  - id: gc_news
+    name: Government of Canada News & Publications
+    jurisdiction: federal
+    publisher: "all departments, via the IO news API"
+    category: news
+    base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?type=newsreleases&sort=publishedDate&orderBy=desc&format=atom"
+    access_method: api
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://api.io.canada.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/breadth.py:fetch_gc_news_records"
+    implementation_status: working
+    backfill_strategy: "large `pick` parameter for history backfill — 20,034 rows loaded"
+    incremental_strategy: "upsert by external_id, daily `pick=500` for the incremental slice — the most genuinely-incremental connector in the codebase"
+    check_frequency: "daily, 5:30am ET"
+    last_checked: "2026-06-19T09:43:33Z"
+    last_successful_import: "2026-06-19T09:43:45Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "headline/summary/link only, per news policy — no full article text stored"
+    priority: P1
+    responsible_parser: "pipeline/breadth.py"
+    health_status: healthy
+
+  - id: statcan
+    name: Statistics Canada (data-cube catalogue)
+    jurisdiction: federal
+    publisher: Statistics Canada
+    category: economic
+    base_url: "https://www150.statcan.gc.ca/t1/wds/rest/getAllCubesListLite"
+    access_method: api
+    license: "Statistics Canada Open Licence"
+    terms_url: "https://www.statcan.gc.ca/en/reference/licence"
+    robots_url: "https://www150.statcan.gc.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: null
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/breadth.py:fetch_statcan_records (production, feeds source_records) -- ALSO pipeline/catalogue_discovery.py:discover_statcan_catalogue (Goal 5 metadata-discovery layer, separate table, added 2026-06-21)"
+    implementation_status: working_incomplete
+    backfill_strategy: "full cube-list fetch, catalogue only. CORRECTED 2026-06-21: the real catalogue is 8,213 tables, not '~300' as stated here and everywhere else previously -- 300 was apparently whatever one earlier capped run happened to load, never the true size. discover_statcan_catalogue() confirmed 8,213 real rows via the same getAllCubesListLite endpoint."
+    incremental_strategy: "none — full replace weekly"
+    check_frequency: "weekly, Sun 4am ET"
+    last_checked: "2026-06-15T14:50:29Z"
+    last_successful_import: "2026-06-15T14:50:30Z"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "CATALOGUE ONLY — no actual cube/series observations (GDP, CPI, employment, etc.) are ingested; this is the single biggest gap for sector/economic intelligence"
+      - "deferred to avoid disk pressure on a different host (~13GB free); this working copy now has 246GB free — re-evaluate whether the deferral still applies"
+      - "the production source_records table still only holds whatever was loaded under the old ~300-row assumption — catalogue_entries (Goal 5, 2026-06-21) now has the full real 8,213-table list with relevance/download-status classification; the two haven't been reconciled into one source_records refresh yet"
+    priority: P1
+    responsible_parser: "pipeline/breadth.py"
+    health_status: stale
+
+  - id: iaac
+    name: Impact Assessment Agency of Canada (catalogue)
+    jurisdiction: federal
+    publisher: Impact Assessment Agency of Canada
+    category: major_projects
+    base_url: "https://open.canada.ca/data/en/dataset/5f676365-2a0f-4195-b174-40b0b5156579"
+    access_method: ckan
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://open.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/breadth.py:fetch_iaac_records"
+    implementation_status: working_incomplete
+    backfill_strategy: "CKAN catalogue fetch — 200 dataset-metadata rows"
+    incremental_strategy: "none — full replace weekly; falls back to catalogue if the primary resource moves/breaks"
+    check_frequency: "weekly, Mon 4am ET"
+    last_checked: "2026-06-15T14:57:00Z"
+    last_successful_import: "2026-06-15T14:57:06Z"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "CATALOGUE ONLY — no actual project registry (proponents, status, decisions, conditions, timelines) — needs a dedicated connector against the IAAC project registry, not the open.canada.ca dataset catalogue"
+      - "the original screenings CSV resource is dead; current 200 rows are dataset-metadata fallback"
+      - "REAL FINDING 2026-06-21 (found building pipeline/catalogue_discovery.py against this same org): open.canada.ca's WAF rejects an org-filtered package_search (?fq=organization:iaac-aeic) when sent with this project's self-identifying User-Agent ('Mozilla/5.0 (compatible; Nessus/1.0; ...)', the exact string pipeline/breadth.py's _HEADERS uses) — HTTP 200 but an HTML 'Request Rejected' page instead of JSON. A generic browser UA or no override works every time, confirmed by toggling only the UA on an identical request. fetch_iaac_records doesn't use fq=organization: today so it isn't hit by this specific case, but ckan_org_catalog()'s plain keyword search uses the same flagged UA — worth knowing if this or other breadth jobs ever show unexplained empty results."
+    priority: P1
+    responsible_parser: "pipeline/breadth.py"
+    health_status: stale
+
+  - id: cer
+    name: Canada Energy Regulator — Pipeline Incidents
+    jurisdiction: federal
+    publisher: Canada Energy Regulator
+    category: major_projects
+    base_url: "https://www.cer-rec.gc.ca/open/incident/pipeline-incidents-data.csv"
+    access_method: bulk_csv
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://www.cer-rec.gc.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/breadth.py:fetch_cer_records"
+    implementation_status: working
+    backfill_strategy: "full CSV stream — 2,008 incident rows"
+    incremental_strategy: "none — full replace weekly; dataset is largely static between reporting cycles"
+    check_frequency: "weekly, Tue 4am ET"
+    last_checked: "2026-06-16T08:10:01Z"
+    last_successful_import: "2026-06-16T08:10:18Z"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "incidents only — applications, hearings, decisions, conditions, energy production/demand/price datasets not ingested"
+      - "regulatory-DOCUMENT systems (hearing files) intentionally not scraped per spec policy — would need confirmed permission first"
+    priority: P1
+    responsible_parser: "pipeline/breadth.py"
+    health_status: healthy
+
+  - id: npri
+    name: National Pollutant Release Inventory
+    jurisdiction: federal
+    publisher: Environment and Climate Change Canada
+    category: environment
+    base_url: "https://open.canada.ca/data/en/dataset/1fb7d8d4-7713-4ec6-b957-4a882a84fed3"
+    access_method: ckan
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://open.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/breadth.py:fetch_npri_records"
+    implementation_status: working_incomplete
+    backfill_strategy: "IMPROVED 2026-06-22: removed a `break` that stopped at the first year that parsed; now accumulates every catalogued year. Real run: 181,780 rows across 2022-2024 (was 60,202 rows, one year). 2020/2021 CSVs in the catalogue still didn't yield rows — not investigated further."
+    incremental_strategy: "none — full replace weekly"
+    check_frequency: "weekly, Wed 3am ET"
+    last_checked: "2026-06-22T00:00:21Z"
+    last_successful_import: "2026-06-22T00:02:09Z (181,780 rows, 107.4s, via pipeline/connectors.py:run_connector)"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained — ingested via the streaming breadth connector, not yet wired to pipeline/raw_storage.py"
+    known_limitations:
+      - "Multi-year (2022-2024) now, but NOT the full 1993-present history. That full bulk archive genuinely exists (CKAN dataset 40e01423-7728-429c-ac9d-2954385ccdfb, file literally named NPRI-INRP_ReleasesRejets_1993-present.csv) but ECCC moved its Data Mart to a JS SPA — every catalogued URL for it now redirects to the React app shell, not the file. Several real attempts at the working /api/file?path=... pattern (used successfully by the single-year CSVs) all 404'd. Needs actual browser dev-tools inspection of the SPA's real XHR calls — not attempted."
+      - "one bulk-file URL pattern 404s; connector already falls back to the next candidate resource — working as designed"
+      - "embed=False by design (numeric/structured-only, SQL-served, not semantically indexed) — correct, not a gap"
+      - "FIXED 2026-06-22: this connector's CKAN calls were hitting open.canada.ca's WAF (self-identifying User-Agent rejected, see search_reindex_performance-style entries above) — pipeline/breadth.py's _UA is now a browser UA, fixing this and every other breadth connector that shares it"
+    priority: P2
+    responsible_parser: "pipeline/breadth.py"
+    health_status: healthy
+
+  - id: transport
+    name: Transport Canada (dataset catalogue)
+    jurisdiction: federal
+    publisher: Transport Canada
+    category: transport
+    base_url: "https://open.canada.ca/data/en/organization/tc"
+    access_method: ckan
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://open.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/breadth.py:fetch_transport_records"
+    implementation_status: working_incomplete
+    backfill_strategy: "CKAN org-catalogue query — 300 dataset-metadata rows"
+    incremental_strategy: "none — full replace weekly"
+    check_frequency: "weekly, Thu 4am ET"
+    last_checked: "2026-06-18T08:00:00Z"
+    last_successful_import: "2026-06-18T08:00:02Z"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "CATALOGUE ONLY — TSB occurrence data, vehicle recalls, rail/marine/aviation incident-level records need a dedicated connector"
+    priority: P3
+    responsible_parser: "pipeline/breadth.py"
+    health_status: healthy
+
+  - id: geospatial
+    name: Federal Geospatial — NRCan / GeoGratis
+    jurisdiction: federal
+    publisher: Natural Resources Canada
+    category: geospatial
+    base_url: "https://open.canada.ca/data/en/organization/nrcan-rncan"
+    access_method: ckan
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://open.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/breadth.py:fetch_geospatial_records"
+    implementation_status: working_incomplete
+    backfill_strategy: "CKAN org-catalogue query — 300 dataset-metadata rows"
+    incremental_strategy: "none — full replace weekly"
+    check_frequency: "weekly, Fri 4am ET"
+    last_checked: "2026-06-19T08:11:10Z"
+    last_successful_import: "2026-06-19T08:11:21Z"
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "none enforced"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "CATALOGUE ONLY by design — no actual boundary/GeoJSON/shapefile files downloaded or made queryable; no PostGIS layer exists"
+    priority: P3
+    responsible_parser: "pipeline/breadth.py"
+    health_status: healthy
+
+  # ── Cross-cutting infrastructure findings (not a data source, but tracked
+  # here because it affects every embedded source's reliability) ─────────────
+
+  - id: search_reindex_performance
+    name: "Search semantic-reindex performance — found AND fixed 2026-06-21"
+    jurisdiction: null
+    publisher: null
+    category: search_infrastructure
+    base_url: null
+    access_method: null
+    license: null
+    terms_url: null
+    robots_url: null
+    commercial_reuse_reviewed: null
+    full_text_storage_allowed: null
+    attribution_required: null
+    enabled: true
+    connector: "search/index.py:build_index, called from api/scheduler.py:_rebuild_search_index"
+    implementation_status: working
+    backfill_strategy: "n/a — this is the reindex step, not a source"
+    incremental_strategy: "FIXED 2026-06-21: build_index() now diffs the candidate document set against the on-disk meta.json by (table, pk) + exact embedding text. Unchanged documents reuse their existing vector; only new/changed documents call the model; documents no longer in the candidate set are dropped from the rebuilt index. full=True forces a complete re-embed when needed (e.g. an embedding-model change)."
+    check_frequency: "called synchronously after every embedded-source ingest succeeds (bills, gazette, tribunal_decisions, and 5 of 7 breadth sources including gc_news, which runs DAILY) — cost is now proportional to what changed, not corpus size"
+    last_checked: "2026-06-21T22:46:24Z"
+    last_successful_import: "2026-06-21T22:46:24Z (documents=23965, embedded=0, reused=23965, 1.1s — then re-verified end-to-end via a real tribunal_decisions trigger: 3.4s total)"
+    last_source_change: null
+    checkpoint_state: "meta.json itself IS the checkpoint — each document's (table, pk) + exact text is compared against the previous build"
+    rate_limit: "n/a"
+    raw_data_path: "data/index/vectors.npy + meta.json (disposable, rebuilt from DB)"
+    known_limitations:
+      - "ORIGINAL BUG (found while triggering tribunal_decisions for the first time): index_build_start logged documents=23965, then the process ran for 40+ minutes at 500%+ CPU before being killed by hand. The code comment in api/scheduler.py calls this 'cheap at current corpus size' — it measurably was not, since it re-embedded everything from scratch every single call."
+      - "FIX VERIFIED TWO WAYS: (1) tests/test_search_index.py proves the discrimination logic itself — new docs embedded, unchanged docs reused (byte-identical vector, not coincidence), changed docs re-embedded, removed docs dropped; (2) re-ran the exact same tribunal_decisions job for real against the live DB — 40+ minutes -> 3.4 seconds end-to-end."
+      - "change detection compares exact text, not a content hash — fine since the embedding input IS that exact text (no false negatives possible), but means this doesn't double as a general-purpose revision-history mechanism for the records themselves (that's still a separate, unaddressed gap — see DATA_CHECKLIST.md)."
+    priority: P1
+    responsible_parser: "search/index.py"
+    health_status: healthy
+
+  # ── Needs investigation ──────────────────────────────────────────────────────
+
+  - id: ocl_legacy_scraper
+    name: "OCL live-search scraper (legacy, likely superseded)"
+    jurisdiction: federal
+    publisher: Office of the Commissioner of Lobbying
+    category: lobbying
+    base_url: "https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/guest"
+    access_method: scrape
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://lobbycanada.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: null
+    enabled: false
+    connector: "scrapers/ocl.py (+ scrapers/sample_data.py fallback)"
+    implementation_status: needs_investigation
+    backfill_strategy: "not designed — live-search probe only, falls back to hardcoded sample data"
+    incremental_strategy: "n/a"
+    check_frequency: "not scheduled — not wired into api/scheduler.py JOB_RUNNERS"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "./data/raw/ocl/ via scrapers/base.py:store_raw() — the ONLY place in the whole codebase that writes a raw-payload file to disk"
+    known_limitations:
+      - "TODO comment in code: 'pin to the OCL Open Data bulk dataset for full fidelity' — appears to predate the current bulk-ZIP connectors which now do exactly that"
+      - "not referenced by the scheduler; confirm nothing else imports it before considering removal"
+    priority: P5
+    responsible_parser: "scrapers/ocl.py"
+    health_status: not_applicable
+
+  # ── Blocked by policy/permission (do not enable) ─────────────────────────────
+
+  - id: canlii
+    name: CanLII Case Database
+    jurisdiction: federal_and_provincial
+    publisher: Canadian Legal Information Institute
+    category: legal
+    base_url: "https://www.canlii.org"
+    access_method: key_required
+    license: unreviewed
+    terms_url: "https://www.canlii.org/en/info/terms.html"
+    robots_url: "https://www.canlii.org/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a"
+    check_frequency: "n/a until permission confirmed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "n/a"
+    raw_data_path: "not applicable — full-text mirroring explicitly prohibited until reviewed"
+    known_limitations:
+      - "needs an approved CanLII API key AND a written commercial-reuse confirmation before ANY bulk use"
+      - "until then: store citations/links only, never full decision text"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: scc_official
+    name: Supreme Court of Canada — Official Decisions
+    jurisdiction: federal
+    publisher: Supreme Court of Canada
+    category: legal
+    base_url: "https://decisions.scc-csc.ca"
+    access_method: scrape
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://decisions.scc-csc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a"
+    check_frequency: "daily once built, per spec"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "unknown — check robots.txt and terms before building"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "spec requires FIRST-PARTY court sources for SCC, not CanLII — needs a dedicated scraper, not built"
+      - "must account for publication bans, redactions, and corrected judgments — not designed yet"
+    priority: P4
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: social_statements
+    name: Social / Public Statements (politicians)
+    jurisdiction: federal
+    publisher: "varies — ministers/MPs, X/LinkedIn, press releases"
+    category: news
+    base_url: null
+    access_method: key_required
+    license: unreviewed
+    terms_url: null
+    robots_url: null
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a"
+    check_frequency: "not designed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "n/a"
+    raw_data_path: "not retained"
+    known_limitations:
+      - "frontend already has a graceful placeholder route (/records/social_statements/{id}) with zero data behind it"
+      - "X/LinkedIn APIs are access-gated; press-release RSS is the legally cleanest starting point"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  # ── High-value missing sources, per the ingestion spec (not yet built) ──────
+
+  - id: statcan_series_observations
+    name: Statistics Canada — Series Observations (GDP, CPI, employment, trade, etc.)
+    jurisdiction: federal
+    publisher: Statistics Canada
+    category: economic
+    base_url: "https://www150.statcan.gc.ca/t1/wds/rest/"
+    access_method: sdmx
+    license: "Statistics Canada Open Licence"
+    terms_url: "https://www.statcan.gc.ca/en/reference/licence"
+    robots_url: "https://www150.statcan.gc.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: null
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: "not designed — pick a starter set (GDP by industry, CPI, employment/unemployment, trade) before attempting all ~300 cubes"
+    incremental_strategy: "WDS supports getChangedSeriesDataFromCubePidCoord — release-driven, check daily, fetch only changed series"
+    check_frequency: "every business day for release metadata; per-series only when changed (per spec)"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "WDS has documented call-volume guidance — review before bulk pulls"
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "the catalogue (`statcan` source above) is live; this is the actual numeric data behind it — not started"
+    priority: P1
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: canadabuys_tenders
+    name: CanadaBuys — Tender Notices & Contract Awards
+    jurisdiction: federal
+    publisher: Public Services and Procurement Canada
+    category: procurement
+    base_url: "https://canadabuys.canada.ca/en"
+    access_method: api
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://canadabuys.canada.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: not designed
+    incremental_strategy: "active-tender feed should be checked every 2-6 hours per spec"
+    check_frequency: "every 2-6 hours for active tenders"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "open-data/API availability confirmed to exist by name only — has not been reachability-probed yet (same discipline that caught the OCL ZIP issue should apply here before building)"
+    priority: P3
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: gc_infobase
+    name: GC InfoBase (budget + performance)
+    jurisdiction: federal
+    publisher: Treasury Board of Canada Secretariat
+    category: spending
+    base_url: "https://www.tbs-sct.canada.ca/ems-sgd/edb-bdd/index-eng.html"
+    access_method: api
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://www.tbs-sct.canada.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: not designed
+    incremental_strategy: not designed
+    check_frequency: "monthly/release-driven per spec"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations: []
+    priority: P3
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: public_accounts
+    name: Public Accounts of Canada
+    jurisdiction: federal
+    publisher: Receiver General for Canada
+    category: spending
+    base_url: "https://www.tpsgc-pwgsc.gc.ca/recgen/cpc-pac/"
+    access_method: bulk_csv
+    license: unreviewed
+    terms_url: null
+    robots_url: null
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: not designed
+    incremental_strategy: "annual — release-driven"
+    check_frequency: "monthly/release-driven per spec"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations: []
+    priority: P4
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: bank_of_canada
+    name: Bank of Canada — Rates, FX, Valet API, Announcements
+    jurisdiction: federal
+    publisher: Bank of Canada
+    category: economic
+    base_url: "https://www.bankofcanada.ca/valet/docs"
+    access_method: api
+    license: unreviewed
+    terms_url: "https://www.bankofcanada.ca/terms/"
+    robots_url: "https://www.bankofcanada.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: "Valet API is open, no key required — should be a fast build"
+    incremental_strategy: "release-driven, check every business day"
+    check_frequency: "every business day"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "RSS announcements feed separate from the Valet data API — both named in the ingestion spec, neither built"
+    priority: P2
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: osfi
+    name: OSFI — Guidance, Announcements, Financial Data
+    jurisdiction: federal
+    publisher: Office of the Superintendent of Financial Institutions
+    category: financial_regulation
+    base_url: "https://www.osfi-bsif.gc.ca"
+    access_method: scrape
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.osfi-bsif.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: not designed
+    incremental_strategy: not designed
+    check_frequency: "weekly per spec (no release calendar known)"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations: []
+    priority: P2
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: cmhc_housing
+    name: CMHC — Housing Starts, Rental Market, Mortgage Data
+    jurisdiction: federal
+    publisher: Canada Mortgage and Housing Corporation
+    category: economic
+    base_url: "https://www.cmhc-schl.gc.ca/professionals/housing-markets-data-and-research"
+    access_method: bulk_csv
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.cmhc-schl.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: not designed
+    incremental_strategy: not designed
+    check_frequency: "weekly (no release calendar known) per spec"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "overlaps with StatCan housing-construction/building-permits series — decide on one source of truth before building both"
+    priority: P4
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: competition_bureau
+    name: Competition Bureau — Decisions, Enforcement, Guidance
+    jurisdiction: federal
+    publisher: Competition Bureau Canada
+    category: regulation
+    base_url: "https://competition-bureau.canada.ca"
+    access_method: scrape
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://competition-bureau.canada.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: not designed
+    incremental_strategy: not designed
+    check_frequency: "daily for active proceedings, per spec"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "sector-critical for merger/competition political-risk reads — currently the single highest-value gap in §8 of the catalog after CRTC triggering"
+    priority: P1
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: cnsc
+    name: Canadian Nuclear Safety Commission — Proceedings & Decisions
+    jurisdiction: federal
+    publisher: Canadian Nuclear Safety Commission
+    category: regulation
+    base_url: "https://www.cnsc-ccsn.gc.ca"
+    access_method: scrape
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.cnsc-ccsn.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: not designed
+    incremental_strategy: not designed
+    check_frequency: "daily for active proceedings, per spec"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations: []
+    priority: P3
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: cfia_recalls
+    name: CFIA — Recalls & Notices
+    jurisdiction: federal
+    publisher: Canadian Food Inspection Agency
+    category: regulation
+    base_url: "https://recalls-rappels.canada.ca"
+    access_method: rss
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://recalls-rappels.canada.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: not designed
+    incremental_strategy: "RSS, should reuse the same pattern as gazette_weekly's guid-upsert"
+    check_frequency: "every 2-6 hours per spec (recalls are time-sensitive)"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations: []
+    priority: P3
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: house_votes
+    name: House of Commons Voting Records (divisions + individual MP votes)
+    jurisdiction: federal
+    publisher: House of Commons
+    category: parliament
+    base_url: "https://www.ourcommons.ca/Members/en/votes"
+    access_method: scrape
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.ourcommons.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: "could also go via openparliament.ca's votes API — same third-party-reuse caveat as parliament_seed/hansard_search applies"
+    incremental_strategy: not designed
+    check_frequency: "daily when Parliament is sitting, per spec"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "Hansard SPEECHES are live (hansard_search); VOTES are not — a real gap for the political-player profile pages"
+    priority: P1
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: committee_evidence
+    name: House Committee Meetings, Membership, Evidence, Witnesses, Reports
+    jurisdiction: federal
+    publisher: House of Commons committees
+    category: parliament
+    base_url: "https://www.ourcommons.ca/Committees/en/Home"
+    access_method: scrape
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.ourcommons.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: not designed
+    incremental_strategy: not designed
+    check_frequency: "daily when Parliament is sitting, per spec"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "the /committees/[slug] frontend page already exists and assembles from Hansard/bills/lobbying/source_records — but there is no dedicated committee-membership/witness/evidence connector behind it yet"
+    priority: P1
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: iaac_project_registry
+    name: IAAC — Row-Level Project Registry (proponents, status, decisions)
+    jurisdiction: federal
+    publisher: Impact Assessment Agency of Canada
+    category: major_projects
+    base_url: "https://iaac-aeic.gc.ca/050/evaluations"
+    access_method: scrape
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://iaac-aeic.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: "dedicated connector against the project registry, distinct from the existing `iaac` CKAN-catalogue connector"
+    incremental_strategy: not designed
+    check_frequency: "daily for active projects, weekly for completed, per spec"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "this is the gap explicitly called out in the existing `iaac` connector's DATA_CHECKLIST note: 'Row-level needs the IAAC registry API (follow-up)'"
+    priority: P1
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: transport_row_level
+    name: Transport Canada — TSB Occurrences & Vehicle Recalls (row-level)
+    jurisdiction: federal
+    publisher: Transportation Safety Board / Transport Canada
+    category: transport
+    base_url: "https://www.tsb.gc.ca/eng/stats/"
+    access_method: bulk_csv
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://www.tsb.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: "dedicated connector, distinct from the existing `transport` CKAN-catalogue connector"
+    incremental_strategy: not designed
+    check_frequency: "weekly per spec"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations: []
+    priority: P3
+    responsible_parser: none
+    health_status: not_applicable
+
+  # ── Approved/reviewable news (headline+link only, per spec policy) ──────────
+
+  - id: global_news_rss
+    name: Global News RSS (Canada, Politics, Money, Environment)
+    jurisdiction: national
+    publisher: Global News (Corus Entertainment)
+    category: news
+    base_url: "https://globalnews.ca/pages/feeds/"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://globalnews.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: missing
+    backfill_strategy: "headline/summary/link/image-where-permitted only — never full article text, per news policy"
+    incremental_strategy: "RSS guid-upsert, same pattern as gazette_weekly"
+    check_frequency: "every 2-6 hours per spec"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "named as a 'starting approved or reviewable source' in the spec, but terms have not actually been reviewed yet — do not flip enabled:true without that review"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: licensed_news_named_publishers
+    name: "Named publishers pending licensing review (CBC, CTV, Financial Post, National Post, Globe and Mail, Toronto Star, La Presse, Le Devoir, The Logic, The Narwhal, Canadian Press, iPolitics, Hill Times, Policy Options, regional/trade press)"
+    jurisdiction: national
+    publisher: various
+    category: news
+    base_url: null
+    access_method: third_party_api
+    license: unreviewed
+    terms_url: null
+    robots_url: null
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "n/a"
+    raw_data_path: "not applicable — no full-text copyrighted news without a licence, no paywall bypass, ever"
+    known_limitations:
+      - "per spec: do not activate any of these (or Factiva/Dow Jones, LexisNexis, Meltwater, Event Registry/NewsAPI.ai) on developer-key availability alone — needs commercial storage/display/caching/redistribution rights reviewed first"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  # ── Provincial placeholders (Phase 2, per spec — do not implement yet) ──────
+
+  - id: provincial_placeholder_on
+    name: "Ontario — legislature, gazette, lobbying registry, procurement, budget, regulators"
+    jurisdiction: provincial
+    publisher: "Government of Ontario"
+    category: provincial_placeholder
+    base_url: null
+    access_method: scrape
+    license: unreviewed
+    terms_url: null
+    robots_url: null
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: null
+    enabled: false
+    connector: none
+    implementation_status: placeholder
+    backfill_strategy: not designed
+    incremental_strategy: not designed
+    check_frequency: "n/a — Phase 2"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "Ontario already operates its own provincial lobbyist registry, separate from the federal OCL — note for whenever this is built"
+    priority: P4
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: provincial_placeholder_qc
+    name: "Quebec — legislature, gazette, lobbying registry, procurement, budget, regulators"
+    jurisdiction: provincial
+    publisher: "Government of Quebec"
+    category: provincial_placeholder
+    base_url: null
+    access_method: scrape
+    license: unreviewed
+    terms_url: null
+    robots_url: null
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: null
+    enabled: false
+    connector: none
+    implementation_status: placeholder
+    backfill_strategy: not designed
+    incremental_strategy: not designed
+    check_frequency: "n/a — Phase 2"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "French-language source — must use the bilingual-record model (language variant of a shared canonical record), not a duplicate entity"
+    priority: P4
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: provincial_placeholder_bc
+    name: "British Columbia — legislature, gazette, lobbying registry, procurement, budget, regulators"
+    jurisdiction: provincial
+    publisher: "Government of British Columbia"
+    category: provincial_placeholder
+    base_url: null
+    access_method: scrape
+    license: unreviewed
+    terms_url: null
+    robots_url: null
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: null
+    enabled: false
+    connector: none
+    implementation_status: placeholder
+    backfill_strategy: not designed
+    incremental_strategy: not designed
+    check_frequency: "n/a — Phase 2"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations: []
+    priority: P4
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: provincial_placeholder_ab
+    name: "Alberta — legislature, gazette, lobbying registry, procurement, budget, energy regulator (AER)"
+    jurisdiction: provincial
+    publisher: "Government of Alberta"
+    category: provincial_placeholder
+    base_url: null
+    access_method: scrape
+    license: unreviewed
+    terms_url: null
+    robots_url: null
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: null
+    attribution_required: null
+    enabled: false
+    connector: none
+    implementation_status: placeholder
+    backfill_strategy: not designed
+    incremental_strategy: not designed
+    check_frequency: "n/a — Phase 2"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not yet designed"
+    known_limitations:
+      - "highest-value provincial energy regulator (AER) given the existing federal CER focus — worth prioritizing first if/when Phase 2 starts"
+    priority: P4
+    responsible_parser: none
+    health_status: not_applicable

@@ -1,12 +1,28 @@
 # Connected Intelligence Audit
 
-Last updated: 2026-06-20
+Last updated: 2026-06-20 (frontend/route content re-verified 2026-06-21 — still accurate, no drift found)
 
-Correct workspace:
+Canonical working copy (real data + API key):
 
-`/Users/codymcmullen/Documents/Claude Code/polaris`
+`~/Documents/Nessus Intelligence` (this repo, cloned from `bigred1996/Political-Intelligence`)
+
+The `/Users/codymcmullen/...` path previously listed here was a stale reference
+from when this project lived on a different machine/user account — corrected
+2026-06-21.
 
 This audit captures the current connected-intelligence foundation for Nessus. It documents the frontend routes, backend routes, database tables, source types, record pages, search behavior, and internal linking rules now used by the customer-interview prototype.
+
+**Ingestion-layer companion audit:** this document covers the frontend/graph/
+record-page layer, which a 2026-06-21 pass confirmed is accurate (all 25 routes
+listed below were verified to exist as real files, no discrepancies). The
+*data-ingestion* side (connector reliability, incremental fetch, raw storage,
+revision history, test coverage) is audited separately in `DATA_CHECKLIST.md`
+("Ingestion audit — 2026-06-21") and `DATA_CATALOG.md`, with the machine-readable
+per-source registry in `config/data-sources.yaml`. Headline: the record/entity/
+graph pages here are in good shape; the connectors feeding them are not yet
+incremental, have no revision history, and two (`grants_quarterly`,
+`appointments_weekly`) have a live duplicate-accumulation bug that hasn't fired
+yet only because they've never been triggered.
 
 ## Frontend Routes
 

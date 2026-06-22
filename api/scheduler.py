@@ -170,11 +170,30 @@ async def _rebuild_search_index() -> None:
         log.error("auto_reindex_failed", error=str(exc))
 
 
+class StreamLoadError(Exception):
+    """Wraps a mid-stream failure with how many rows were already committed.
+
+    A dropped connection near the tail of a multi-million-row stream does NOT
+    lose committed batches (each batch is its own commit) — but the bare
+    exception that used to propagate out of _stream_load gave callers no way
+    to report that, so scheduler_log recorded rows_added=0 even when most of
+    the corpus had actually landed. See CLAUDE.md: "A dropped stream at the
+    tail != data lost."
+    """
+
+    def __init__(self, loaded: int, cause: BaseException) -> None:
+        super().__init__(f"{type(cause).__name__}: {cause} (partial: {loaded} rows committed before failure)")
+        self.loaded = loaded
+        self.cause = cause
+
+
 async def _stream_load(model, agen, *, delete_first: bool = True, batch_size: int = 5000) -> int:
     """Stream rows from an async iterator into the DB in batches.
 
     Keeps memory flat for full-corpus ingests (contracts ~1M rows, donations
     multi-million) — we never materialize the whole dataset. Returns row count.
+    Raises StreamLoadError (not the bare original exception) on failure so
+    callers can still log how much was actually committed.
     """
     from api.database import AsyncSessionLocal
     from sqlalchemy import delete as _delete
@@ -185,17 +204,20 @@ async def _stream_load(model, agen, *, delete_first: bool = True, batch_size: in
             await session.execute(_delete(model))
             await session.commit()
         batch: list = []
-        async for row in agen:
-            batch.append(model(**row))
-            if len(batch) >= batch_size:
+        try:
+            async for row in agen:
+                batch.append(model(**row))
+                if len(batch) >= batch_size:
+                    session.add_all(batch)
+                    await session.commit()
+                    loaded += len(batch)
+                    batch = []
+            if batch:
                 session.add_all(batch)
                 await session.commit()
                 loaded += len(batch)
-                batch = []
-        if batch:
-            session.add_all(batch)
-            await session.commit()
-            loaded += len(batch)
+        except Exception as exc:
+            raise StreamLoadError(loaded, exc) from exc
     return loaded
 
 
@@ -349,6 +371,7 @@ async def _run_hansard_search(triggered_by: str = "scheduler") -> None:
 
 
 async def _run_appointments(triggered_by: str = "scheduler") -> None:
+    from sqlalchemy import delete
     from api.database import AsyncSessionLocal
     from api.models.appointment import Appointment
     from pipeline.ingest import fetch_appointment_rows
@@ -356,11 +379,15 @@ async def _run_appointments(triggered_by: str = "scheduler") -> None:
     t0 = time.monotonic()
     try:
         rows = await fetch_appointment_rows(max_rows=10000)
-        added = 0
         async with AsyncSessionLocal() as session:
+            # Full replace, like bills/contracts/donations — GIC appointments has no
+            # stable natural key (a person can hold multiple appointments; one OIC
+            # can name multiple appointees), so a plain insert-without-delete would
+            # duplicate every row on every recurrence.
+            await session.execute(delete(Appointment))
             session.add_all([Appointment(**r) for r in rows])
             await session.commit()
-            added = len(rows)
+        added = len(rows)
         await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
         invalidate_workspace_caches("appointments_weekly")
         log.info("scheduler_appointments_done", count=added)
@@ -370,8 +397,6 @@ async def _run_appointments(triggered_by: str = "scheduler") -> None:
 
 
 async def _run_contracts(triggered_by: str = "scheduler") -> None:
-    from sqlalchemy import delete
-    from api.database import AsyncSessionLocal
     from api.models.contract import Contract
     from pipeline.ingest import iter_contract_rows
     log_id = await _log_start("contracts_monthly", "Federal Contracts (Proactive Disclosure)", triggered_by)
@@ -382,6 +407,9 @@ async def _run_contracts(triggered_by: str = "scheduler") -> None:
         await _log_finish(log_id, "ok", n, n, time.monotonic() - t0)
         invalidate_workspace_caches("contracts_monthly")
         log.info("scheduler_contracts_done", count=n)
+    except StreamLoadError as exc:
+        await _log_finish(log_id, "error", exc.loaded, exc.loaded, time.monotonic() - t0, str(exc))
+        log.error("scheduler_contracts_failed", error=str(exc.cause), rows_committed=exc.loaded)
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
         log.error("scheduler_contracts_failed", error=str(exc))
@@ -432,23 +460,25 @@ async def _run_ocl(triggered_by: str = "scheduler") -> None:
 
 
 async def _run_grants(triggered_by: str = "scheduler") -> None:
-    from api.database import AsyncSessionLocal
     from api.models.grant import Grant
-    from pipeline.ingest import fetch_grant_rows
+    from pipeline.ingest import iter_grant_rows
     log_id = await _log_start("grants_quarterly", "Grants & Contributions", triggered_by)
     t0 = time.monotonic()
     try:
-        rows = await fetch_grant_rows(max_rows=0)  # full corpus
-        added = 0
-        async with AsyncSessionLocal() as session:
-            batch = 2000
-            for i in range(0, len(rows), batch):
-                session.add_all([Grant(**r) for r in rows[i:i+batch]])
-                await session.commit()
-                added += len(rows[i:i+batch])
-        await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
+        # Full corpus, streamed (max_rows=0). Memory stays flat via _stream_load —
+        # fixed 2026-06-22, this used to materialize the whole ~2.25GB CSV into a
+        # list first (see DATA_CHECKLIST.md "Goal 6"). Full replace, like
+        # bills/contracts/donations: ref_number is nullable on a meaningful
+        # fraction of source rows, so an existence-check upsert can't reliably
+        # dedupe; a plain insert-without-delete would duplicate every row on
+        # every recurrence.
+        n = await _stream_load(Grant, iter_grant_rows(max_rows=0))
+        await _log_finish(log_id, "ok", n, n, time.monotonic() - t0)
         invalidate_workspace_caches("grants_quarterly")
-        log.info("scheduler_grants_done", count=added)
+        log.info("scheduler_grants_done", count=n)
+    except StreamLoadError as exc:
+        await _log_finish(log_id, "error", exc.loaded, exc.loaded, time.monotonic() - t0, str(exc))
+        log.error("scheduler_grants_failed", error=str(exc.cause), rows_committed=exc.loaded)
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
         log.error("scheduler_grants_failed", error=str(exc))
@@ -529,6 +559,9 @@ async def _run_donations(triggered_by: str = "scheduler") -> None:
         await _log_finish(log_id, "ok", n, n, time.monotonic() - t0)
         invalidate_workspace_caches("donations_quarterly")
         log.info("scheduler_donations_done", count=n)
+    except StreamLoadError as exc:
+        await _log_finish(log_id, "error", exc.loaded, exc.loaded, time.monotonic() - t0, str(exc))
+        log.error("scheduler_donations_failed", error=str(exc.cause), rows_committed=exc.loaded)
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
         log.error("scheduler_donations_failed", error=str(exc))

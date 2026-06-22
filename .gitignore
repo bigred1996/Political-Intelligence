@@ -28,6 +28,11 @@ polaris.db
 data/cache/
 data/index/
 data/raw/
+data/extracted/
+data/manifests/
+data/checkpoints/
+data/quarantine/
+data/logs/
 logs/
 reports/
 
