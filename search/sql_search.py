@@ -239,5 +239,14 @@ async def structured_search(
 
 
 # Source-name sets used for routing source_records filtering.
-BREADTH_SOURCES = {"statcan", "iaac", "cer", "npri", "transport", "geospatial", "gc_news", "social_statements", "public_statements"}
+BREADTH_SOURCES = {
+    "statcan", "iaac", "cer", "npri", "transport", "geospatial", "gc_news",
+    "social_statements", "public_statements",
+    # Goal 8 connectors — missing here previously, so an explicit `sources=`
+    # filter on just one of these wouldn't scope the source_records query.
+    "cer_applications", "gazette_notices", "orders_in_council",
+    # Generic RSS/Atom/RDF government-publication feeds (pipeline/feeds.py, Goal 9).
+    "pmo_news", "boc_news", "nrcan_news", "eccc_news", "ised_news", "gac_news",
+    "transport_news", "health_news", "competition_news", "crtc_news", "cer_news",
+}
 EMBED_AND_NPRI = BREADTH_SOURCES

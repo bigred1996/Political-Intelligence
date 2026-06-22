@@ -15,12 +15,13 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, Awaitable, Callable
 
 import structlog
 from apscheduler.triggers.cron import CronTrigger
 
-from pipeline import breadth
+from pipeline import breadth, feeds
 from pipeline import connector_cer_applications, connector_gazette_notices, connector_iaac, connector_orders_in_council
 
 log = structlog.get_logger()
@@ -118,6 +119,32 @@ CONNECTORS: list[SourceConnector] = [
         description="Federal geospatial data catalogue (NRCan / GeoGratis / CGDI).",
     ),
 ]
+
+
+def _feed_connectors() -> list[SourceConnector]:
+    """One SourceConnector per pipeline.feeds.FEED_DEFS entry (Goal 9).
+
+    feeds.py owns the URL/department/id for each government RSS/Atom/RDF feed;
+    this just assigns a cadence, staggering each 5 minutes apart right after the
+    gc_news slot since every fetch is one small XML request (seconds, not the
+    minutes a CSV/ZIP pull takes).
+    """
+    start_hour, start_minute = 5, 35
+    out = []
+    for i, feed in enumerate(feeds.FEED_DEFS):
+        minute = (start_minute + i * 5) % 60
+        hour = start_hour + (start_minute + i * 5) // 60
+        out.append(SourceConnector(
+            id=feed.id, name=feed.name, category=feed.category,
+            fetch=partial(feeds.fetch_feed_records, feed),
+            trigger=CronTrigger(hour=hour, minute=minute, timezone="America/Toronto"),
+            cadence="daily", upsert="upsert", embed=True, typical_rows=100,
+            description=f"{feed.department} — RSS/Atom publications (generic feed connector, Goal 9).",
+        ))
+    return out
+
+
+CONNECTORS.extend(_feed_connectors())
 
 CONNECTORS_BY_ID: dict[str, SourceConnector] = {c.id: c for c in CONNECTORS}
 

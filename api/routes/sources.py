@@ -205,6 +205,27 @@ SOURCE_DEFS: list[dict[str, Any]] = [
         "fresh_days": 30,
         "known_gaps": ["No dedicated public-statement ingestion job is active yet."],
     },
+    {
+        "id": "gov_publications", "label": "Government publications & RSS", "table": "source_records",
+        "job_id": None, "status_when_rows": "partial",
+        "source_values": [
+            "pmo_news", "boc_news", "nrcan_news", "eccc_news", "ised_news", "gac_news",
+            "transport_news", "health_news", "competition_news", "crtc_news", "cer_news",
+        ],
+        "description": "PMO, Bank of Canada, NRCan, ECCC, ISED, GAC, Transport Canada, Health Canada, "
+                        "Competition Bureau and CRTC news/publications via generic RSS/Atom connectors (Goal 9).",
+        "fresh_days": 14,
+        "known_gaps": [
+            "IAAC, OSFI and the Canadian Nuclear Safety Commission publish no working RSS/Atom feed "
+            "as of this writing (dead links / HTML-404-with-200 / email-only notifications) — no "
+            "connector is wired for them rather than guessing a URL.",
+            "Finance Canada has no separate departmental feed; its releases flow through the "
+            "existing gc_news connector (filter entity_name = \"Department of Finance Canada\").",
+            "Only a short (~320 char) publisher-supplied snippet is stored/displayed per item, not "
+            "the full release text — Canada.ca's Terms and Conditions license reproduction for "
+            "non-commercial use only; Nessus is commercial and holds no separate written permission.",
+        ],
+    },
 ]
 
 

@@ -696,6 +696,389 @@ sources:
     responsible_parser: "pipeline/connector_orders_in_council.py"
     health_status: healthy
 
+  # ── Goal 9 (2026-06-22): generic RSS/Atom/RDF government-publication
+  # connector. pipeline/feeds.py is ONE parser shared by all 11 entries below
+  # (FeedDef registry); pipeline/connectors.py generates one SourceConnector
+  # per FeedDef. Of Tasks.md's NEWS AND RSS POLICY pre-approved starting list
+  # (PMO, Finance, Bank of Canada, GAC, NRCan, "relevant regulator feeds"),
+  # only Finance Canada has no dedicated departmental feed — it has no
+  # discoverable RSS/Atom and no working `dept=` slug on the IO News API
+  # (tried departmentoffinance/departmentoffinancecanada/financecanada, all
+  # 0 results); its releases already flow through the existing `gc_news`
+  # connector (entity_name = "Department of Finance Canada", ~117 items in a
+  # pick=3000 window) so it is NOT duplicated here. IAAC, OSFI and the
+  # Canadian Nuclear Safety Commission were also investigated and have NO
+  # working RSS/Atom feed (IAAC: /rss.xml and /eng/rss.xml both return
+  # HTTP 200 HTML-404 pages; OSFI: email-only "Subscribe" page, no feed
+  # references at all; CNSC: both documented subscribe-rss URLs 404) — left
+  # out rather than wired to a guessed/dead URL.
+  #
+  # LICENSING (commercial_reuse_reviewed for the 8 canada.ca-hosted department
+  # feeds below): confirmed via canada.ca/en/transparency/terms.html — "you may
+  # reproduce materials... for non-commercial purposes... without charge or
+  # further permission"; "you may not reproduce materials for the purposes of
+  # commercial redistribution... without prior written permission". Nessus is
+  # commercial and holds no such permission, so full_text_storage_allowed is
+  # false for ALL 11 sources here regardless of what the feed item itself
+  # contains — pipeline/feeds.py never even parses `<content:encoded>`/Atom
+  # `<content>` (the full-article fields), and caps the stored/displayed
+  # `summary`/`full_text` to a ~320-char publisher-supplied snippet, per
+  # Tasks.md's "For unlicensed news and RSS: store only... short
+  # publisher-supplied description... do not store or display full
+  # copyrighted article text". The complete raw feed XML is still archived via
+  # pipeline.raw_storage.save_raw() (category "news-rss") for internal
+  # provenance only — not a public display/redistribution surface. Bank of
+  # Canada, CRTC and CER publish under their own separate sites/terms (not
+  # canada.ca) — their specific terms-of-use pages were NOT individually
+  # reviewed this session, so commercial_reuse_reviewed is honestly false for
+  # those three even though the same conservative snippet-only handling
+  # applies to them too.
+
+  - id: pmo_news
+    name: "Prime Minister's Office — News"
+    jurisdiction: federal
+    publisher: "Prime Minister's Office"
+    category: news
+    base_url: "https://www.pm.gc.ca/en/news.rss"
+    access_method: rss
+    license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
+    terms_url: "https://www.canada.ca/en/transparency/terms.html"
+    robots_url: "https://www.pm.gc.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/feeds.py:fetch_feed_records (FeedDef id=pmo_news)"
+    implementation_status: working
+    backfill_strategy: "single GET captures the feed's full live window — 10 items, 2026-06-17..2026-06-22 (RSS 2.0 has no deeper pagination; this IS the full backfill for this source)"
+    incremental_strategy: "upsert by GUID (RSS <guid>, falls back to <link>) — same pattern as gc_news"
+    check_frequency: "daily, 5:35am ET"
+    last_checked: "2026-06-22T18:45:22Z"
+    last_successful_import: "2026-06-22T18:45:26Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/news-rss/pmo_news/..."
+    known_limitations:
+      - "pm.gc.ca's bot-management WAF 403s the shared breadth.py UA string (contains the literal substring \"Nessus\", which reads as a security-scanner name to some WAFs) — pipeline/feeds.py uses a real browser UA instead, same class of fix as the existing OCL download gotcha"
+      - "RSS-only window (~10 most recent items) — no deeper archive discovered"
+    priority: P2
+    responsible_parser: "pipeline/feeds.py"
+    health_status: healthy
+
+  - id: boc_news
+    name: "Bank of Canada — Press Releases"
+    jurisdiction: federal
+    publisher: "Bank of Canada"
+    category: news
+    base_url: "https://www.bankofcanada.ca/content_type/press-releases/feed/"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.bankofcanada.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/feeds.py:fetch_feed_records (FeedDef id=boc_news)"
+    implementation_status: working
+    backfill_strategy: "single GET captures the feed's full live window — 10 items, 2026-01-28..2026-06-10 (RSS 1.0/RDF, no deeper pagination)"
+    incremental_strategy: "upsert by external_id (RDF items have no <guid>; falls back to <link>)"
+    check_frequency: "daily, 5:40am ET"
+    last_checked: "2026-06-22T18:45:31Z"
+    last_successful_import: "2026-06-22T18:45:32Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/news-rss/boc_news/..."
+    known_limitations:
+      - "bankofcanada.ca's own Terms of Use were not individually reviewed this session — same shared-UA 403 issue as pm.gc.ca, worked around with a real browser UA"
+      - "Bank of Canada publishes ~25 other content-type feeds (announcements, speeches, market notices, MPR, FSR, staff working papers...) at the same URL pattern, not yet added"
+    priority: P2
+    responsible_parser: "pipeline/feeds.py"
+    health_status: healthy
+
+  - id: nrcan_news
+    name: "Natural Resources Canada — News"
+    jurisdiction: federal
+    publisher: "Natural Resources Canada"
+    category: news
+    base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=naturalresourcescanada&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
+    access_method: api
+    license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
+    terms_url: "https://www.canada.ca/en/transparency/terms.html"
+    robots_url: "https://api.io.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/feeds.py:fetch_feed_records (FeedDef id=nrcan_news)"
+    implementation_status: working
+    backfill_strategy: "department-filtered IO News API with a large `pick`; full available depth — 1,862 items, 2017-10-13..2026-06-22 (pick=1000 only surfaced ~1,000 on a cold query; pick=50000 reliably returns the true ceiling once warm)"
+    incremental_strategy: "upsert by external_id (Atom <id>/link) — same fixed-URL re-fetch-and-dedup pattern as gc_news"
+    check_frequency: "daily, 5:45am ET"
+    last_checked: "2026-06-22T18:45:36Z"
+    last_successful_import: "2026-06-22T18:45:38Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/news-rss/nrcan_news/..."
+    known_limitations:
+      - "the IO News API's `dept=` slug is the department's legacy/legal name lowercased with no spaces (e.g. \"naturalresourcescanada\"), not derivable from the display name or canada.ca URL slug — discovered empirically per department, not documented anywhere found"
+      - "re-fetches the full ~1,862-item window on every daily run (cheap, ~1s) rather than using a smaller incremental page — simpler than threading a separate small-pick URL through for daily vs backfill runs"
+    priority: P2
+    responsible_parser: "pipeline/feeds.py"
+    health_status: healthy
+
+  - id: eccc_news
+    name: "Environment and Climate Change Canada — News"
+    jurisdiction: federal
+    publisher: "Environment and Climate Change Canada"
+    category: news
+    base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentoftheenvironment&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
+    access_method: api
+    license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
+    terms_url: "https://www.canada.ca/en/transparency/terms.html"
+    robots_url: "https://api.io.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/feeds.py:fetch_feed_records (FeedDef id=eccc_news)"
+    implementation_status: working
+    backfill_strategy: "department-filtered IO News API, pick=50000 — 1,522 items, 2018-02-01..2026-06-22"
+    incremental_strategy: "upsert by external_id — same pattern as nrcan_news"
+    check_frequency: "daily, 5:50am ET"
+    last_checked: "2026-06-22T18:46:27Z"
+    last_successful_import: "2026-06-22T18:46:29Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/news-rss/eccc_news/..."
+    known_limitations:
+      - "dept slug uses the legal name \"Department of the Environment\", not \"ECCC\""
+    priority: P2
+    responsible_parser: "pipeline/feeds.py"
+    health_status: healthy
+
+  - id: ised_news
+    name: "Innovation, Science and Economic Development Canada — News"
+    jurisdiction: federal
+    publisher: "Innovation, Science and Economic Development Canada"
+    category: news
+    base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentofindustry&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
+    access_method: api
+    license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
+    terms_url: "https://www.canada.ca/en/transparency/terms.html"
+    robots_url: "https://api.io.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/feeds.py:fetch_feed_records (FeedDef id=ised_news)"
+    implementation_status: working
+    backfill_strategy: "department-filtered IO News API, pick=50000 — 1,857 items, 2017-03-16..2026-06-22"
+    incremental_strategy: "upsert by external_id — same pattern as nrcan_news"
+    check_frequency: "daily, 5:55am ET"
+    last_checked: "2026-06-22T18:47:35Z"
+    last_successful_import: "2026-06-22T18:47:38Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/news-rss/ised_news/..."
+    known_limitations:
+      - "dept slug uses the legal name \"Department of Industry\", not \"ISED\""
+    priority: P2
+    responsible_parser: "pipeline/feeds.py"
+    health_status: healthy
+
+  - id: gac_news
+    name: "Global Affairs Canada — News"
+    jurisdiction: federal
+    publisher: "Global Affairs Canada"
+    category: news
+    base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentofforeignaffairstradeanddevelopment&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
+    access_method: api
+    license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
+    terms_url: "https://www.canada.ca/en/transparency/terms.html"
+    robots_url: "https://api.io.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/feeds.py:fetch_feed_records (FeedDef id=gac_news)"
+    implementation_status: working
+    backfill_strategy: "department-filtered IO News API, pick=50000 — 3,620 items (deepest of the dept-filtered feeds), 2018-03-13..2026-06-22"
+    incremental_strategy: "upsert by external_id — same pattern as nrcan_news"
+    check_frequency: "daily, 6:00am ET"
+    last_checked: "2026-06-22T18:48:52Z"
+    last_successful_import: "2026-06-22T18:48:55Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/news-rss/gac_news/..."
+    known_limitations:
+      - "dept slug uses the legal name \"Department of Foreign Affairs, Trade and Development\""
+    priority: P2
+    responsible_parser: "pipeline/feeds.py"
+    health_status: healthy
+
+  - id: transport_news
+    name: "Transport Canada — News"
+    jurisdiction: federal
+    publisher: "Transport Canada"
+    category: news
+    base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentoftransport&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
+    access_method: api
+    license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
+    terms_url: "https://www.canada.ca/en/transparency/terms.html"
+    robots_url: "https://api.io.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/feeds.py:fetch_feed_records (FeedDef id=transport_news)"
+    implementation_status: working
+    backfill_strategy: "department-filtered IO News API, pick=50000 — 1,220 items, 2017-05-12..2026-06-22"
+    incremental_strategy: "upsert by external_id — same pattern as nrcan_news"
+    check_frequency: "daily, 6:05am ET"
+    last_checked: "2026-06-22T18:51:08Z"
+    last_successful_import: "2026-06-22T18:51:10Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/news-rss/transport_news/..."
+    known_limitations:
+      - "dept slug uses the legal name \"Department of Transport\"; distinct from the existing `transport` connector, which ingests the open-data dataset catalogue, not news"
+    priority: P2
+    responsible_parser: "pipeline/feeds.py"
+    health_status: healthy
+
+  - id: health_news
+    name: "Health Canada — News"
+    jurisdiction: federal
+    publisher: "Health Canada"
+    category: news
+    base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentofhealth&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
+    access_method: api
+    license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
+    terms_url: "https://www.canada.ca/en/transparency/terms.html"
+    robots_url: "https://api.io.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/feeds.py:fetch_feed_records (FeedDef id=health_news)"
+    implementation_status: working
+    backfill_strategy: "department-filtered IO News API, pick=50000 — 1,159 items, 2017-05-17..2026-06-16"
+    incremental_strategy: "upsert by external_id — same pattern as nrcan_news"
+    check_frequency: "daily, 6:10am ET"
+    last_checked: "2026-06-22T18:52:02Z"
+    last_successful_import: "2026-06-22T18:52:04Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/news-rss/health_news/..."
+    known_limitations:
+      - "dept slug uses the legal name \"Department of Health\""
+    priority: P2
+    responsible_parser: "pipeline/feeds.py"
+    health_status: healthy
+
+  - id: competition_news
+    name: "Competition Bureau Canada — News"
+    jurisdiction: federal
+    publisher: "Competition Bureau Canada"
+    category: news
+    base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=competitionbureau&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
+    access_method: api
+    license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
+    terms_url: "https://www.canada.ca/en/transparency/terms.html"
+    robots_url: "https://api.io.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/feeds.py:fetch_feed_records (FeedDef id=competition_news)"
+    implementation_status: working
+    backfill_strategy: "department-filtered IO News API, pick=50000 — 495 items, 2016-11-21..2026-06-22 (deepest history of all dept-filtered feeds in calendar terms after GAC)"
+    incremental_strategy: "upsert by external_id — same pattern as nrcan_news"
+    check_frequency: "daily, 6:15am ET"
+    last_checked: "2026-06-22T18:52:56Z"
+    last_successful_import: "2026-06-22T18:52:58Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/news-rss/competition_news/..."
+    known_limitations: []
+    priority: P2
+    responsible_parser: "pipeline/feeds.py"
+    health_status: healthy
+
+  - id: crtc_news
+    name: "CRTC — News & Speeches"
+    jurisdiction: federal
+    publisher: "Canadian Radio-television and Telecommunications Commission"
+    category: news
+    base_url: "https://crtc.gc.ca/eng/rss/news.xml"
+    access_method: atom
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://crtc.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/feeds.py:fetch_feed_records (FeedDef id=crtc_news)"
+    implementation_status: working
+    backfill_strategy: "single GET captures the feed's full live window — 28 items, 2025-11-18..2026-06-16 (no deeper pagination)"
+    incremental_strategy: "upsert by external_id (Atom <id>)"
+    check_frequency: "daily, 6:20am ET"
+    last_checked: "2026-06-22T18:53:22Z"
+    last_successful_import: "2026-06-22T18:53:23Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/news-rss/crtc_news/..."
+    known_limitations:
+      - "distinct from the existing tribunal_decisions job, which ingests CRTC's BroadcastDecisions/TelecomDecisions RSS into structured per-decision rows — this feed is general news/speeches/media advisories, no decision-number parsing"
+      - "crtc.gc.ca's own terms of use were not individually reviewed this session"
+    priority: P3
+    responsible_parser: "pipeline/feeds.py"
+    health_status: healthy
+
+  - id: cer_news
+    name: "Canada Energy Regulator — News Releases"
+    jurisdiction: federal
+    publisher: "Canada Energy Regulator"
+    category: news
+    base_url: "https://www.cer-rec.gc.ca/rss/rssfd.aspx?l=e&c=catNR"
+    access_method: atom
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.cer-rec.gc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/feeds.py:fetch_feed_records (FeedDef id=cer_news)"
+    implementation_status: working
+    backfill_strategy: "single GET captures the feed's full live window — 3 items, 2026-01-30..2026-03-17 (catNR = News Release category; 8 other category feeds exist at cer-rec.gc.ca/en/rss/rss.html, not yet added)"
+    incremental_strategy: "upsert by external_id (Atom <id>, urn:uuid format)"
+    check_frequency: "daily, 6:25am ET"
+    last_checked: "2026-06-22T18:53:29Z"
+    last_successful_import: "2026-06-22T18:53:30Z"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/news-rss/cer_news/..."
+    known_limitations:
+      - "distinct from the existing cer (pipeline-incident CSV) and cer_applications (proceedings) connectors — this is general news releases only"
+      - "very thin window (3 items / ~2 months) — the News Release category feed itself appears low-volume; cer-rec.gc.ca's own terms of use were not individually reviewed this session"
+    priority: P3
+    responsible_parser: "pipeline/feeds.py"
+    health_status: healthy
+
   - id: npri
     name: National Pollutant Release Inventory
     jurisdiction: federal

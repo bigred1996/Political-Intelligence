@@ -9,12 +9,14 @@ short build tracker; this is the full universe).
 **Priority** (for political-risk DD on a company/sector):
 **P1** core to the 9 report sections · **P2** strong enhancer · **P3** breadth / later
 
-Last updated: 2026-06-21 — reconciled against `config/data-sources.yaml` and a
-live audit of `polaris.db` + `scheduler_log` (see `DATA_CHECKLIST.md`
-"Ingestion audit — 2026-06-21" for the systemic findings: no connector does
-true incremental fetch, no raw storage/revision history exists, two wired-but-
-dormant jobs have duplicate-accumulation bugs). Rows below marked "✅(2026-06-21)"
-were corrected this pass — the prior status was stale.
+Last updated: 2026-06-22 (Goal 9 — generic RSS/Atom/RDF government-publication
+connector, 11 feeds live; see §12/§13) — reconciled against
+`config/data-sources.yaml` and a live audit of `polaris.db` + `scheduler_log`
+(see `DATA_CHECKLIST.md` "Ingestion audit — 2026-06-21" for the systemic
+findings: no connector does true incremental fetch, no raw storage/revision
+history exists, two wired-but-dormant jobs have duplicate-accumulation bugs).
+Rows below marked "✅(2026-06-21)" were corrected that pass; "✅(2026-06-22)"
+rows are Goal 9 — the prior status was stale.
 
 ---
 
@@ -168,26 +170,49 @@ were corrected this pass — the prior status was stale.
 | Source | Access | Priority | Status | Notes / next step |
 |---|---|---|---|---|
 | Bank of Canada policy rate, FX rates, market data | API | P2 | ⬜ | Bank of Canada Valet API (open, no key) — not started |
-| Bank of Canada announcements / RSS | RSS | P2 | ⬜ | not started |
-| Department of Finance releases + Fiscal Monitor | RSS/BULK | P2 | ⬜ | not started |
-| OSFI guidance, announcements, financial data | SCRAPE/BULK | P2 | ⬜ | not started |
+| Bank of Canada announcements / RSS | RSS | P2 | ✅(2026-06-22) | Goal 9: `boc_news` — 10 items live, 2026-01-28..2026-06-10 (RSS 1.0/RDF; feed window is thin, no deeper archive at this URL) |
+| Department of Finance releases + Fiscal Monitor | RSS/BULK | P2 | 🟡(2026-06-22) | Goal 9 investigated: no dedicated departmental RSS/Atom feed found (the IO News API's `dept=` slug for Finance could not be discovered — tried 3 legal-name variants, all 0 results). Already captured via the existing `gc_news` connector instead (`entity_name = "Department of Finance Canada"`, ~117 items in a `pick=3000` window) — not duplicated as a separate connector. Fiscal Monitor/budget documents themselves still not started. |
+| OSFI guidance, announcements, financial data | SCRAPE/BULK | P2 | 🔴(2026-06-22) | Goal 9 investigated: OSFI publishes no RSS/Atom feed at all — its "Stay Connected" page is email-only notifications, no feed references found. No connector built. |
 | CMHC housing starts, building permits, rental market data | BULK/API | P2 | ⬜ | not started; StatCan also publishes overlapping series |
-| Competition Bureau decisions, enforcement, guidance | SCRAPE | P1 | ⬜ | sector-critical for any merger/competition political-risk read; not started |
-| Canadian Nuclear Safety Commission proceedings/decisions | SCRAPE | P2 | ⬜ | not started |
+| Competition Bureau decisions, enforcement, guidance | SCRAPE | P1 | 🟡(2026-06-22) | Goal 9 added the news/announcements side (`competition_news` — 495 items, 2016-11-21..2026-06-22, deepest dept-filtered feed found); formal decisions/enforcement-action registry (distinct from news releases) still not ingested |
+| Canadian Nuclear Safety Commission proceedings/decisions | SCRAPE | P2 | 🔴(2026-06-22) | Goal 9 investigated: both documented RSS subscribe URLs (`cnsc-ccsn.gc.ca` and `nuclearsafety.gc.ca` `/eng/get-involved/subscribe-rss/`) return HTTP 404 — CNSC appears to have discontinued RSS without removing the link from its own news-room page. No connector built; revisit periodically. |
 | Canadian Food Inspection Agency recalls/notices | RSS/API | P2 | ⬜ | not started |
-| Health Canada recalls/advisories/compliance notices | RSS | P2 | ⬜ | not started |
+| Health Canada recalls/advisories/compliance notices | RSS | P2 | 🟡(2026-06-22) | Goal 9 added general news (`health_news` — 1,159 items, 2017-05-17..2026-06-16); recall/advisory/compliance-specific feeds (`canada.ca/en/health-canada/services/rss-feeds.html`) are a separate, more granular source not yet ingested |
 | Canadian International Trade Tribunal decisions | SCRAPE | P3 | ⬜ | not started |
 | Canadian Transportation Agency decisions | SCRAPE | P3 | ⬜ | not started |
 
-## 13. Approved News & Publications (added 2026-06-21)
+## 13. Approved News & Publications (added 2026-06-21; itemized 2026-06-22 — Goal 9)
 
 Per the ingestion spec's news policy — full-text copyrighted news stays
 disabled pending licensing review. Headline/summary/link metadata under fair
 use from official feeds is fine to enable now.
 
+**Goal 9 (2026-06-22) built a single generic RSS/Atom/RDF connector
+(`pipeline/feeds.py`) serving 11 government feeds** — see
+`config/data-sources.yaml` for full per-source detail (licensing,
+backfill/incremental strategy, known limitations). All 11 are `enabled: true`,
+checkpointed via upsert-by-GUID, and registered as daily scheduler jobs.
+**License finding:** Canada.ca's Terms and Conditions permit reproduction for
+non-commercial use only ("you may not reproduce materials for the purposes of
+commercial redistribution... without prior written permission") — Nessus is
+commercial, so every one of these 11 stores/displays only a ~320-char
+publisher-supplied snippet per item (never the full release body, and
+`<content:encoded>`/Atom `<content>` are never even parsed), with the complete
+raw feed XML retained separately via `pipeline/raw_storage.py` for internal
+provenance only (not a public display surface).
+
 | Source | Access | Priority | Status | Notes / next step |
 |---|---|---|---|---|
-| GC departmental news RSS (PMO, Finance, GAC, NRCan, ECCC, ISED, TC, Health, Public Safety, IRCC, CRA, Competition Bureau, CER, IAAC, CNSC, CRTC, OSFI) | RSS | P1 | 🟡 | `gc_news` breadth connector already covers "all departments" via the IO news API — confirm it's a superset of these specific department feeds before building per-department RSS separately |
+| PMO news | RSS | P2 | ✅(2026-06-22) | `pmo_news` — 10 items, 2026-06-17..2026-06-22 (thin RSS window, no deeper archive) |
+| Global Affairs Canada news | API (IO News, dept-filtered) | P2 | ✅(2026-06-22) | `gac_news` — 3,620 items, 2018-03-13..2026-06-22 (deepest dept-filtered feed) |
+| Natural Resources Canada news | API (IO News, dept-filtered) | P2 | ✅(2026-06-22) | `nrcan_news` — 1,862 items, 2017-10-13..2026-06-22 |
+| Environment and Climate Change Canada news | API (IO News, dept-filtered) | P2 | ✅(2026-06-22) | `eccc_news` — 1,522 items, 2018-02-01..2026-06-22 |
+| ISED news | API (IO News, dept-filtered) | P2 | ✅(2026-06-22) | `ised_news` — 1,857 items, 2017-03-16..2026-06-22 |
+| Transport Canada news | API (IO News, dept-filtered) | P2 | ✅(2026-06-22) | `transport_news` — 1,220 items, 2017-05-12..2026-06-22; distinct from the existing `transport` open-data-catalogue connector |
+| CRTC news & speeches | Atom | P3 | ✅(2026-06-22) | `crtc_news` — 28 items, 2025-11-18..2026-06-16; distinct from the existing `tribunal_decisions` job (structured CRTC decision rows) |
+| Canada Energy Regulator news releases | Atom | P3 | ✅(2026-06-22) | `cer_news` — 3 items, 2026-01-30..2026-03-17 (very thin feed); distinct from the existing `cer` (incidents) and `cer_applications` (proceedings) connectors |
+| Finance Canada, OSFI, CNSC, IAAC | — | P2 | see §12 | no dedicated RSS/Atom feed exists for these four — see §12 rows above for what was tried and why each is unbuilt rather than ✅ |
+| Public Safety Canada, IRCC, CRA | RSS | P2 | ⬜ | named in the ingestion spec's §13 priority list but out of Goal 9's explicit scope ("Start with" 17 named sources) — not investigated this pass |
 | Global News RSS (Canada, Politics, Money, Environment) | RSS | P3 | ⬜ | publisher-provided feed, terms permit headline/summary/link use — reviewable, not yet built |
 | CBC, CTV, Financial Post, National Post, Globe and Mail, Toronto Star, La Presse, Le Devoir, The Logic, The Narwhal, Canadian Press, iPolitics, Hill Times, Policy Options | — | P5 | 🔴 | **disabled candidates pending licensing/terms review** per spec — do not enable without a reviewed agreement |
 | Licensed news APIs (CP, Factiva/Dow Jones, LexisNexis, Meltwater, Event Registry/NewsAPI.ai) | 3P/KEY | P5 | 🔴 | do not activate on key availability alone — needs commercial storage/display/caching/redistribution review first |

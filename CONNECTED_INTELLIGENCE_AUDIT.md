@@ -113,6 +113,7 @@ Live or partial source surfaces currently represented in app/source status:
 - MP profiles
 - Hansard mentions
 - Operations breadth records in `source_records` for CER, NPRI, GC News, StatCan, IAAC, Transport, and geospatial/catalogue records
+- Government publications & RSS in `source_records` (Goal 9): PMO, Bank of Canada, NRCan, ECCC, ISED, GAC, Transport Canada, Health Canada, Competition Bureau and CRTC news/publications via a generic RSS/Atom/RDF connector (`pipeline/feeds.py`)
 - Public statements/social signals in `source_records` under `social_statements` or `public_statements`, with internal detail URLs and a source profile even while ingestion is not active
 - Grants and contributions
 - Governor in Council appointments
