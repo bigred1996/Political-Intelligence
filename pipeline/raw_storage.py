@@ -48,7 +48,7 @@ CATEGORIES = frozenset({
     "open-government", "parliament", "elections-canada", "lobbying", "statcan",
     "bank-of-canada", "iaac", "cer", "npri", "transport-canada", "canada-gazette",
     "canadabuys", "proactive-disclosure", "courts", "geospatial",
-    "government-news", "news-rss", "orders-in-council",
+    "government-news", "news-rss", "orders-in-council", "canadian-news",
 })
 
 

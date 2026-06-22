@@ -65,7 +65,10 @@ class FeedDef:
     name: str                                 # human label, e.g. "Bank of Canada — Press Releases"
     department: str                           # entity_name/canonical_name + regulator-fragment resolution
     url: str
-    category: str = "News & Publications"     # UI grouping, mirrors SourceConnector.category
+    category: str = "Government Publications"  # UI grouping, mirrors SourceConnector.category — distinct
+    # from "Canadian News" (pipeline/news_feeds.py, Goal 10): every feed here is an official government
+    # department/agency, blanket-reviewed once under Crown copyright / canada.ca's Terms and Conditions,
+    # not a commercial news publisher with its own individually-reviewed licence.
 
 
 FEED_DEFS: list[FeedDef] = [

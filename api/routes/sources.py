@@ -226,6 +226,27 @@ SOURCE_DEFS: list[dict[str, Any]] = [
             "non-commercial use only; Nessus is commercial and holds no separate written permission.",
         ],
     },
+    {
+        "id": "canadian_news", "label": "Canadian news", "table": "source_records",
+        "job_id": None, "status_when_rows": "partial",
+        "source_values": ["conversation_ca_politics"],
+        "description": "Commercial/independent Canadian news publishers — a separate connector "
+                        "category from government publications above, since each carries its own, "
+                        "individually-reviewed licence rather than the gov-wide Crown-copyright review "
+                        "(Goal 10). Currently: The Conversation Canada — Politics (CC BY-ND 4.0).",
+        "fresh_days": 14,
+        "known_gaps": [
+            "Global News and The Narwhal were reviewed and found to require a commercial licence "
+            "Nessus does not hold (non-commercial-only Terms of Use / case-by-case email approval "
+            "respectively) — not enabled. CBC, CTV, Financial Post, National Post, Globe and Mail, "
+            "Toronto Star, La Presse, Le Devoir, The Logic, Canadian Press, iPolitics, Hill Times "
+            "and Policy Options are disabled candidates pending licensing review (see "
+            "config/data-sources.yaml for the per-source registry rows).",
+            "Headline/excerpt/author/canonical-link only, per item — full article text is never "
+            "stored even though The Conversation's licence technically permits it, since their own "
+            "guidelines forbid systematically republishing every article from a feed.",
+        ],
+    },
 ]
 
 

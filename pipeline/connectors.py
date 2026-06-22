@@ -21,7 +21,7 @@ from typing import Any, Awaitable, Callable
 import structlog
 from apscheduler.triggers.cron import CronTrigger
 
-from pipeline import breadth, feeds
+from pipeline import breadth, feeds, news_feeds
 from pipeline import connector_cer_applications, connector_gazette_notices, connector_iaac, connector_orders_in_council
 
 log = structlog.get_logger()
@@ -44,7 +44,7 @@ class SourceConnector:
 # Stagger ingests across the week so the dev box never runs two big pulls at once.
 CONNECTORS: list[SourceConnector] = [
     SourceConnector(
-        id="gc_news", name="Government of Canada News", category="News & Publications",
+        id="gc_news", name="Government of Canada News", category="Government Publications",
         fetch=breadth.fetch_gc_news_records,
         trigger=CronTrigger(hour=5, minute=30, timezone="America/Toronto"),
         cadence="daily", upsert="upsert", embed=True, typical_rows=100,
@@ -145,6 +145,37 @@ def _feed_connectors() -> list[SourceConnector]:
 
 
 CONNECTORS.extend(_feed_connectors())
+
+
+def _news_connectors() -> list[SourceConnector]:
+    """One SourceConnector per pipeline.news_feeds.NEWS_FEED_DEFS entry (Goal 10).
+
+    Distinct from `_feed_connectors()` above: those wrap government department
+    RSS/Atom feeds (pipeline/feeds.py, Goal 9), reviewed once under Crown
+    copyright. Each entry here is a commercial news publisher with its OWN
+    individually-reviewed licence, kept in a separate "Canadian News" category
+    so the two are never visually or operationally conflated. Disabled
+    candidates pending a commercial licence (CBC, CTV, Financial Post, ...) are
+    documentation-only rows in config/data-sources.yaml, not Python objects
+    here — nothing to schedule until one is actually licensed. Staggered right
+    after the government feed slots (which end at 6:25am).
+    """
+    start_hour, start_minute = 6, 30
+    out = []
+    for i, feed in enumerate(news_feeds.NEWS_FEED_DEFS):
+        minute = (start_minute + i * 5) % 60
+        hour = start_hour + (start_minute + i * 5) // 60
+        out.append(SourceConnector(
+            id=feed.id, name=feed.name, category=feed.category,
+            fetch=partial(news_feeds.fetch_news_feed_records, feed),
+            trigger=CronTrigger(hour=hour, minute=minute, timezone="America/Toronto"),
+            cadence="daily", upsert="upsert", embed=True, typical_rows=20,
+            description=f"{feed.publisher} — {feed.license_name} (Goal 10).",
+        ))
+    return out
+
+
+CONNECTORS.extend(_news_connectors())
 
 CONNECTORS_BY_ID: dict[str, SourceConnector] = {c.id: c for c in CONNECTORS}
 

@@ -36,7 +36,10 @@ EMBED_SOURCES = ["statcan", "iaac", "cer", "transport", "geospatial", "gc_news",
                  "public_statements", "cer_applications", "gazette_notices", "orders_in_council",
                  # Generic RSS/Atom/RDF government-publication feeds (Goal 9).
                  "pmo_news", "boc_news", "nrcan_news", "eccc_news", "ised_news", "gac_news",
-                 "transport_news", "health_news", "competition_news", "crtc_news", "cer_news"]
+                 "transport_news", "health_news", "competition_news", "crtc_news", "cer_news",
+                 # Canadian News — commercial news publishers, separate connector category,
+                 # each individually licence-reviewed (pipeline/news_feeds.py, Goal 10).
+                 "conversation_ca_politics"]
 
 _cache: dict[str, Any] = {"vectors": None, "meta": None, "mtime": None}
 

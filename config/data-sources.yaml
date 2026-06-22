@@ -23,7 +23,11 @@
 #   name                        human label
 #   jurisdiction                federal | provincial | municipal | international
 #   publisher                   department/agency/site that publishes the data
-#   category                    UI/grouping category
+#   category                    UI/grouping category. Goal 10 (2026-06-22) split what used to be one
+#                                undifferentiated `news` bucket into `government_publications` (official
+#                                government department/agency RSS+API feeds — pipeline/feeds.py, blanket
+#                                Crown-copyright review) and `canadian_news` (actual commercial/independent
+#                                news publishers — pipeline/news_feeds.py, each individually licence-reviewed)
 #   base_url                    primary access endpoint or dataset landing page
 #   access_method               api | rss | ckan | bulk_csv | bulk_zip | sdmx | scrape | third_party_api | key_required
 #   license                     citable licence name, or "unreviewed"
@@ -426,7 +430,7 @@ sources:
     name: Government of Canada News & Publications
     jurisdiction: federal
     publisher: "all departments, via the IO news API"
-    category: news
+    category: government_publications
     base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?type=newsreleases&sort=publishedDate&orderBy=desc&format=atom"
     access_method: api
     license: unreviewed
@@ -448,7 +452,7 @@ sources:
     rate_limit: "none enforced"
     raw_data_path: "not retained"
     known_limitations:
-      - "headline/summary/link only, per news policy — no full article text stored"
+      - "FIXED 2026-06-22 (Goal 10): this entry's own full_text_storage_allowed: false claim did not match the code — fetch_gc_news_records was storing up to 4000 chars of summary and a separate 6000-char full_text field (title+summary concatenated) per item, in violation of the same canada.ca non-commercial-reproduction finding pipeline/feeds.py already enforces for every other government feed. Capped summary to a 320-char snippet (same policy as pipeline/feeds.py) and full_text is now always None. Found while auditing the news/government-publications split for Goal 10, not part of its original scope, but directly on-point for the 'no unapproved full-text content is being stored' bar."
     priority: P1
     responsible_parser: "pipeline/breadth.py"
     health_status: healthy
@@ -738,7 +742,7 @@ sources:
     name: "Prime Minister's Office — News"
     jurisdiction: federal
     publisher: "Prime Minister's Office"
-    category: news
+    category: government_publications
     base_url: "https://www.pm.gc.ca/en/news.rss"
     access_method: rss
     license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
@@ -770,7 +774,7 @@ sources:
     name: "Bank of Canada — Press Releases"
     jurisdiction: federal
     publisher: "Bank of Canada"
-    category: news
+    category: government_publications
     base_url: "https://www.bankofcanada.ca/content_type/press-releases/feed/"
     access_method: rss
     license: unreviewed
@@ -802,7 +806,7 @@ sources:
     name: "Natural Resources Canada — News"
     jurisdiction: federal
     publisher: "Natural Resources Canada"
-    category: news
+    category: government_publications
     base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=naturalresourcescanada&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
     access_method: api
     license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
@@ -834,7 +838,7 @@ sources:
     name: "Environment and Climate Change Canada — News"
     jurisdiction: federal
     publisher: "Environment and Climate Change Canada"
-    category: news
+    category: government_publications
     base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentoftheenvironment&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
     access_method: api
     license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
@@ -865,7 +869,7 @@ sources:
     name: "Innovation, Science and Economic Development Canada — News"
     jurisdiction: federal
     publisher: "Innovation, Science and Economic Development Canada"
-    category: news
+    category: government_publications
     base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentofindustry&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
     access_method: api
     license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
@@ -896,7 +900,7 @@ sources:
     name: "Global Affairs Canada — News"
     jurisdiction: federal
     publisher: "Global Affairs Canada"
-    category: news
+    category: government_publications
     base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentofforeignaffairstradeanddevelopment&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
     access_method: api
     license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
@@ -927,7 +931,7 @@ sources:
     name: "Transport Canada — News"
     jurisdiction: federal
     publisher: "Transport Canada"
-    category: news
+    category: government_publications
     base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentoftransport&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
     access_method: api
     license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
@@ -958,7 +962,7 @@ sources:
     name: "Health Canada — News"
     jurisdiction: federal
     publisher: "Health Canada"
-    category: news
+    category: government_publications
     base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentofhealth&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
     access_method: api
     license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
@@ -989,7 +993,7 @@ sources:
     name: "Competition Bureau Canada — News"
     jurisdiction: federal
     publisher: "Competition Bureau Canada"
-    category: news
+    category: government_publications
     base_url: "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=competitionbureau&sort=publishedDate&orderBy=desc&pick=50000&format=atom"
     access_method: api
     license: "Crown copyright — Canada.ca Terms and Conditions (non-commercial reproduction only)"
@@ -1019,7 +1023,7 @@ sources:
     name: "CRTC — News & Speeches"
     jurisdiction: federal
     publisher: "Canadian Radio-television and Telecommunications Commission"
-    category: news
+    category: government_publications
     base_url: "https://crtc.gc.ca/eng/rss/news.xml"
     access_method: atom
     license: unreviewed
@@ -1051,7 +1055,7 @@ sources:
     name: "Canada Energy Regulator — News Releases"
     jurisdiction: federal
     publisher: "Canada Energy Regulator"
-    category: news
+    category: government_publications
     base_url: "https://www.cer-rec.gc.ca/rss/rssfd.aspx?l=e&c=catNR"
     access_method: atom
     license: unreviewed
@@ -1773,44 +1777,580 @@ sources:
     responsible_parser: none
     health_status: not_applicable
 
-  # ── Approved/reviewable news (headline+link only, per spec policy) ──────────
+  # ── Goal 10 (2026-06-22): Canadian News, split into its own connector
+  # category ("Canadian News", pipeline/news_feeds.py) distinct from the
+  # government-department feeds above (now "Government Publications",
+  # pipeline/feeds.py) — mixing actual journalism and gov press releases
+  # under one "news" bucket made it impossible to tell which sources were
+  # screened for COMMERCIAL reuse versus which only ever got the gov-wide
+  # Crown-copyright review. Two real terms-of-use reviews were done this
+  # session (fetched and read live, not assumed):
+  #
+  # - Global News / Corus Entertainment: REJECTED. corusent.com's Terms of Use
+  #   ("you may download, print or view individual pages for non-commercial
+  #   use only") govern globalnews.ca, and Global News runs a separate paid
+  #   "Licensing Requests" page (globalnews.ca/pages/global-news-licensing-requests/)
+  #   for any other use. No RSS-specific syndication carve-out exists. The
+  #   spec named Global News as a "starting approved" source on the
+  #   optimistic assumption RSS implies a syndication licence — that
+  #   assumption does not hold once the actual ToU is read.
+  # - The Conversation Canada: APPROVED. Confirmed live: every Atom entry
+  #   carries a per-item <rights> tag reading "Licensed as Creative Commons –
+  #   attribution, no derivatives" (CC BY-ND 4.0), and their own
+  #   republishing guidelines (theconversation.com/ca/republishing-guidelines)
+  #   say commercial use is fine ("it's OK to put our articles on pages with
+  #   ads"; you just "can't sell our material separately"). It is the one
+  #   source actually enabled below — full text still stays OFF (see
+  #   pipeline/news_feeds.py module docstring: their own guidelines forbid
+  #   "systematically republish[ing] all of our articles", which is exactly
+  #   what a recurring connector does, and full republication separately
+  #   requires a pageview-counter script this connector doesn't embed).
+  #
+  # The remaining named publishers from Tasks.md's NEWS AND RSS POLICY
+  # ("disabled candidates pending terms or licensing review") were NOT
+  # individually reviewed this session — each gets its own row below (split
+  # out of the single bundled placeholder this registry used to carry) so a
+  # future licensing pass can track each negotiation separately, but none are
+  # Python objects in pipeline/news_feeds.py — there is no connector to wire
+  # until one is actually licensed, exactly like the canlii/scc_official rows.
+
+  - id: the_conversation_ca
+    name: "The Conversation Canada — Politics"
+    jurisdiction: national
+    publisher: "The Conversation Canada"
+    category: canadian_news
+    base_url: "https://theconversation.com/ca/politics/articles.atom"
+    access_method: atom
+    license: "Creative Commons Attribution-NoDerivatives 4.0 (CC BY-ND)"
+    terms_url: "https://theconversation.com/ca/republishing-guidelines"
+    robots_url: "https://theconversation.com/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/news_feeds.py:fetch_news_feed_records (NewsFeedDef id=conversation_ca_politics)"
+    implementation_status: working
+    backfill_strategy: "single GET captures the feed's full live window — politics-section Atom feed, 25 items live (2026-05-24..2026-06-22; no deeper pagination on this endpoint, this IS the full backfill), all 25 passing the per-item <rights> check"
+    incremental_strategy: "upsert by external_id (Atom <id>/link) — same pattern as pipeline/feeds.py's government connectors"
+    check_frequency: "daily, 6:30am ET"
+    last_checked: "2026-06-22T20:18:26Z"
+    last_successful_import: "2026-06-22T20:18:26Z (real uncapped fetch+parse against the live feed, 25/25 rows passed the rights check; not yet run through the scheduler/inserted into a populated DB — this working copy's polaris.db is empty, see project memory on the canonical Documents copy)"
+    last_source_change: null
+    checkpoint_state: "implicit — external_id existence check"
+    rate_limit: "none enforced"
+    raw_data_path: "data/raw/canadian-news/conversation_ca_politics/..."
+    known_limitations:
+      - "full text is licensed per-article under their republishing guidelines but deliberately NOT stored here — their guidelines forbid 'systematically republish[ing] ALL of our articles', which a recurring daily connector does by nature, and full republication requires their pageview-counter script (not implemented). Headline/excerpt/author/canonical-link only."
+      - "fetch_news_feed_records additionally verifies each entry's own <rights> text against the reviewed licence string before accepting it — an item whose rights text doesn't match is dropped and logged (news_item_rights_mismatch), not silently ingested on the assumption the feed-level review holds for every item"
+      - "politics-section feed only — The Conversation Canada also publishes Business+Economy, Environment+Energy, Science+Tech sections at the same /ca/<section>/articles.atom pattern, not yet added"
+    priority: P3
+    responsible_parser: "pipeline/news_feeds.py"
+    health_status: healthy
 
   - id: global_news_rss
     name: Global News RSS (Canada, Politics, Money, Environment)
     jurisdiction: national
     publisher: Global News (Corus Entertainment)
-    category: news
+    category: canadian_news
     base_url: "https://globalnews.ca/pages/feeds/"
+    access_method: rss
+    license: "Corus Entertainment Terms of Use (non-commercial use only) — see known_limitations for the exact reviewed clause"
+    terms_url: "https://www.corusent.com/terms-of-use/"
+    robots_url: "https://globalnews.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: "not built — REVIEWED 2026-06-22 and blocked, see known_limitations"
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable — no content of any kind stored without a confirmed commercial licence"
+    known_limitations:
+      - "REVIEWED 2026-06-22 (fetched and read corusent.com/terms-of-use/ live, the ToU that governs globalnews.ca): 'you may download, print or view individual pages for non-commercial use only' and 'you agree not to sell, license, rent, modify, distribute, copy, reproduce, transmit, publicly display, publicly perform, publish, adapt, edit or create derivative works from the Content'. No RSS/syndication carve-out exists anywhere in the document."
+      - "Global News runs a separate paid licensing path (globalnews.ca/pages/global-news-licensing-requests/, currently scoped to footage requests) confirming any commercial use needs an explicit agreement, not an RSS-implied licence"
+      - "the spec's CLAUDE.md/Tasks.md framing called this a 'starting approved or reviewable source' on the assumption that publishing an RSS feed implies a syndication licence — that assumption does not survive actually reading the ToU, so this stays disabled rather than enabled on the spec's optimism"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: cbc_news
+    name: "CBC News / Radio-Canada"
+    jurisdiction: national
+    publisher: "Canadian Broadcasting Corporation"
+    category: canadian_news
+    base_url: "https://www.cbc.ca/rss/"
     access_method: rss
     license: unreviewed
     terms_url: null
-    robots_url: "https://globalnews.ca/robots.txt"
+    robots_url: "https://www.cbc.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: ctv_news
+    name: "CTV News"
+    jurisdiction: national
+    publisher: "Bell Media"
+    category: canadian_news
+    base_url: "https://www.ctvnews.ca/rss/"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.ctvnews.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: financial_post
+    name: "Financial Post"
+    jurisdiction: national
+    publisher: "Postmedia Network"
+    category: canadian_news
+    base_url: "https://financialpost.com"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://financialpost.com/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: national_post
+    name: "National Post"
+    jurisdiction: national
+    publisher: "Postmedia Network"
+    category: canadian_news
+    base_url: "https://nationalpost.com"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://nationalpost.com/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: globe_and_mail
+    name: "The Globe and Mail"
+    jurisdiction: national
+    publisher: "The Globe and Mail Inc."
+    category: canadian_news
+    base_url: "https://www.theglobeandmail.com"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.theglobeandmail.com/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session; also paywalled, raising a second access question beyond licensing"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: toronto_star
+    name: "Toronto Star"
+    jurisdiction: national
+    publisher: "Toronto Star Newspapers Limited (Torstar)"
+    category: canadian_news
+    base_url: "https://www.thestar.com"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.thestar.com/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: la_presse
+    name: "La Presse"
+    jurisdiction: national
+    publisher: "La Presse (1996) inc."
+    category: canadian_news
+    base_url: "https://www.lapresse.ca"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.lapresse.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session; French-language source, would need the bilingual-record model if ever enabled"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: le_devoir
+    name: "Le Devoir"
+    jurisdiction: national
+    publisher: "Le Devoir inc."
+    category: canadian_news
+    base_url: "https://www.ledevoir.com"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.ledevoir.com/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session; French-language source, would need the bilingual-record model if ever enabled"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: the_logic
+    name: "The Logic"
+    jurisdiction: national
+    publisher: "The Logic"
+    category: canadian_news
+    base_url: "https://thelogic.co"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://thelogic.co/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session; subscription/paywalled trade publication"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: the_narwhal
+    name: "The Narwhal"
+    jurisdiction: national
+    publisher: "The Narwhal"
+    category: canadian_news
+    base_url: "https://thenarwhal.ca"
+    access_method: rss
+    license: "The Narwhal custom republishing terms — case-by-case email approval, not a standing licence (see known_limitations)"
+    terms_url: "https://thenarwhal.ca/article-republish-permission-information/"
+    robots_url: "https://thenarwhal.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: "not built — REVIEWED 2026-06-22 and blocked, see known_limitations"
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "REVIEWED 2026-06-22 (fetched and read thenarwhal.ca/article-republish-permission-information/ live): explicitly NOT a standing open licence like The Conversation Canada's — requires emailing republish@thenarwhal.ca for individual approval BEFORE republishing each story, which is incompatible with an unattended recurring connector. Also explicitly says 'please don't sell ads on our stories' (a direct commercial-use restriction) and 'you can't republish all our stories systematically' (the same systematic-republication bar The Conversation's guidelines set). No RSS feed is offered for automated syndication at all."
+      - "initially guessed (before this review) to resemble The Conversation Canada's CC-licence pattern — that guess was wrong; corrected here rather than left as speculation"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: canadian_press
+    name: "The Canadian Press"
+    jurisdiction: national
+    publisher: "The Canadian Press"
+    category: canadian_news
+    base_url: "https://www.thecanadianpress.com"
+    access_method: third_party_api
+    license: unreviewed
+    terms_url: null
+    robots_url: null
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: "n/a"
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "wire service — access is via a paid commercial licensing agreement, not a public RSS feed; named in Tasks.md's licensed-API-vendor list"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: ipolitics
+    name: "iPolitics"
+    jurisdiction: national
+    publisher: "iPolitics"
+    category: canadian_news
+    base_url: "https://ipolitics.ca"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://ipolitics.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session; subscription/paywalled trade publication"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: hill_times
+    name: "The Hill Times"
+    jurisdiction: national
+    publisher: "Hill Times Publishing"
+    category: canadian_news
+    base_url: "https://www.hilltimes.com"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.hilltimes.com/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session; subscription/paywalled trade publication"
+    priority: P5
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: policy_options
+    name: "Policy Options"
+    jurisdiction: national
+    publisher: "Institute for Research on Public Policy (IRPP)"
+    category: canadian_news
+    base_url: "https://policyoptions.irpp.org"
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://policyoptions.irpp.org/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: false
+    attribution_required: true
+    enabled: false
+    connector: none
+    implementation_status: blocked_licensing
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until licensed"
+    check_frequency: "n/a until licensed"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: none
+    rate_limit: unknown
+    raw_data_path: "not applicable until licensed"
+    known_limitations:
+      - "named in Tasks.md's disabled-candidates list — not individually reviewed this session; a think-tank publication rather than a wire/newsroom, may turn out closer to the_conversation_ca's open-licence pattern on review"
+    priority: P4
+    responsible_parser: none
+    health_status: not_applicable
+
+  - id: regional_and_trade_press_placeholder
+    name: "Regional business publications & energy/mining trade press (Business in Vancouver, regional business outlets, energy and mining trade publications)"
+    jurisdiction: national
+    publisher: various
+    category: canadian_news
+    base_url: null
+    access_method: rss
+    license: unreviewed
+    terms_url: null
+    robots_url: null
     commercial_reuse_reviewed: false
     full_text_storage_allowed: false
     attribution_required: true
     enabled: false
     connector: none
     implementation_status: missing
-    backfill_strategy: "headline/summary/link/image-where-permitted only — never full article text, per news policy"
-    incremental_strategy: "RSS guid-upsert, same pattern as gazette_weekly"
-    check_frequency: "every 2-6 hours per spec"
+    backfill_strategy: not designed
+    incremental_strategy: "n/a until specific outlets are named and reviewed"
+    check_frequency: "n/a"
     last_checked: null
     last_successful_import: null
     last_source_change: null
     checkpoint_state: none
-    rate_limit: unknown
-    raw_data_path: "not yet designed"
+    rate_limit: "n/a"
+    raw_data_path: "not applicable until licensed"
     known_limitations:
-      - "named as a 'starting approved or reviewable source' in the spec, but terms have not actually been reviewed yet — do not flip enabled:true without that review"
+      - "Tasks.md names this category generically rather than specific outlets — needs a real candidate list (e.g. Business in Vancouver, JWN Energy, Northern Miner) before any review can happen"
     priority: P5
     responsible_parser: none
     health_status: not_applicable
 
-  - id: licensed_news_named_publishers
-    name: "Named publishers pending licensing review (CBC, CTV, Financial Post, National Post, Globe and Mail, Toronto Star, La Presse, Le Devoir, The Logic, The Narwhal, Canadian Press, iPolitics, Hill Times, Policy Options, regional/trade press)"
-    jurisdiction: national
+  - id: licensed_news_api_vendors
+    name: "Licensed news API vendors (Factiva/Dow Jones, LexisNexis, Meltwater, Event Registry/NewsAPI.ai)"
+    jurisdiction: international
     publisher: various
-    category: news
+    category: canadian_news
     base_url: null
     access_method: third_party_api
     license: unreviewed
@@ -1832,7 +2372,7 @@ sources:
     rate_limit: "n/a"
     raw_data_path: "not applicable — no full-text copyrighted news without a licence, no paywall bypass, ever"
     known_limitations:
-      - "per spec: do not activate any of these (or Factiva/Dow Jones, LexisNexis, Meltwater, Event Registry/NewsAPI.ai) on developer-key availability alone — needs commercial storage/display/caching/redistribution rights reviewed first"
+      - "per Tasks.md: do not activate any of these on developer-key availability alone — needs commercial storage/display/caching/redistribution rights reviewed and an active paid agreement signed first. The Canadian Press's own direct licensing programme (separate from the canadian_press wire-feed row above) belongs in this same review, not a developer-key shortcut."
     priority: P5
     responsible_parser: none
     health_status: not_applicable

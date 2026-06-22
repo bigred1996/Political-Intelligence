@@ -181,7 +181,7 @@ rows are Goal 9 — the prior status was stale.
 | Canadian International Trade Tribunal decisions | SCRAPE | P3 | ⬜ | not started |
 | Canadian Transportation Agency decisions | SCRAPE | P3 | ⬜ | not started |
 
-## 13. Approved News & Publications (added 2026-06-21; itemized 2026-06-22 — Goal 9)
+## 13. Government Publications (added 2026-06-21; itemized 2026-06-22 — Goal 9)
 
 Per the ingestion spec's news policy — full-text copyrighted news stays
 disabled pending licensing review. Headline/summary/link metadata under fair
@@ -213,9 +213,43 @@ provenance only (not a public display surface).
 | Canada Energy Regulator news releases | Atom | P3 | ✅(2026-06-22) | `cer_news` — 3 items, 2026-01-30..2026-03-17 (very thin feed); distinct from the existing `cer` (incidents) and `cer_applications` (proceedings) connectors |
 | Finance Canada, OSFI, CNSC, IAAC | — | P2 | see §12 | no dedicated RSS/Atom feed exists for these four — see §12 rows above for what was tried and why each is unbuilt rather than ✅ |
 | Public Safety Canada, IRCC, CRA | RSS | P2 | ⬜ | named in the ingestion spec's §13 priority list but out of Goal 9's explicit scope ("Start with" 17 named sources) — not investigated this pass |
-| Global News RSS (Canada, Politics, Money, Environment) | RSS | P3 | ⬜ | publisher-provided feed, terms permit headline/summary/link use — reviewable, not yet built |
-| CBC, CTV, Financial Post, National Post, Globe and Mail, Toronto Star, La Presse, Le Devoir, The Logic, The Narwhal, Canadian Press, iPolitics, Hill Times, Policy Options | — | P5 | 🔴 | **disabled candidates pending licensing/terms review** per spec — do not enable without a reviewed agreement |
-| Licensed news APIs (CP, Factiva/Dow Jones, LexisNexis, Meltwater, Event Registry/NewsAPI.ai) | 3P/KEY | P5 | 🔴 | do not activate on key availability alone — needs commercial storage/display/caching/redistribution review first |
+
+## 13b. Canadian News — separate connector category (added 2026-06-22 — Goal 10)
+
+Goal 9's `pipeline/feeds.py` connectors above are all official government
+departments/agencies — a blanket Crown-copyright/canada.ca-Terms review covers
+all 11 at once. Actual commercial/independent news publishers are a different
+risk category (each carries its own, individually-negotiated licence), so
+Goal 10 split them into a **separate connector category, "Canadian News"**
+(`pipeline/news_feeds.py`), with two real terms-of-use reviews done live
+this session rather than assumed from the spec's own optimistic framing:
+
+- **Global News (Corus Entertainment) — REJECTED.** corusent.com's Terms of
+  Use (which the spec named as a "starting approved" source) state content
+  may be downloaded/printed/viewed "for non-commercial use only", with a
+  separate paid licensing-request page for anything else. No RSS/syndication
+  carve-out exists. Stays disabled.
+- **The Conversation Canada — APPROVED, and now live.** Every Atom entry
+  carries a per-item `<rights>` tag reading "Licensed as Creative Commons –
+  attribution, no derivatives" (CC BY-ND 4.0); their republishing guidelines
+  confirm commercial use is fine. `fetch_news_feed_records` additionally
+  verifies that per-item rights string before accepting any row, rather than
+  trusting the feed-level review for every item. Full text is still never
+  stored (their own guidelines forbid "systematically republish[ing] ALL of
+  our articles", which a recurring connector does by nature, and full
+  republication separately needs a pageview-counter script not implemented
+  here) — same headline/excerpt/author/canonical-link shape as the Goal 9
+  government feeds.
+
+| Source | Access | Priority | Status | Notes / next step |
+|---|---|---|---|---|
+| The Conversation Canada — Politics | Atom | P3 | ✅(2026-06-22) | `the_conversation_ca` — CC BY-ND 4.0, reviewed and enabled; 25 items live, 2026-05-24..2026-06-22, all 25 passing the per-item `<rights>` check; headline/excerpt only, full text deliberately withheld (see above) |
+| Global News RSS (Canada, Politics, Money, Environment) | RSS | P5 | 🔴 | **REVIEWED 2026-06-22 and blocked** — corusent.com ToU is non-commercial-use-only; was previously listed as "reviewable", now confirmed blocked |
+| The Narwhal | — | P5 | 🔴 | **REVIEWED 2026-06-22 and blocked** — their republishing page requires case-by-case email approval per story, prohibits ads on republished stories and systematic republication, and offers no RSS at all; initially guessed to resemble The Conversation Canada's open licence, that guess was wrong |
+| CBC, CTV, Financial Post, National Post, Globe and Mail, Toronto Star, La Presse, Le Devoir, The Logic, iPolitics, Hill Times, Policy Options | RSS | P5 | 🔴 | **disabled candidates pending licensing/terms review** — each now has its own row in `config/data-sources.yaml` (split out of one bundled placeholder) so a future review can track each negotiation separately; not individually reviewed this session |
+| The Canadian Press (wire) | 3P/KEY | P5 | 🔴 | wire-service access requires a paid commercial licensing agreement, not a public feed |
+| Licensed news APIs (Factiva/Dow Jones, LexisNexis, Meltwater, Event Registry/NewsAPI.ai) | 3P/KEY | P5 | 🔴 | do not activate on key availability alone — needs commercial storage/display/caching/redistribution review first |
+| Regional business & energy/mining trade press (Business in Vancouver, etc.) | RSS | P5 | ⬜ | Tasks.md names this generically rather than by specific outlet — needs a real candidate list before any review |
 
 ## 14. Provincial Sources (placeholders only, per spec — Phase 2)
 

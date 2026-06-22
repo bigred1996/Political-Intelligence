@@ -385,6 +385,14 @@ GC_NEWS_ATOM = (
 _GC_NEWS_DAILY_PICK = 500   # plenty to catch a day's releases across all departments
 _ATOM_NS = "{http://www.w3.org/2005/Atom}"
 
+# Same canada.ca Terms and Conditions finding pipeline/feeds.py documents (non-
+# commercial reproduction only) governs this connector too — it predates that
+# finding and was, until Goal 10, still storing up to 4000/6000 chars per item
+# despite config/data-sources.yaml's gc_news entry already claiming
+# full_text_storage_allowed: false. Capped here to match every other
+# government-publication connector's snippet policy.
+_GC_NEWS_SNIPPET_CHARS = 320
+
 
 def _atom_date(raw: str) -> str | None:
     if not raw:
@@ -416,7 +424,8 @@ async def fetch_gc_news_records(max_rows: int = 0) -> list[dict[str, Any]]:
         title = _t("title")
         if not title:
             continue
-        summary = re.sub(r"<[^>]+>", " ", _t("summary")).strip()
+        summary_full = re.sub(r"<[^>]+>", " ", _t("summary")).strip()
+        summary = re.sub(r"\s+", " ", summary_full)[:_GC_NEWS_SNIPPET_CHARS]
         link_el = entry.find(f"{_ATOM_NS}link")
         url = link_el.get("href") if link_el is not None else None
         author = ""
@@ -431,8 +440,8 @@ async def fetch_gc_news_records(max_rows: int = 0) -> list[dict[str, Any]]:
             "entity_name": author or None,
             "canonical_name": normalize(author) if author else None,
             "title": title[:1024],
-            "summary": summary[:4000] or None,
-            "full_text": f"{title}\n{summary}"[:6000],
+            "summary": summary or None,
+            "full_text": None,  # never the full release body — see _GC_NEWS_SNIPPET_CHARS note above
             "event_date": _atom_date(_t("published") or _t("updated")),
             "amount": None,
             "province": None,

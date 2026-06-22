@@ -248,5 +248,8 @@ BREADTH_SOURCES = {
     # Generic RSS/Atom/RDF government-publication feeds (pipeline/feeds.py, Goal 9).
     "pmo_news", "boc_news", "nrcan_news", "eccc_news", "ised_news", "gac_news",
     "transport_news", "health_news", "competition_news", "crtc_news", "cer_news",
+    # Canadian News — commercial news publishers, separate connector category,
+    # each individually licence-reviewed (pipeline/news_feeds.py, Goal 10).
+    "conversation_ca_politics",
 }
 EMBED_AND_NPRI = BREADTH_SOURCES
