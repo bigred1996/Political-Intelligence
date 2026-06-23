@@ -447,7 +447,7 @@ function SummaryStat({ label, value, tone = "neutral", small }: { label: string;
 }
 
 function ChangedRow({ finding }: { finding: IntelligenceFinding }) {
-  const href = `${findingHref(finding) ?? "/signals"}?from=dashboard`;
+  const href = `${findingHref(finding) ?? "/signals"}?from=briefing`;
   const evidenceCount = finding.evidence_references?.length ?? finding.related_records?.length ?? 0;
   const accent = finding.risk_level === "high" || finding.risk_level === "elevated" ? "var(--color-down)" : finding.risk_level === "moderate" ? "var(--color-warn)" : "var(--color-outline-variant)";
   const dirGlyph = { increasing: "trending_up", decreasing: "trending_down", stable: "trending_flat", unclear: "help" }[finding.risk_direction] ?? "trending_flat";
@@ -565,7 +565,7 @@ function RiskOppColumn({ kind, findings, loading }: { kind: "risk" | "opportunit
             const evHref = ev ? evidenceHref(ev) : f.evidence_references?.[0]?.internal_url;
             return (
               <div key={f.title} className="rounded border border-outline-variant bg-surface-container-lowest p-3">
-                <Link href={`${findingHref(f) ?? "/signals"}?from=dashboard`} className="font-body-md text-body-md font-bold text-primary leading-snug hover:underline focus-ring rounded block">{f.title}</Link>
+                <Link href={`${findingHref(f) ?? "/signals"}?from=briefing`} className="font-body-md text-body-md font-bold text-primary leading-snug hover:underline focus-ring rounded block">{f.title}</Link>
                 <p className="font-body-md text-[13px] text-on-surface-variant mt-1 leading-snug line-clamp-2">{f.concise_summary || f.why_it_matters}</p>
                 {f.suggested_questions?.[0] && (
                   <div className="mt-2 flex items-start gap-1.5">
