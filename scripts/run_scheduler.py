@@ -19,6 +19,12 @@ from __future__ import annotations
 
 import asyncio
 import signal
+import sys
+from pathlib import Path
+
+# Plain `python scripts/run_scheduler.py` puts scripts/ itself on sys.path,
+# not the repo root, so `import api`/`import pipeline` fails — add it explicitly.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import structlog
 
