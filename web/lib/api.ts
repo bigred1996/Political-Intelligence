@@ -531,6 +531,61 @@ export interface InterpretationResponse {
   generated_by: string;
 }
 
+// ── Research runs (Goal B3 — multi-step deep research) ──────────────────
+export interface ResearchFindingRef {
+  table: string; pk: number | string; title: string; internal_url: string | null;
+}
+export interface SynthesisItem {
+  title?: string;
+  text: string;
+  label: "observed" | "inferred" | "speculative";
+  finding_ids: { table: string; pk: number | string }[];
+  findings: ResearchFindingRef[];
+}
+export interface ResearchSynthesis {
+  themes: SynthesisItem[];
+  material_risks: SynthesisItem[];
+  opportunities: SynthesisItem[];
+  diligence_questions: string[];
+  overall_confidence: "high" | "medium" | "low";
+  coverage_summary: string;
+  generated_by: string;
+}
+export interface ResearchCoverageGap {
+  type: string; table?: string; pk?: string; title?: string;
+}
+export interface ResearchRound {
+  round: number;
+  queries: string[];
+  retrieval_sets: { id: string; query: string | null; result_count: number }[];
+  interpretations: InterpretationResponse[];
+  coverage_gaps: ResearchCoverageGap[];
+  gap_assessment: { material_gaps_remain?: boolean };
+}
+export interface ResearchRunResponse {
+  id: string;
+  topic: string;
+  depth_tier: "brief" | "standard" | "deep";
+  status: "running" | "complete" | "insufficient_evidence" | "degraded" | "error";
+  contract_version: string;
+  max_rounds: number;
+  max_interpretations: number;
+  rounds_used: number;
+  interpretations_used: number;
+  model: string;
+  provider: string;
+  model_call_count: number;
+  created_at: string | null;
+  completed_at: string | null;
+  rounds: ResearchRound[];
+  synthesis: ResearchSynthesis;
+}
+export interface ResearchRunSummary {
+  id: string; topic: string; depth_tier: string; status: string;
+  rounds_used: number; max_rounds: number; interpretations_used: number;
+  model_call_count: number; created_at: string | null;
+}
+
 export interface SearchSourcesResponse {
   sources: Record<string, number>;
   total_records: number;

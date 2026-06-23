@@ -22,8 +22,8 @@ async def init_db() -> None:
     # Import models so they register on Base.metadata before create_all.
     from .models import (  # noqa: F401
         appointment, catalogue_entry, contract, donation, entity, grant, interpretation,
-        ocl_registration, politician, regulation, report, request, retrieval_set,
-        scheduler_log, source_record,
+        ocl_registration, politician, regulation, report, request, research_run,
+        retrieval_set, scheduler_log, source_record,
     )
 
     async with engine.begin() as conn:

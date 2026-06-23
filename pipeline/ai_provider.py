@@ -108,21 +108,31 @@ class ProviderTurn:
     model: str
 
 
-class ClaudeInterpretationProvider:
-    """One forced tool-call to Claude per turn. Any other provider that can
-    return a JSON object matching `INTERPRETATION_TOOL`'s schema can implement
-    the same `call`/`continue_call` signatures and be swapped in."""
+class _ClaudeToolProvider:
+    """Shared base for every forced-single-tool-call-to-Claude provider in
+    Nessus. Subclasses set `tool` (the schema) and `name`; this base owns the
+    one Anthropic client construction, the `tool_choice` forcing, the response
+    extraction, and the `call`/`continue_call` re-prompt protocol. Adding a new
+    structured AI step = a new subclass + a new tool schema, never a new copy
+    of the client plumbing (same spirit as reusing one provider abstraction
+    across B2 interpretation and B3 research)."""
 
     name = "claude"
+    tool: dict[str, Any] = INTERPRETATION_TOOL
+    max_tokens = 1400
 
     def __init__(self, model: str | None = None):
         if not settings.anthropic_api_key:
             raise ProviderUnavailable("ANTHROPIC_API_KEY not set")
         self.model = model or settings.claude_model
 
+    @property
+    def _tool_name(self) -> str:
+        return self.tool["name"]
+
     def _extract(self, resp: Any, messages_so_far: list[dict[str, Any]]) -> ProviderTurn:
         for block in resp.content:
-            if getattr(block, "type", "") == "tool_use" and block.name == TOOL_NAME:
+            if getattr(block, "type", "") == "tool_use" and block.name == self._tool_name:
                 assistant_message = {"role": "assistant", "content": resp.content}
                 return ProviderTurn(
                     tool_input=block.input,
@@ -130,18 +140,17 @@ class ClaudeInterpretationProvider:
                     messages=messages_so_far + [assistant_message],
                     model=self.model,
                 )
-        raise ProviderError("model did not return the build_interpretation tool call")
+        raise ProviderError(f"model did not return the {self._tool_name} tool call")
 
-    async def call(self, system: str, user_content: str) -> ProviderTurn:
+    async def _create(self, system: str, messages: list[dict[str, Any]]) -> ProviderTurn:
         try:
             from anthropic import AsyncAnthropic
 
             client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-            messages = [{"role": "user", "content": user_content}]
             resp = await client.messages.create(
-                model=self.model, max_tokens=1400, system=system,
-                tools=[INTERPRETATION_TOOL],
-                tool_choice={"type": "tool", "name": TOOL_NAME},
+                model=self.model, max_tokens=self.max_tokens, system=system,
+                tools=[self.tool],
+                tool_choice={"type": "tool", "name": self._tool_name},
                 messages=messages,
             )
         except ProviderError:
@@ -149,30 +158,158 @@ class ClaudeInterpretationProvider:
         except Exception as exc:  # noqa: BLE001
             raise ProviderError(str(exc)) from exc
         return self._extract(resp, messages)
+
+    async def call(self, system: str, user_content: str) -> ProviderTurn:
+        return await self._create(system, [{"role": "user", "content": user_content}])
 
     async def continue_call(self, system: str, prior: ProviderTurn, correction: str) -> ProviderTurn:
         """Re-prompt with a single correction, tied to the prior tool_use via
         a tool_result block (required by the Anthropic message format)."""
-        try:
-            from anthropic import AsyncAnthropic
+        messages = prior.messages + [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": prior.tool_use_id, "content": correction},
+                ],
+            }
+        ]
+        return await self._create(system, messages)
 
-            client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-            messages = prior.messages + [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "tool_result", "tool_use_id": prior.tool_use_id, "content": correction},
-                    ],
-                }
-            ]
-            resp = await client.messages.create(
-                model=self.model, max_tokens=1400, system=system,
-                tools=[INTERPRETATION_TOOL],
-                tool_choice={"type": "tool", "name": TOOL_NAME},
-                messages=messages,
-            )
-        except ProviderError:
-            raise
-        except Exception as exc:  # noqa: BLE001
-            raise ProviderError(str(exc)) from exc
-        return self._extract(resp, messages)
+
+class ClaudeInterpretationProvider(_ClaudeToolProvider):
+    """One forced `build_interpretation` tool-call per turn (Goal B2). Any
+    provider returning a JSON object matching `INTERPRETATION_TOOL`'s schema can
+    implement the same `call`/`continue_call` signatures and be swapped in."""
+
+    name = "claude"
+    tool = INTERPRETATION_TOOL
+
+
+# --- Goal B3 — research-loop tools (planner + cross-finding synthesizer) -------
+# These reuse the exact same provider plumbing (_ClaudeToolProvider,
+# ProviderTurn, ProviderError, ProviderUnavailable, forced tool_choice) — only
+# the tool schema changes. The B3 orchestrator owns all citation/conclusion
+# validation; these tools just shape the model's output.
+
+PLAN_TOOL_NAME = "plan_research_round"
+
+PLAN_TOOL: dict[str, Any] = {
+    "name": PLAN_TOOL_NAME,
+    "description": (
+        "Propose the next round of internal-records retrieval queries for a "
+        "due-diligence research run. Queries must be GAP-DRIVEN — target what "
+        "is still unknown given what has already been found, never repeat "
+        "prior queries. Also judge whether material questions still remain."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "queries": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "1-4 natural-language retrieval queries for the next round, gap-driven.",
+            },
+            "material_gaps_remain": {
+                "type": "boolean",
+                "description": "True if material due-diligence questions are still unanswered and another round is warranted.",
+            },
+            "rationale": {
+                "type": "string",
+                "description": "Brief reason for these queries / for stopping.",
+            },
+        },
+        "required": ["queries", "material_gaps_remain", "rationale"],
+    },
+}
+
+SYNTHESIS_TOOL_NAME = "build_synthesis"
+
+_LABELLED_FINDING_LIST = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string"},
+            "label": {"type": "string", "enum": ["observed", "inferred", "speculative"]},
+            "finding_ids": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"table": {"type": "string"}, "pk": {"type": ["string", "integer"]}},
+                    "required": ["table", "pk"],
+                },
+            },
+        },
+        "required": ["text", "label", "finding_ids"],
+    },
+}
+
+SYNTHESIS_TOOL: dict[str, Any] = {
+    "name": SYNTHESIS_TOOL_NAME,
+    "description": (
+        "Synthesize ACROSS many interpreted due-diligence findings into a "
+        "structured run result. Never include a buy/sell/proceed/valuation "
+        "conclusion anywhere. Every finding_id MUST come from the run's "
+        "retrieved records — never invent one. Label every risk/opportunity/"
+        "theme observed, inferred, or speculative."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "themes": {
+                "type": "array",
+                "description": "Clusters of related findings.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "summary": {"type": "string"},
+                        "label": {"type": "string", "enum": ["observed", "inferred", "speculative"]},
+                        "finding_ids": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {"table": {"type": "string"}, "pk": {"type": ["string", "integer"]}},
+                                "required": ["table", "pk"],
+                            },
+                        },
+                    },
+                    "required": ["title", "summary", "label", "finding_ids"],
+                },
+            },
+            "material_risks": _LABELLED_FINDING_LIST,
+            "opportunities": _LABELLED_FINDING_LIST,
+            "diligence_questions": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Open questions for an analyst to pursue. Never deal conclusions.",
+            },
+            "overall_confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+            "coverage_summary": {
+                "type": "string",
+                "description": "What was searched, what is thin or missing. Be specific.",
+            },
+        },
+        "required": [
+            "themes", "material_risks", "opportunities",
+            "diligence_questions", "overall_confidence", "coverage_summary",
+        ],
+    },
+}
+
+
+class ClaudeResearchPlanner(_ClaudeToolProvider):
+    """Forced `plan_research_round` tool-call — proposes the next round's
+    gap-driven retrieval queries (Goal B3)."""
+
+    name = "claude"
+    tool = PLAN_TOOL
+    max_tokens = 800
+
+
+class ClaudeSynthesisProvider(_ClaudeToolProvider):
+    """Forced `build_synthesis` tool-call — cross-finding synthesis (Goal B3)."""
+
+    name = "claude"
+    tool = SYNTHESIS_TOOL
+    max_tokens = 2000

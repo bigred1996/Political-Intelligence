@@ -20,6 +20,7 @@ const DIRECTORY: Item[] = [
   { href: "/entities", label: "Entities", icon: "corporate_fare" },
   { href: "/records", label: "Records", icon: "database" },
   { href: "/retrieve", label: "Retrieval", icon: "fact_check" },
+  { href: "/research", label: "Deep Research", icon: "neurology" },
   { href: "/explorer", label: "Evidence Graph", icon: "hub" },
   { href: "/sources", label: "Sources", icon: "dataset" },
 ];

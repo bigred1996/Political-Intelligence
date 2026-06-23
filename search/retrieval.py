@@ -54,6 +54,25 @@ from search.sql_search import SPECS, _import_model, structured_search
 
 EMBEDDING_MODEL_LABEL = f"{MODEL_NAME} (dim={DIM})"
 
+# The non-evidentiary "pseudo" record types this module surfaces. They are
+# directory/catalog entries (a politician profile, a sector taxonomy node, an
+# entity rollup, a regulator, a House committee, a prior report) — real,
+# linkable Nessus pages, but NOT individual evidentiary records the generic
+# `/api/records/{table}/{pk}` loader (search.sql_search.SPECS) can resolve, so
+# the B2 interpretation layer cannot ground a `source_fact` in one. Anything
+# downstream that wants to interpret a retrieval hit must skip these (the B3
+# research loop records them as coverage gaps instead). Mirrors the frontend's
+# NON_EVIDENTIARY_TABLES set in web/app/retrieve/page.tsx — keep in sync.
+PSEUDO_TABLES = frozenset(
+    {"politicians", "sectors", "entities", "organizations", "committees", "reports"}
+)
+
+
+def is_evidentiary(table: str | None) -> bool:
+    """True if `table` is an individual evidentiary record (resolvable by the
+    generic record loader), False for the pseudo/directory record types."""
+    return bool(table) and table not in PSEUDO_TABLES
+
 # Physical table names used by the semantic indexer that differ from the short
 # `source` key the SQL layer / records route uses — same aliasing as
 # api/routes/records.py:_ALIASES, kept in sync so a link is never broken.
