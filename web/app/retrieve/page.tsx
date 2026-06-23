@@ -140,7 +140,7 @@ function Retrieval() {
             typeEntries.map(([recordType, hits]) => (
               <Panel key={recordType} title={`${humanizeType(recordType)} (${hits.length})`} bodyClass="p-0">
                 <div className="divide-y divide-outline-variant/40">
-                  {hits.map((hit) => <HitRow key={hit.id} hit={hit} />)}
+                  {hits.map((hit) => <HitRow key={hit.id} hit={hit} retrievalSetId={data.retrieval_set_id} />)}
                 </div>
               </Panel>
             ))
@@ -151,7 +151,12 @@ function Retrieval() {
   );
 }
 
-function HitRow({ hit }: { hit: RetrievalHit }) {
+// Pseudo-table hits (politicians, sectors, entities, organizations,
+// committees, reports) aren't evidentiary records the interpretation layer's
+// record loader can resolve — only offer "Interpret" for real source tables.
+const NON_EVIDENTIARY_TABLES = new Set(["politicians", "sectors", "entities", "organizations", "committees", "reports"]);
+
+function HitRow({ hit, retrievalSetId }: { hit: RetrievalHit; retrievalSetId: string }) {
   const inner = (
     <div className="flex items-start gap-3 p-3 hover:bg-surface-container-high transition-colors">
       <span className="material-symbols-outlined text-[18px] text-primary mt-0.5">
@@ -169,7 +174,19 @@ function HitRow({ hit }: { hit: RetrievalHit }) {
       </div>
     </div>
   );
-  return hit.internal_url ? (
-    <Link href={hit.internal_url} className="block focus-ring">{inner}</Link>
-  ) : inner;
+  return (
+    <div className="flex items-center">
+      <div className="flex-1 min-w-0">
+        {hit.internal_url ? <Link href={hit.internal_url} className="block focus-ring">{inner}</Link> : inner}
+      </div>
+      {!NON_EVIDENTIARY_TABLES.has(hit.table) && (
+        <Link
+          href={`/interpret?retrieval_set_id=${encodeURIComponent(retrievalSetId)}&table=${encodeURIComponent(hit.table)}&pk=${encodeURIComponent(String(hit.pk))}`}
+          className="shrink-0 mr-3 px-2.5 py-1.5 bg-surface-container-lowest border border-outline-variant rounded text-[12px] text-on-surface-variant hover:border-primary hover:text-on-surface transition-colors"
+        >
+          Interpret
+        </Link>
+      )}
+    </div>
+  );
 }

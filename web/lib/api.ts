@@ -498,6 +498,39 @@ export interface RetrievalResponse {
   by_type: Record<string, RetrievalHit[]>;
 }
 
+// ── Single-finding AI interpretation (Goal B2) — citation-safe, no report ──
+export interface InterpretationClaim {
+  text: string;
+  label: "observed" | "inferred" | "speculative";
+  cited_record_ids: { table: string; pk: number | string }[];
+}
+export interface CitedRecord {
+  table: string; pk: number | string; title: string; internal_url: string | null;
+}
+export interface InterpretationResponse {
+  id: string;
+  retrieval_set_id: string;
+  table: string;
+  pk: number | string;
+  status: "ok" | "degraded" | "rejected";
+  rejection_reason: string | null;
+  model: string;
+  provider: string;
+  contract_version: string;
+  created_at: string;
+  from_cache: boolean;
+  source_fact: string;
+  interpretation: string;
+  impact: string;
+  recommendation: string;
+  confidence: "high" | "medium" | "low";
+  evidence_limitations: string;
+  cited_record_ids: { table: string; pk: number | string }[];
+  cited_records: CitedRecord[];
+  claims: InterpretationClaim[];
+  generated_by: string;
+}
+
 export interface SearchSourcesResponse {
   sources: Record<string, number>;
   total_records: number;

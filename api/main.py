@@ -14,9 +14,9 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import init_db
 from .routes import (
-    appointments, briefing, contracts, data_health, entities, grants, health, lobbying, ocl_registrations,
-    organizations, graph, overview, parliament, politicians, records, regulations, reports, requests,
-    retrieval, scheduler, search, sectors, sources,
+    appointments, briefing, contracts, data_health, entities, grants, health, interpretation, lobbying,
+    ocl_registrations, organizations, graph, overview, parliament, politicians, records, regulations,
+    reports, requests, retrieval, scheduler, search, sectors, sources,
 )
 from .schemas import HealthResponse
 from .scheduler import start_scheduler, stop_scheduler
@@ -43,6 +43,7 @@ app.include_router(ocl_registrations.router)
 app.include_router(sources.router)
 app.include_router(search.router)
 app.include_router(retrieval.router)
+app.include_router(interpretation.router)
 app.include_router(parliament.router)
 app.include_router(reports.router)
 app.include_router(reports.view)

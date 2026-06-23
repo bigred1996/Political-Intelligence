@@ -340,6 +340,43 @@ class CitationValidationResponse(APIModel):
     invalid: list[CitationRef] = Field(default_factory=list)
 
 
+class CitedRecord(APIModel):
+    table: str
+    pk: int | str
+    title: str
+    internal_url: str | None = None
+
+
+class InterpretationClaim(APIModel):
+    text: str
+    label: Literal["observed", "inferred", "speculative"]
+    cited_record_ids: list[CitationRef] = Field(default_factory=list)
+
+
+class InterpretationResponse(APIModel):
+    id: str
+    retrieval_set_id: str
+    table: str
+    pk: int | str
+    status: Literal["ok", "degraded", "rejected"]
+    rejection_reason: str | None = None
+    model: str
+    provider: str
+    contract_version: str
+    created_at: str
+    from_cache: bool
+    source_fact: str
+    interpretation: str
+    impact: str
+    recommendation: str
+    confidence: Literal["high", "medium", "low"]
+    evidence_limitations: str
+    cited_record_ids: list[CitationRef] = Field(default_factory=list)
+    cited_records: list[CitedRecord] = Field(default_factory=list)
+    claims: list[InterpretationClaim] = Field(default_factory=list)
+    generated_by: str
+
+
 class ReportSummary(APIModel):
     id: str
     company_name: str
