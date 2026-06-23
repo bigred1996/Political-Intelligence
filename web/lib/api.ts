@@ -478,6 +478,26 @@ export interface SearchResponse {
   results: SearchHit[];
 }
 
+// ── Internal-records retrieval (no AI prose — transparent, citation-safe) ──
+export interface RetrievalHit {
+  id: string; table: string; pk: number | string; record_type: string;
+  source: string; title: string; snippet: string; score: number;
+  match: "structured" | "semantic" | "both" | "deterministic";
+  date?: string | null; amount?: number | null;
+  internal_url: string | null; external_url: string | null;
+}
+export interface RetrievalResponse {
+  query: string;
+  plan: { planner?: string; sources?: string[]; min_amount?: number; date_from?: string; date_to?: string };
+  retrieval_set_id: string;
+  generated_at: string;
+  embedding_model: string;
+  empty: boolean;
+  counts: { returned: number; structured: number; semantic: number; deterministic: number; by_type: Record<string, number> };
+  results: RetrievalHit[];
+  by_type: Record<string, RetrievalHit[]>;
+}
+
 export interface SearchSourcesResponse {
   sources: Record<string, number>;
   total_records: number;

@@ -300,6 +300,46 @@ class SearchReindexResponse(APIModel):
     by_source: dict[str, int] = Field(default_factory=dict)
 
 
+class RetrievalHit(APIModel):
+    id: str
+    table: str
+    pk: int | str
+    record_type: str
+    source: str
+    title: str
+    snippet: str = ""
+    score: float = 0.0
+    match: str = "deterministic"
+    date: str | None = None
+    amount: float | None = None
+    internal_url: str | None = None
+    external_url: str | None = None
+
+
+class RetrievalResponse(APIModel):
+    query: str
+    plan: dict[str, Any]
+    retrieval_set_id: str
+    generated_at: str
+    embedding_model: str
+    empty: bool
+    counts: dict[str, Any]
+    results: list[RetrievalHit] = Field(default_factory=list)
+    by_type: dict[str, list[RetrievalHit]] = Field(default_factory=dict)
+
+
+class CitationRef(APIModel):
+    table: str
+    pk: int | str
+
+
+class CitationValidationResponse(APIModel):
+    retrieval_set_id: str
+    all_valid: bool
+    valid: list[CitationRef] = Field(default_factory=list)
+    invalid: list[CitationRef] = Field(default_factory=list)
+
+
 class ReportSummary(APIModel):
     id: str
     company_name: str
