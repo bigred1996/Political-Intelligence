@@ -239,6 +239,16 @@
     </div>
 
     <div class="card">
+      <h3>Data Completeness <span class="badge live">Goal 12</span></h3>
+      <p class="sub">What data do we have, what period does it cover, and what's missing — one snapshot across the registry, the scheduler log, and raw-storage manifests/checkpoints.</p>
+      <div class="row">
+        <button class="ghost" onclick="loadDataHealth(false)">Refresh</button>
+        <button class="ghost" onclick="loadDataHealth(true)">Deep scan (year-gaps on large tables)</button>
+      </div>
+      <div id="dataHealth" class="meta"></div>
+    </div>
+
+    <div class="card">
       <h3>New Report Request</h3>
       <p class="sub">Step 2 — intake. Stored now; full report pipeline lands in later build steps.</p>
       <div class="row">
@@ -714,7 +724,7 @@ async function loadCommittees(){
   }catch(e){}
 }
 
-loadReports(); loadSources(); loadScheduler();
+loadReports(); loadSources(); loadScheduler(); loadDataHealth(false);
 
 function cadenceColor(c){ return c==='daily'?'var(--accent-2)':c==='weekly'?'var(--accent)':c==='monthly'?'var(--warn)':'var(--muted)'; }
 function statusColor(s){ return s==='ok'?'var(--good)':s==='error'?'var(--bad)':s==='running'?'var(--accent)':'var(--muted)'; }
@@ -744,6 +754,72 @@ async function loadScheduler(){
       <table><thead><tr><th>Source</th><th>Cadence</th><th>Last run</th><th>Result</th><th>Next run</th><th>Action</th></tr></thead>
       <tbody>${rows}</tbody></table>`;
   }catch(e){ document.getElementById('schedulerStatus').innerHTML=`<div class="empty">Scheduler not reachable: ${e}</div>`; }
+}
+
+function fmtBytes(n){
+  if(n==null) return '—';
+  const units=['B','KB','MB','GB','TB']; let i=0;
+  while(n>=1024 && i<units.length-1){ n/=1024; i++; }
+  return (i===0?Math.round(n):n.toFixed(1))+units[i];
+}
+function fmtWhen(iso){
+  if(!iso) return '—';
+  return new Date(iso).toLocaleString('en-CA',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+async function loadDataHealth(deep){
+  const el=document.getElementById('dataHealth');
+  el.innerHTML='<div class="empty">Loading…</div>';
+  try{
+    const r=await fetch('/api/data/health'+(deep?'?deep=true':''));
+    const j=await r.json();
+    const reg=j.registry_summary, t=j.totals, d=j.disk;
+    const statusColor=s=>s==='pass'?'var(--good)':s==='warn'?'var(--warn)':'var(--bad)';
+    const tiles=[
+      ['Registered', reg.total_registered],['Enabled (yaml)', reg.enabled_in_registry],
+      ['Wired in scheduler', reg.wired_in_scheduler],
+      ['Fully backfilled', t.fully_backfilled],['Partially backfilled', t.partially_backfilled],
+      ['Not started', t.not_started],
+      ['Files downloaded', t.files_downloaded.toLocaleString()],
+      ['Bytes downloaded', fmtBytes(t.bytes_downloaded)],
+      ['Duplicates avoided', t.duplicate_files.toLocaleString()],
+      ['Failed downloads', t.failed_downloads],
+      ['Disk free', d.free_pct!=null?d.free_pct+'%':'—'],
+      ['Last successful sync', fmtWhen(t.last_successful_sync)],
+      ['Next scheduled sync', fmtWhen(t.next_scheduled_sync)],
+    ];
+    const tilesHtml=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin:10px 0">
+      ${tiles.map(([label,val])=>`
+        <div style="background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px">
+          <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">${escq(label)}</div>
+          <div style="font-size:18px;font-weight:700;margin-top:2px">${escq(val)}</div>
+        </div>`).join('')}
+    </div>`;
+
+    const validateHtml=`<div style="margin:6px 0 14px">
+      ${j.validate.map(c=>`<div style="padding:4px 0;font-size:12px">
+        <span class="badge" style="background:rgba(255,255,255,.04);color:${statusColor(c.status)}">${escq(c.status)}</span>
+        <strong style="margin-left:6px">${escq(c.check)}</strong>
+        <div style="color:var(--muted);margin-left:2px">${escq(c.detail)}</div>
+      </div>`).join('')}
+    </div>`;
+
+    const sourceRows=j.sources.map(s=>`
+      <tr>
+        <td><strong>${escq(s.id)}</strong><br><span style="color:var(--muted);font-size:11px">${escq(s.category||'')}</span></td>
+        <td>${s.rows.toLocaleString()}</td>
+        <td style="font-size:11px;color:var(--muted)">${escq(s.earliest_date||'—')} → ${escq(s.latest_date||'—')}</td>
+        <td>${escq(s.backfill_state)}</td>
+        <td style="font-size:11px;color:var(--muted)">${s.last_run?escq(s.last_run.status):'never'}</td>
+      </tr>`).join('');
+
+    el.innerHTML=tilesHtml+validateHtml+`
+      <div style="max-height:360px;overflow-y:auto;border:1px solid var(--line);border-radius:8px">
+        <table><thead><tr><th>Source</th><th>Rows</th><th>Coverage</th><th>Backfill</th><th>Last run</th></tr></thead>
+        <tbody>${sourceRows}</tbody></table>
+      </div>
+      <div class="meta">Generated ${fmtWhen(j.generated_at)}${j.deep?' (deep scan)':''}</div>`;
+  }catch(e){ el.innerHTML=`<div class="empty">Data health not reachable: ${e}</div>`; }
 }
 
 async function triggerJob(id){

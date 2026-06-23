@@ -26,6 +26,7 @@ playwright==1.48.0         # for JS-heavy government sites
 pydantic==2.9.0
 pydantic-settings==2.5.0
 pandas==2.2.3              # for CSV processing (Elections Canada bulk data)
+pyyaml==6.0.3              # parses config/data-sources.yaml (pipeline/data_audit.py)
 
 # Search
 fastembed==0.5.1           # local BGE-small embeddings for semantic search (no API key, CPU-only)
