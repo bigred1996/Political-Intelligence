@@ -12,6 +12,7 @@ const NAV: Item[] = [
   { href: "/sectors", label: "Sectors", icon: "category" },
   { href: "/watchlists", label: "Watchlists", icon: "visibility" },
   { href: "/search", label: "Ask Nessus", icon: "forum" },
+  { href: "/reviews", label: "Diligence", icon: "fact_check" },
   { href: "/briefings", label: "Reports", icon: "description" },
 ];
 

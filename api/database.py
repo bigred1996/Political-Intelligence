@@ -23,7 +23,7 @@ async def init_db() -> None:
     from .models import (  # noqa: F401
         appointment, catalogue_entry, contract, donation, entity, grant, interpretation,
         ocl_registration, politician, regulation, report, request, research_run,
-        retrieval_set, scheduler_log, source_record,
+        retrieval_set, review, scheduler_log, source_record,
     )
 
     async with engine.begin() as conn:

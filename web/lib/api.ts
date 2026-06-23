@@ -586,6 +586,90 @@ export interface ResearchRunSummary {
   model_call_count: number; created_at: string | null;
 }
 
+// ── Diligence reviews + workspace (Goal B4) ─────────────────────────────
+export interface ReviewInputs {
+  id: string;
+  company: string;
+  sectors: string[];
+  transaction_type: string | null;
+  jurisdiction: string | null;
+  date_from: string | null;
+  date_to: string | null;
+  key_concerns: string | null;
+  keywords: string[];
+  research_question: string | null;
+  depth_tier: "brief" | "standard" | "deep";
+  research_run_id: string | null;
+  status: "researching" | "ready" | "failed";
+  error: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+export interface WorkspaceFindingMeta {
+  date: string | null;
+  sector_slug: string | null;
+  sector_name: string | null;
+  jurisdiction: string;
+  source_type: string;
+  source_label: string;
+  risk_level: string;
+  signal_type: string;
+  entity: string | null;
+  confidence: "high" | "medium" | "low";
+  interpretation_types: string[];
+}
+export interface WorkspaceFinding {
+  interpretation_id: string;
+  table: string;
+  pk: string;
+  title: string;
+  internal_url: string | null;
+  source_fact: string;
+  interpretation: string;
+  impact: string;
+  recommendation: string;
+  evidence_limitations: string;
+  confidence: "high" | "medium" | "low";
+  claims: InterpretationClaim[];
+  generated_by: string;
+  category: string;
+  meta: WorkspaceFindingMeta;
+}
+export interface WorkspaceConnected {
+  table: string; pk: string; kind: string; title: string; internal_url: string | null;
+}
+export interface WorkspaceGap {
+  type: string; table: string | null; pk: string | null; title: string; internal_url: string | null;
+}
+export interface WorkspaceSourceCoverage {
+  source_type: string; label: string; count: number;
+}
+export interface WorkspaceFacets {
+  sectors: { slug: string; name: string }[];
+  jurisdictions: string[];
+  source_types: { key: string; label: string }[];
+  risk_levels: string[];
+  confidences: string[];
+  signal_types: string[];
+  entities: string[];
+  interpretation_types: string[];
+  date_min: string | null;
+  date_max: string | null;
+}
+export interface Workspace {
+  findings: WorkspaceFinding[];
+  connected: WorkspaceConnected[];
+  further_research: WorkspaceGap[];
+  source_coverage: WorkspaceSourceCoverage[];
+  facets: WorkspaceFacets;
+}
+export interface ReviewWorkspaceResponse {
+  review: ReviewInputs;
+  run: ResearchRunResponse | null;
+  workspace: Workspace;
+}
+export interface ReviewsListResponse { reviews: ReviewInputs[] }
+
 export interface SearchSourcesResponse {
   sources: Record<string, number>;
   total_records: number;
