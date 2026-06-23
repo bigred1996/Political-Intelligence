@@ -124,7 +124,9 @@ export function TrendArea({
 }
 
 // ── Year column chart ─────────────────────────────────────────────────
-export function TrendBars({ data, color = "var(--color-up)", height = 130 }: { data: { year: string; count?: number; value?: number }[]; color?: string; height?: number }) {
+// Optional `onSelect(year)` turns each column into a drill-down control;
+// `activeYear` highlights the selected column. Both additive.
+export function TrendBars({ data, color = "var(--color-up)", height = 130, onSelect, activeYear }: { data: { year: string; count?: number; value?: number }[]; color?: string; height?: number; onSelect?: (year: string) => void; activeYear?: string | null }) {
   const series = data.map((d) => ({ year: d.year, v: d.count ?? d.value ?? 0 }));
   if (!series.length) return <NoData h={height} />;
   const W = 520, H = height, pad = { l: 6, r: 6, t: 12, b: 20 };
@@ -132,10 +134,20 @@ export function TrendBars({ data, color = "var(--color-up)", height = 130 }: { d
   const bw = (W - pad.l - pad.r) / series.length;
   const labelIdx = [0, series.length - 1];
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height }} aria-hidden="true">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height }} role={onSelect ? "group" : undefined} aria-hidden={onSelect ? undefined : "true"}>
       {series.map((d, i) => {
         const bh = (d.v / maxV) * (H - pad.t - pad.b);
-        return <rect key={i} x={pad.l + i * bw + bw * 0.12} y={H - pad.b - bh} width={bw * 0.76} height={bh} fill={color} opacity={i === series.length - 1 ? 1 : 0.65} rx="1" />;
+        const active = activeYear != null && activeYear === d.year;
+        const op = activeYear != null ? (active ? 1 : 0.3) : i === series.length - 1 ? 1 : 0.65;
+        return (
+          <g key={i} onClick={onSelect ? () => onSelect(d.year) : undefined} style={onSelect ? { cursor: "pointer" } : undefined}>
+            {/* full-height hit target so thin/zero bars stay clickable */}
+            {onSelect && <rect x={pad.l + i * bw} y={pad.t} width={bw} height={H - pad.t - pad.b} fill="transparent" />}
+            <rect x={pad.l + i * bw + bw * 0.12} y={H - pad.b - bh} width={bw * 0.76} height={bh} fill={color} opacity={op} rx="1">
+              <title>{d.year}: {num(d.v)}</title>
+            </rect>
+          </g>
+        );
       })}
       <line x1={pad.l} y1={H - pad.b} x2={W - pad.r} y2={H - pad.b} stroke="var(--color-line)" strokeWidth="1" />
       <text x={pad.l} y={pad.t - 2} fontSize="9.5" className="mono" fill="var(--color-fg-dim)">{num(maxV)}</text>
@@ -197,28 +209,48 @@ export function RadialNetwork({
 }
 
 // ── Horizontal bar list ───────────────────────────────────────────────
+// Optional `onSelect` makes each row a drill-down control (keyed by `it.key`);
+// `activeKey` highlights the currently-selected row. Both are additive — callers
+// that pass neither get the original static list.
 export function BarList({
   items,
   asMoney = false,
   color = "var(--color-brass)",
+  onSelect,
+  activeKey,
 }: {
-  items: { label: string; value: number; href?: string }[];
+  items: { label: string; value: number; href?: string; key?: string }[];
   asMoney?: boolean;
   color?: string;
+  onSelect?: (key: string) => void;
+  activeKey?: string | null;
 }) {
   if (!items.length) return <NoData />;
   const max = Math.max(...items.map((i) => i.value)) || 1;
   return (
     <div className="space-y-1.5">
-      {items.map((it, i) => (
-        <div key={i} className="flex items-center gap-2 text-sm">
-          <span className="w-40 shrink-0 truncate text-fg capitalize" title={it.label}>{it.label}</span>
-          <div className="flex-1 h-3.5 bg-panel-2 rounded-sm overflow-hidden">
-            <div className="h-full rounded-sm" style={{ width: `${(it.value / max) * 100}%`, background: color, transition: "width .5s ease" }} />
-          </div>
-          <span className="mono w-20 shrink-0 text-right text-fg-dim">{asMoney ? money(it.value) : num(it.value)}</span>
-        </div>
-      ))}
+      {items.map((it, i) => {
+        const k = it.key ?? it.label;
+        const active = activeKey != null && activeKey === k;
+        const row = (
+          <>
+            <span className={`w-40 shrink-0 truncate capitalize ${active ? "text-brass-bright font-medium" : "text-fg"}`} title={it.label}>{it.label}</span>
+            <div className="flex-1 h-3.5 bg-panel-2 rounded-sm overflow-hidden">
+              <div className="h-full rounded-sm" style={{ width: `${(it.value / max) * 100}%`, background: color, transition: "width .5s ease", opacity: activeKey != null && !active ? 0.4 : 1 }} />
+            </div>
+            <span className="mono w-20 shrink-0 text-right text-fg-dim">{asMoney ? money(it.value) : num(it.value)}</span>
+          </>
+        );
+        if (onSelect) {
+          return (
+            <button key={i} type="button" onClick={() => onSelect(k)} aria-pressed={active}
+              className="flex w-full items-center gap-2 text-sm text-left rounded-sm px-1 -mx-1 hover:bg-panel-2 focus-ring">
+              {row}
+            </button>
+          );
+        }
+        return <div key={i} className="flex items-center gap-2 text-sm">{row}</div>;
+      })}
     </div>
   );
 }

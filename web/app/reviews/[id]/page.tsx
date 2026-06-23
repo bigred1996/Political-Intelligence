@@ -9,6 +9,7 @@ import {
 } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
 import {
+  ChartFrame,
   ConfidenceBadge,
   EmptyState,
   InterpretationBadge,
@@ -17,6 +18,14 @@ import {
   Pill,
   SeverityBadge,
 } from "@/components/ui";
+import { BarList, RadialNetwork, TrendBars } from "@/components/dataviz";
+import {
+  connectedNetwork,
+  findingsByYear,
+  riskDistribution,
+  sectorExposure,
+  sourceCoverageBars,
+} from "@/lib/workspace-charts";
 
 /* Goal B4 — the persistent diligence workspace. READS one stored B3 run
    (via /api/reviews/{id}); it never re-runs the loop or calls a model. The run
@@ -43,8 +52,28 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const { data, loading, error } = useApi<ReviewWorkspaceResponse>(`/api/reviews/${id}`);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
 
-  const findings = data?.workspace.findings ?? [];
+  const findings = useMemo(() => data?.workspace.findings ?? [], [data]);
   const filtered = useMemo(() => findings.filter((f) => matches(f, filters)), [findings, filters]);
+
+  // Chart series — derived in code from the SAME filtered array the lists render,
+  // so a chart can never drift from the findings beneath it. Empty series fall
+  // through to each primitive's "No data" insufficient-data state.
+  const riskBars = useMemo(() => riskDistribution(filtered), [filtered]);
+  const sectorBars = useMemo(() => sectorExposure(filtered), [filtered]);
+  const yearBars = useMemo(() => findingsByYear(filtered), [filtered]);
+  // Source coverage + connections are run-level overviews (full run, like a legend).
+  const coverageBars = useMemo(() => sourceCoverageBars(data?.workspace.source_coverage ?? []), [data]);
+  const netNodes = useMemo(() => connectedNetwork(data?.workspace.connected ?? []), [data]);
+
+  // Drill-down: a chart click toggles the matching FilterBar facet (reusing the
+  // exact same filter logic the lists already obey). Clicking an active bar clears.
+  const toggle = (k: keyof Filters, v: string) =>
+    setFilters({ ...filters, [k]: filters[k] === v ? "" : v });
+  const toggleYear = (year: string) => {
+    const on = filters.date_from === year && filters.date_to === `${year}-12-31`;
+    setFilters({ ...filters, date_from: on ? "" : year, date_to: on ? "" : `${year}-12-31` });
+  };
+  const activeYear = /^\d{4}$/.test(filters.date_from) ? filters.date_from : null;
 
   if (loading) return <div className="p-6 text-on-surface-variant">Loading workspace…</div>;
   if (error) return <div className="p-6 text-on-error-container">{error}</div>;
@@ -135,6 +164,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </div>
           </Section>
 
+          {/* Sector exposure chart — backs the section above; click a bar to filter. */}
+          <ChartFrame title="Sector exposure" subtitle="Findings by resolved sector — click a bar to filter">
+            <BarList items={sectorBars} onSelect={(k) => toggle("sector", k)} activeKey={filters.sector || null} />
+          </ChartFrame>
+
+          {/* Risk distribution chart — overview for the findings below; click to filter. */}
+          <ChartFrame title="Risk distribution" subtitle="Findings by risk level — click a bar to filter">
+            <BarList items={riskBars} color="var(--color-risk-high)" onSelect={(k) => toggle("risk_level", k)} activeKey={filters.risk_level || null} />
+          </ChartFrame>
+
           {/* 3. Material findings */}
           <Section title={`Material findings (${filtered.length})`} empty={filtered.length === 0}>
             <div className="divide-y divide-outline-variant/40">
@@ -147,6 +186,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           <CategorySection title="Lobbying & stakeholders" items={byCat("lobbying_stakeholders")} />
           <CategorySection title="Government support & dependency" items={byCat("govt_support")} />
           <CategorySection title="Political & reputational attention" items={byCat("political_attention")} />
+
+          {/* Connection map — visual overview of the connected directory hits.
+              The chip list below remains the exhaustive, linkable enumeration. */}
+          {workspace.connected.length > 0 && (
+            <ChartFrame title="Connection map" subtitle={`${workspace.connected.length} connected ${workspace.connected.length === 1 ? "entity" : "entities"}`}>
+              <RadialNetwork center={review.company || "Subject"} nodes={netNodes} />
+            </ChartFrame>
+          )}
 
           {/* 8. Connected people & orgs */}
           <Section title={`Connected people & organizations (${workspace.connected.length})`}
@@ -162,6 +209,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               ))}
             </div>
           </Section>
+
+          {/* Findings-over-time chart — backs the timeline; click a column to scope to that year. */}
+          <ChartFrame title="Findings over time"
+            subtitle={workspace.facets.date_min ? `${workspace.facets.date_min} – ${workspace.facets.date_max} · click a year to filter` : "Findings by year — click a column to filter"}>
+            <TrendBars data={yearBars} onSelect={toggleYear} activeYear={activeYear} />
+          </ChartFrame>
 
           {/* 9. Timeline & events */}
           <Section title="Timeline & events" empty={timelineItems(filtered).length === 0}>
@@ -226,12 +279,15 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </div>
           </Section>
 
-          {/* 13. Source coverage */}
+          {/* 13. Source coverage — run-level overview; click a bar to filter the lists by source. */}
           <Section title="Source coverage" empty={workspace.source_coverage.length === 0}>
-            <div className="p-4 flex flex-wrap gap-2">
-              {workspace.source_coverage.map((sc) => (
-                <Pill key={sc.source_type}>{sc.label} · {sc.count}</Pill>
-              ))}
+            <div className="p-4 space-y-3">
+              <BarList items={coverageBars} onSelect={(k) => toggle("source_type", k)} activeKey={filters.source_type || null} />
+              <div className="flex flex-wrap gap-2">
+                {workspace.source_coverage.map((sc) => (
+                  <Pill key={sc.source_type}>{sc.label} · {sc.count}</Pill>
+                ))}
+              </div>
             </div>
           </Section>
 
