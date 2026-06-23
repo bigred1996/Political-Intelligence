@@ -6,7 +6,7 @@ import json
 import pytest
 
 import pipeline.raw_storage as rs
-from pipeline.connector_ckan_catalogue import backfill_ckan_catalogue
+from pipeline.connector_ckan_catalogue import backfill_ckan_catalogue, fetch_ckan_catalogue_records
 
 
 @pytest.fixture(autouse=True)
@@ -67,6 +67,28 @@ async def test_resumes_from_checkpointed_offset_without_redownloading(httpx_mock
     assert summary2.pages_skipped_already_done == 1  # start=0 not refetched
     assert summary2.pages_fetched == 1  # start=100 only
     assert [r["id"] for r in summary2.rows] == ["ds-2"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_ckan_catalogue_records_maps_rows_for_source_records(httpx_mock):
+    """Goal 11: registers this crawl into pipeline/connectors.py's scheduler
+    registry, which needs fetch(max_rows=...) -> list[dict] shaped for
+    SourceRecord, not a raw BackfillSummary."""
+    httpx_mock.add_response(
+        url="https://open.canada.ca/data/api/3/action/package_search?q=&rows=100&start=0&sort=metadata_created+asc",
+        **_page([_dataset(1)]))
+    httpx_mock.add_response(
+        url="https://open.canada.ca/data/api/3/action/package_search?q=&rows=100&start=100&sort=metadata_created+asc",
+        **_page([]))
+
+    records = await fetch_ckan_catalogue_records(max_rows=5)
+    assert len(records) == 1
+    r = records[0]
+    assert r["source"] == "ckan_catalogue"
+    assert r["external_id"] == "ds-1"
+    assert r["title"] == "Dataset 1"
+    assert r["canonical_name"] == "org"
+    assert r["url"] == "https://open.canada.ca/data/dataset/ds-1"
 
 
 @pytest.mark.asyncio

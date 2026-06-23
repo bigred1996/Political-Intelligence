@@ -3,11 +3,19 @@
 Runs inside the FastAPI process via APScheduler AsyncIOScheduler.
 Each source has a configured cadence matching its upstream publish frequency.
 
-Update cadences:
-  daily       — Bills (LEGISinfo, Parliament sits daily), Canada Gazette RSS
-  weekly      — GIC Appointments (OIC appointments published weekly)
-  monthly     — Federal Contracts, OCL Lobbying Communications
-  quarterly   — Elections Canada Donations, Grants & Contributions
+Update cadences (retuned for Goal 11 — "switch each connector into
+incremental mode" after the initial historical backfill — against the
+policy table in Tasks.md; a tighter cadence is safe because every job below
+now runs pipeline.conditional_fetch's skip-if-unchanged gate before doing
+any real download, so most scheduled fires are a single cheap HEAD/
+package_show check, not a full re-pull):
+  daily       — Bills (LEGISinfo, Parliament sits daily), Canada Gazette RSS,
+                Hansard sector mentions, OCL Lobbying Communications & OCL
+                Registrations ("Lobby Canada" daily), Tribunal Decisions
+                ("Court decisions" daily)
+  weekly      — GIC Appointments, MP roster, Federal Contracts ("Proactive
+                Disclosure" weekly), Grants & Contributions, Elections
+                Canada Donations ("outside election periods" weekly)
 
 The scheduler persists job state to the DB so next-run times survive restarts.
 Each run is logged to the scheduler_log table for auditing and dashboard display.
@@ -43,9 +51,11 @@ SOURCE_CONFIGS: list[dict[str, Any]] = [
     {
         "id": "gazette_weekly",
         "name": "Canada Gazette Part I + II",
-        "cadence": "weekly",
-        "trigger": CronTrigger(day_of_week="sat", hour=8, minute=0, timezone="America/Toronto"),
-        "description": "Part I published every Saturday; Part II bi-weekly. RSS pull is fast (~2s).",
+        "cadence": "daily",
+        "trigger": CronTrigger(hour=8, minute=0, timezone="America/Toronto"),
+        "description": "Part I published every Saturday; Part II bi-weekly. RSS pull is fast "
+                        "(~2s) and upserts by guid, so a daily check (Goal 11) costs nothing "
+                        "extra on the 6 days nothing new has posted.",
         "typical_rows": 15,
     },
     {
@@ -75,50 +85,88 @@ SOURCE_CONFIGS: list[dict[str, Any]] = [
     {
         "id": "contracts_monthly",
         "name": "Federal Contracts (Proactive Disclosure)",
-        "cadence": "monthly",
-        "trigger": CronTrigger(day=3, hour=2, minute=0, timezone="America/Toronto"),
-        "description": "open.canada.ca publishes the proactive disclosure CSV monthly. Full ingest; 15k-row cap during MVP.",
+        "cadence": "weekly",
+        "trigger": CronTrigger(day_of_week="tue", hour=2, minute=0, timezone="America/Toronto"),
+        "description": "open.canada.ca republishes the proactive disclosure CSV monthly, but a "
+                        "weekly check (Goal 11's \"Proactive Disclosure\" policy) is now safe and "
+                        "cheap: conditional_fetch skips the full re-pull on every week the "
+                        "resource's CKAN last_modified/size hasn't actually changed.",
         "typical_rows": 15000,
     },
     {
         "id": "ocl_monthly",
         "name": "OCL Lobbying Communications",
-        "cadence": "monthly",
-        "trigger": CronTrigger(day=4, hour=3, minute=0, timezone="America/Toronto"),
-        "description": "Office of the Commissioner of Lobbying publishes the monthly communications ZIP.",
+        "cadence": "daily",
+        "trigger": CronTrigger(hour=3, minute=0, timezone="America/Toronto"),
+        "description": "Office of the Commissioner of Lobbying publishes the monthly "
+                        "communications ZIP. Daily per Goal 11's \"Lobby Canada\" policy — "
+                        "conditional_fetch (CKAN last_modified/size) makes the other ~29 days "
+                        "a single cheap check instead of a full re-download.",
         "typical_rows": 370000,
     },
     {
         "id": "ocl_registrations",
         "name": "OCL Lobbying Registrations",
-        "cadence": "monthly",
-        "trigger": CronTrigger(day=4, hour=4, minute=30, timezone="America/Toronto"),
-        "description": "Office of the Commissioner of Lobbying registration filings: clients, subjects, funding and status.",
+        "cadence": "daily",
+        "trigger": CronTrigger(hour=4, minute=30, timezone="America/Toronto"),
+        "description": "Office of the Commissioner of Lobbying registration filings: clients, "
+                        "subjects, funding and status. Daily per Goal 11's \"Lobby Canada\" "
+                        "policy, gated by the same conditional_fetch check as ocl_monthly.",
         "typical_rows": 25000,
     },
     {
         "id": "grants_quarterly",
         "name": "Grants & Contributions",
-        "cadence": "quarterly",
-        "trigger": CronTrigger(month="1,4,7,10", day=5, hour=2, minute=30, timezone="America/Toronto"),
-        "description": "open.canada.ca publishes G&C data quarterly. 30k-row cap during MVP.",
+        "cadence": "weekly",
+        "trigger": CronTrigger(day_of_week="wed", hour=2, minute=30, timezone="America/Toronto"),
+        "description": "open.canada.ca publishes G&C data quarterly, but a weekly check "
+                        "(Tasks.md's \"Contracts, grants and contributions\" weekly policy) is "
+                        "now cheap: conditional_fetch skips the full re-pull until the CKAN "
+                        "resource actually changes.",
         "typical_rows": 30000,
     },
     {
         "id": "donations_quarterly",
         "name": "Elections Canada Donations",
-        "cadence": "quarterly",
-        "trigger": CronTrigger(month="1,4,7,10", day=6, hour=3, minute=30, timezone="America/Toronto"),
-        "description": "Elections Canada reviews and publishes contributions quarterly. 80k-row cap.",
+        "cadence": "weekly",
+        "trigger": CronTrigger(day_of_week="thu", hour=3, minute=30, timezone="America/Toronto"),
+        "description": "Elections Canada reviews and publishes contributions quarterly, but "
+                        "Goal 11's \"Elections Canada outside election periods\" policy wants "
+                        "weekly checks — safe now that conditional_fetch (HTTP HEAD against "
+                        "the ZIP's Last-Modified/size) gates the actual re-download, fixing the "
+                        "prior bug where the cached ZIP was reused forever and never refreshed.",
         "typical_rows": 80000,
     },
     {
         "id": "tribunal_decisions",
         "name": "Tribunal Decisions",
-        "cadence": "weekly",
-        "trigger": CronTrigger(day_of_week="sat", hour=9, minute=0, timezone="America/Toronto"),
-        "description": "Regulatory tribunal decisions; MVP connector currently loads CRTC decisions.",
+        "cadence": "daily",
+        "trigger": CronTrigger(hour=9, minute=0, timezone="America/Toronto"),
+        "description": "Regulatory tribunal decisions; MVP connector currently loads CRTC "
+                        "decisions. Daily per Goal 11's \"Court decisions\" policy.",
         "typical_rows": 1000,
+    },
+    {
+        "id": "canadabuys_tenders",
+        "name": "CanadaBuys — Active Tender Notices",
+        "cadence": "every 4 hours",
+        "trigger": CronTrigger(hour="0,4,8,12,16,20", minute=15, timezone="America/Toronto"),
+        "description": "Goal 7's resumable raw-archival walk, scheduled for the first time "
+                        "(Goal 11) — re-fetches the 3 rolling tender-notice snapshots. Raw "
+                        "archive only so far; no source_records rows yet.",
+        "typical_rows": 3,
+    },
+    {
+        "id": "bank_of_canada",
+        "name": "Bank of Canada — Valet Series Catalogue",
+        "cadence": "every business day",
+        "trigger": CronTrigger(day_of_week="mon-fri", hour=4, minute=15, timezone="America/Toronto"),
+        "description": "Goal 7's resumable raw-archival walk over Valet's ~15,642 economic "
+                        "series, scheduled for the first time (Goal 11). Known limitation: "
+                        "once every series has been walked once, the checkpoint skips it "
+                        "forever even though most series gain new observations on a regular "
+                        "schedule — see api/scheduler.py:_run_boc_series docstring.",
+        "typical_rows": 200,
     },
 ]
 
@@ -374,10 +422,17 @@ async def _run_appointments(triggered_by: str = "scheduler") -> None:
     from sqlalchemy import delete
     from api.database import AsyncSessionLocal
     from api.models.appointment import Appointment
-    from pipeline.ingest import fetch_appointment_rows
+    from pipeline import conditional_fetch as cf
+    from pipeline.ingest import GIC_DATASET, fetch_appointment_rows
     log_id = await _log_start("appointments_weekly", "GIC Appointments", triggered_by)
     t0 = time.monotonic()
     try:
+        fp = await cf.fingerprint_ckan_resource(GIC_DATASET, fmt="CSV")
+        if cf.unchanged("appointments_weekly", fp):
+            await _log_finish(log_id, "skipped", 0, 0, time.monotonic() - t0)
+            log.info("scheduler_appointments_skipped_unchanged")
+            return
+
         rows = await fetch_appointment_rows(max_rows=10000)
         async with AsyncSessionLocal() as session:
             # Full replace, like bills/contracts/donations — GIC appointments has no
@@ -389,6 +444,7 @@ async def _run_appointments(triggered_by: str = "scheduler") -> None:
             await session.commit()
         added = len(rows)
         await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
+        cf.record("appointments_weekly", fp, rows=added)
         invalidate_workspace_caches("appointments_weekly")
         log.info("scheduler_appointments_done", count=added)
     except Exception as exc:
@@ -398,13 +454,22 @@ async def _run_appointments(triggered_by: str = "scheduler") -> None:
 
 async def _run_contracts(triggered_by: str = "scheduler") -> None:
     from api.models.contract import Contract
-    from pipeline.ingest import iter_contract_rows
+    from pipeline import conditional_fetch as cf
+    from pipeline.ingest import CONTRACTS_DATASET, CONTRACTS_RESOURCE_NAME, iter_contract_rows
     log_id = await _log_start("contracts_monthly", "Federal Contracts (Proactive Disclosure)", triggered_by)
     t0 = time.monotonic()
     try:
+        fp = await cf.fingerprint_ckan_resource(CONTRACTS_DATASET, fmt="CSV",
+                                                 name_hint=CONTRACTS_RESOURCE_NAME)
+        if cf.unchanged("contracts_monthly", fp):
+            await _log_finish(log_id, "skipped", 0, 0, time.monotonic() - t0)
+            log.info("scheduler_contracts_skipped_unchanged")
+            return
+
         # Full corpus, streamed (max_rows=0). Memory stays flat via _stream_load.
         n = await _stream_load(Contract, iter_contract_rows(max_rows=0))
         await _log_finish(log_id, "ok", n, n, time.monotonic() - t0)
+        cf.record("contracts_monthly", fp, rows=n)
         invalidate_workspace_caches("contracts_monthly")
         log.info("scheduler_contracts_done", count=n)
     except StreamLoadError as exc:
@@ -419,12 +484,19 @@ async def _run_ocl(triggered_by: str = "scheduler") -> None:
     from sqlalchemy import delete
     from api.database import AsyncSessionLocal
     from api.models.entity import LobbyingRecord
-    from pipeline.ingest import fetch_ocl_communication_rows
+    from pipeline import conditional_fetch as cf
+    from pipeline.ingest import OCL_COMMS_CACHE, OCL_COMMS_DATASET, fetch_ocl_communication_rows
     log_id = await _log_start("ocl_monthly", "OCL Lobbying Communications", triggered_by)
     t0 = time.monotonic()
     try:
-        # Delete cached ZIP so fresh data is pulled
-        from pipeline.ingest import OCL_COMMS_CACHE
+        fp = await cf.fingerprint_ckan_resource(OCL_COMMS_DATASET, fmt="CSV")
+        if cf.unchanged("ocl_monthly", fp):
+            await _log_finish(log_id, "skipped", 0, 0, time.monotonic() - t0)
+            log.info("scheduler_ocl_skipped_unchanged")
+            return
+
+        # Resource changed (or this is the first check) — delete the cached
+        # ZIP so fresh data is pulled instead of reusing a stale local copy.
         if OCL_COMMS_CACHE.exists():
             OCL_COMMS_CACHE.unlink()
 
@@ -452,6 +524,7 @@ async def _run_ocl(triggered_by: str = "scheduler") -> None:
                     ))
                 await session.commit()
         await _log_finish(log_id, "ok", len(rows), len(rows), time.monotonic() - t0)
+        cf.record("ocl_monthly", fp, rows=len(rows))
         invalidate_workspace_caches("ocl_monthly")
         log.info("scheduler_ocl_done", count=len(rows))
     except Exception as exc:
@@ -461,10 +534,17 @@ async def _run_ocl(triggered_by: str = "scheduler") -> None:
 
 async def _run_grants(triggered_by: str = "scheduler") -> None:
     from api.models.grant import Grant
-    from pipeline.ingest import iter_grant_rows
+    from pipeline import conditional_fetch as cf
+    from pipeline.ingest import GRANTS_DATASET, iter_grant_rows
     log_id = await _log_start("grants_quarterly", "Grants & Contributions", triggered_by)
     t0 = time.monotonic()
     try:
+        fp = await cf.fingerprint_ckan_resource(GRANTS_DATASET, fmt="CSV", name_hint="grant", pick="largest")
+        if cf.unchanged("grants_quarterly", fp):
+            await _log_finish(log_id, "skipped", 0, 0, time.monotonic() - t0)
+            log.info("scheduler_grants_skipped_unchanged")
+            return
+
         # Full corpus, streamed (max_rows=0). Memory stays flat via _stream_load —
         # fixed 2026-06-22, this used to materialize the whole ~2.25GB CSV into a
         # list first (see DATA_CHECKLIST.md "Goal 6"). Full replace, like
@@ -474,6 +554,7 @@ async def _run_grants(triggered_by: str = "scheduler") -> None:
         # every recurrence.
         n = await _stream_load(Grant, iter_grant_rows(max_rows=0))
         await _log_finish(log_id, "ok", n, n, time.monotonic() - t0)
+        cf.record("grants_quarterly", fp, rows=n)
         invalidate_workspace_caches("grants_quarterly")
         log.info("scheduler_grants_done", count=n)
     except StreamLoadError as exc:
@@ -488,10 +569,21 @@ async def _run_ocl_registrations(triggered_by: str = "scheduler") -> None:
     from sqlalchemy import select
     from api.database import AsyncSessionLocal
     from api.models.ocl_registration import OCLRegistration
-    from pipeline.ingest import fetch_ocl_registration_rows
+    from pipeline import conditional_fetch as cf
+    from pipeline.ingest import OCL_REG_DATASET, fetch_ocl_registration_rows
     log_id = await _log_start("ocl_registrations", "OCL Lobbying Registrations", triggered_by)
     t0 = time.monotonic()
     try:
+        # The standalone OCLRegistrationsConnector.discover() proof-of-concept
+        # (pipeline/connector_ocl_registrations.py) captured this same
+        # Last-Modified header months ago but never acted on it — this is
+        # that finally wired into the production scheduler path.
+        fp = await cf.fingerprint_ckan_resource(OCL_REG_DATASET, fmt="CSV")
+        if cf.unchanged("ocl_registrations", fp):
+            await _log_finish(log_id, "skipped", 0, 0, time.monotonic() - t0)
+            log.info("scheduler_ocl_registrations_skipped_unchanged")
+            return
+
         rows = await fetch_ocl_registration_rows(max_rows=0)
         added = 0
         async with AsyncSessionLocal() as session:
@@ -509,6 +601,7 @@ async def _run_ocl_registrations(triggered_by: str = "scheduler") -> None:
                     added += 1
                 await session.commit()
         await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
+        cf.record("ocl_registrations", fp, rows=len(rows), added=added)
         invalidate_workspace_caches("ocl_registrations")
         log.info("scheduler_ocl_registrations_done", added=added, total=len(rows))
     except Exception as exc:
@@ -550,13 +643,28 @@ async def _run_tribunal_decisions(triggered_by: str = "scheduler") -> None:
 
 async def _run_donations(triggered_by: str = "scheduler") -> None:
     from api.models.donation import Donation
-    from pipeline.ingest import iter_donation_rows
+    from pipeline import conditional_fetch as cf
+    from pipeline.ingest import DONATIONS_CACHE, DONATIONS_ZIP_URL, iter_donation_rows
     log_id = await _log_start("donations_quarterly", "Elections Canada Donations", triggered_by)
     t0 = time.monotonic()
     try:
+        # _ensure_donations_cache() (pipeline/ingest.py) reuses the cached ZIP
+        # forever once it exists — without this check, the "quarterly" cron
+        # trigger has never actually refreshed donations data past the first
+        # download (see DATA_CHECKLIST.md). Bust the cache only when the
+        # upstream file has actually changed.
+        fp = await cf.fingerprint_url(DONATIONS_ZIP_URL)
+        if cf.unchanged("donations_quarterly", fp):
+            await _log_finish(log_id, "skipped", 0, 0, time.monotonic() - t0)
+            log.info("scheduler_donations_skipped_unchanged")
+            return
+        if DONATIONS_CACHE.exists():
+            DONATIONS_CACHE.unlink()
+
         # Full corpus, streamed (max_rows=0).
         n = await _stream_load(Donation, iter_donation_rows(max_rows=0))
         await _log_finish(log_id, "ok", n, n, time.monotonic() - t0)
+        cf.record("donations_quarterly", fp, rows=n)
         invalidate_workspace_caches("donations_quarterly")
         log.info("scheduler_donations_done", count=n)
     except StreamLoadError as exc:
@@ -565,6 +673,52 @@ async def _run_donations(triggered_by: str = "scheduler") -> None:
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
         log.error("scheduler_donations_failed", error=str(exc))
+
+
+async def _run_canadabuys(triggered_by: str = "scheduler") -> None:
+    """Goal 7 built this connector's raw-archival walk but never scheduled
+    it (Goal 11 gap: "Active procurement opportunities" had no recurring
+    job at all). Re-fetches the 3 rolling tender-notice snapshots every
+    call — see connector_canadabuys.py:sync_rolling_tender_notices for why
+    the historical-backfill walker can't be reused for this directly. Raw-
+    archive only so far (save_raw, no source_records rows yet) — same
+    maturity stage NPRI/IAAC catalogue pulls started at before row-level
+    parsing was built."""
+    from pipeline.connector_canadabuys import sync_rolling_tender_notices
+    log_id = await _log_start("canadabuys_tenders", "CanadaBuys — Active Tender Notices", triggered_by)
+    t0 = time.monotonic()
+    try:
+        result = await sync_rolling_tender_notices()
+        await _log_finish(log_id, "ok", result["changed"], len(result["files"]), time.monotonic() - t0)
+        log.info("scheduler_canadabuys_done", changed=result["changed"], files=len(result["files"]))
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_canadabuys_failed", error=str(exc))
+
+
+async def _run_boc_series(triggered_by: str = "scheduler") -> None:
+    """Goal 7 built this connector's raw-archival walk but never scheduled
+    it (Goal 11 gap: "Bank of Canada" had no recurring job at all). Each
+    call advances the checkpointed crawl across Valet's ~15,642 series.
+    Known limitation (documented, not silently accepted): once every series
+    has been walked once, walk_cursor_pages's checkpoint will skip them
+    forever even though most series gain new observations on a regular
+    release schedule — the fixed-cursor walker has no "recheck periodically"
+    mode yet, only "discover once." Tracked in DATA_CHECKLIST.md/data-
+    sources.yaml rather than silently claiming this is fully incremental."""
+    from pipeline.connector_boc_series import backfill_all_series
+    log_id = await _log_start("bank_of_canada", "Bank of Canada — Valet Series Catalogue", triggered_by)
+    t0 = time.monotonic()
+    try:
+        summary = await backfill_all_series(max_pages=200)
+        await _log_finish(log_id, "ok", summary.pages_fetched,
+                          summary.pages_fetched + summary.pages_skipped_already_done,
+                          time.monotonic() - t0)
+        log.info("scheduler_boc_series_done", pages=summary.pages_fetched,
+                 skipped=summary.pages_skipped_already_done, stopped=summary.stopped_reason)
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_boc_series_failed", error=str(exc))
 
 
 # Map job_id → async function
@@ -580,6 +734,8 @@ JOB_RUNNERS = {
     "grants_quarterly": _run_grants,
     "donations_quarterly": _run_donations,
     "tribunal_decisions": _run_tribunal_decisions,
+    "canadabuys_tenders": _run_canadabuys,
+    "bank_of_canada": _run_boc_series,
 }
 
 

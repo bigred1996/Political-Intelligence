@@ -16,6 +16,8 @@ dataset is published as", not date pages or row offsets.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 
 from pipeline import raw_storage as rs
@@ -66,6 +68,16 @@ async def backfill_tender_notices(*, max_pages: int | None = None, rate_limit_s:
     Safe to interrupt/resume: resumes from the checkpointed file index, and
     save_raw_streamed's own content-hash dedup means even a re-run of a
     file that's already current just confirms it rather than duplicating it.
+
+    One-time/manual historical pull, not the recurring sync — once every
+    FILES index has succeeded once, walk_cursor_pages's `cursor <= last_done`
+    skip rule (correct for the historical fixed-year files, which never
+    change once published) ALSO locks out the 3 rolling snapshot files
+    (open/new/complete-since), which mutate in place under the same fixed
+    index rather than growing the cursor space — this walker's checkpoint
+    model has no way to tell "done forever" apart from "due for a recheck"
+    for an in-place-mutating cursor. See sync_rolling_tender_notices() for
+    the recurring job that actually keeps those three current.
     """
     async def fetch_page(index: int) -> PageResult:
         return await _fetch_file(index)
@@ -79,3 +91,26 @@ async def backfill_tender_notices(*, max_pages: int | None = None, rate_limit_s:
               skipped=summary.pages_skipped_already_done, gaps=len(summary.gaps),
               stopped=summary.stopped_reason)
     return summary
+
+
+# The 3 rolling snapshots (not the fixed historical fiscal-year files) —
+# these are what "active procurement opportunities" (Goal 11) actually
+# means: tenders open right now, not 2009-2022 history.
+_ROLLING_LABELS = {"complete-since-2022-08-08", "open", "new"}
+_ROLLING_INDICES = [i for i, (label, _) in enumerate(FILES) if label in _ROLLING_LABELS]
+
+
+async def sync_rolling_tender_notices() -> dict[str, Any]:
+    """Re-fetch just the 3 rolling tender-notice snapshots, every call —
+    deliberately bypassing walk_cursor_pages's checkpoint skip (see
+    backfill_tender_notices's docstring for why that would lock these out
+    after the first successful fetch). save_raw_streamed's own content-hash
+    dedup still makes an unchanged file a cheap no-new-file no-op; CanadaBuys
+    exposes no documented ETag/Last-Modified to skip the download itself."""
+    results = []
+    for index in _ROLLING_INDICES:
+        page = await _fetch_file(index)
+        results.append(page.parsed_rows[0])
+    changed = sum(1 for r in results if not r["duplicate"])
+    log.info("canadabuys_rolling_sync_done", files=len(results), changed=changed)
+    return {"files": results, "changed": changed}

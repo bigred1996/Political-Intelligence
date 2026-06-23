@@ -26,11 +26,21 @@ import httpx
 import structlog
 
 from pipeline.api_paginator import BackfillSummary, PageResult, walk_cursor_pages
+from pipeline.entity_resolver import normalize
 
 log = structlog.get_logger()
 
 CATEGORY = "open-government"
 SOURCE_ID = "ckan_full_catalogue"
+
+# Page budget per scheduled call once Goal 11 wires this into the weekly
+# "Open Government catalogue" job — the full crawl is ~475 pages (47k
+# datasets / PAGE_SIZE); capping each run the same way connector_iaac.py's
+# _DEFAULT_CHUNK does keeps every individual fire fast and lets the
+# checkpoint carry the crawl forward across several weekly runs. Once
+# caught up, the api_paginator "complete" boundary re-check (Goal 11) makes
+# each later run a cheap single-page re-probe instead of a full re-walk.
+_DEFAULT_CHUNK_PAGES = 50
 
 _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 _HEADERS = {"User-Agent": _UA, "Accept": "application/json"}
@@ -83,3 +93,40 @@ async def backfill_ckan_catalogue(*, query: str = "", org: str | None = None,
               skipped=summary.pages_skipped_already_done, gaps=len(summary.gaps),
               datasets=len(summary.rows), stopped=summary.stopped_reason)
     return summary
+
+
+async def fetch_ckan_catalogue_records(max_rows: int = 0) -> list[dict[str, Any]]:
+    """Registry-facing wrapper for pipeline/connectors.py — same
+    "max_rows=0 is a bounded per-call page budget, not no cap" convention as
+    connector_iaac.py's fetch_iaac_project_records (see _DEFAULT_CHUNK_PAGES
+    above for why an unbounded first run isn't started here).
+
+    Each dataset becomes one SourceRecord shaped exactly like
+    breadth.py:ckan_org_catalog()'s rows, so it surfaces identically in
+    search/records — this just walks the FULL catalogue instead of one
+    org-filtered slice, resumably, across many scheduled runs.
+    """
+    cap = max_rows if max_rows else _DEFAULT_CHUNK_PAGES
+    summary = await backfill_ckan_catalogue(max_pages=cap)
+    out: list[dict[str, Any]] = []
+    for row in summary.rows:
+        org = row.get("organization") or ""
+        title = row.get("title") or ""
+        if not title:
+            continue
+        out.append({
+            "source": "ckan_catalogue",
+            "record_type": "dataset",
+            "external_id": row.get("id"),
+            "entity_name": org or None,
+            "canonical_name": normalize(org) if org else None,
+            "title": title[:1024],
+            "summary": f"{row.get('num_resources', 0)} resource(s) published by {org or 'unknown organization'}.",
+            "full_text": f"{title}\n{org}"[:6000],
+            "event_date": (row.get("metadata_created") or "")[:10] or None,
+            "amount": None,
+            "province": None,
+            "url": f"https://open.canada.ca/data/dataset/{row.get('id')}" if row.get("id") else None,
+            "raw": row,
+        })
+    return out

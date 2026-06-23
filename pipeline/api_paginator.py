@@ -113,6 +113,17 @@ async def walk_cursor_pages(
     checkpoint = rs.read_checkpoint(source_id) if resume else None
     last_done = _normalize(checkpoint.get("last_cursor")) if checkpoint else None
     prior_gaps: list[dict[str, Any]] = list(checkpoint.get("gaps", [])) if checkpoint else []
+    # A "complete" checkpoint's last_cursor IS the empty/terminal cursor that
+    # ended the previous walk — skipping it forever (the in-progress `<=`
+    # rule below) would permanently lock out rediscovering new content that
+    # the source later publishes at exactly that boundary (e.g. a growing
+    # offset-paginated catalogue, or the current year of a per-year walk).
+    # An "in_progress" resume must still skip its last completed cursor
+    # (proven by test_interrupted_run_resumes_without_redownloading), so only
+    # a prior "complete" status re-opens the boundary cursor for one cheap
+    # re-check per sync call — this is the actual "incremental check" Goal 11
+    # asks for: free 29 days out of 30, real work the one day content grows.
+    reopen_boundary = bool(checkpoint) and checkpoint.get("status") == "complete"
 
     # A gap is an open retry, not a permanent skip — without this, a cursor
     # that fails and is later passed by a successful higher cursor (which
@@ -134,7 +145,10 @@ async def walk_cursor_pages(
         if cursor_start is None:
             cursor_start = cursor
 
-        if last_done is not None and cursor <= last_done and _normalize(cursor) not in gap_cursors:
+        already_done = (
+            cursor < last_done if reopen_boundary else cursor <= last_done
+        ) if last_done is not None else False
+        if already_done and _normalize(cursor) not in gap_cursors:
             pages_skipped += 1
             continue
 

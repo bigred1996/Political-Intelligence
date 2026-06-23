@@ -103,6 +103,46 @@ async def test_interrupted_run_resumes_without_redownloading_or_duplicating(tmp_
 
 
 @pytest.mark.asyncio
+async def test_complete_walk_rechecks_boundary_and_discovers_new_pages():
+    """Goal 11: once a walk reaches 'complete' (stop_on_empty hit), its
+    terminal empty cursor is exactly where new content appears if the
+    source grows later — a CKAN catalogue gaining datasets, or the current
+    year of a per-year walk gaining new P.C. numbers. A scheduled
+    incremental re-run must re-probe that one cursor instead of treating
+    'complete' as a permanent lockout (which would make every later sync a
+    silent, content-free no-op forever, not a real incremental check)."""
+    calls: list[int] = []
+    fetch_page = _make_fetcher(calls, last_page=4)
+    summary = await walk_cursor_pages(category="parliament", source_id="src_grows",
+                                       cursors=itertools.count(1), fetch_page=fetch_page, rate_limit_s=0)
+    assert summary.stopped_reason == "exhausted"
+    checkpoint = rs.read_checkpoint("src_grows")
+    assert checkpoint["status"] == "complete"
+    assert checkpoint["last_cursor"] == 5  # the empty cursor that ended the walk
+
+    # Nothing new yet: a re-run must re-probe cursor 5 (cheap, one request)
+    # rather than reporting "already done" with zero requests.
+    calls.clear()
+    fetch_page_same = _make_fetcher(calls, last_page=4)
+    summary2 = await walk_cursor_pages(category="parliament", source_id="src_grows",
+                                        cursors=itertools.count(1), fetch_page=fetch_page_same, rate_limit_s=0)
+    assert calls == [5]
+    assert summary2.pages_fetched == 0
+    assert summary2.stopped_reason == "exhausted"
+
+    # The source grows (3 new pages published past the old boundary). The
+    # next scheduled sync must rediscover them, not skip cursor 5 forever.
+    calls.clear()
+    fetch_page_grown = _make_fetcher(calls, last_page=7)
+    summary3 = await walk_cursor_pages(category="parliament", source_id="src_grows",
+                                        cursors=itertools.count(1), fetch_page=fetch_page_grown, rate_limit_s=0)
+    assert calls == [5, 6, 7, 8]
+    assert [r["n"] for r in summary3.rows] == [5, 6, 7]
+    assert summary3.stopped_reason == "exhausted"
+    assert rs.read_checkpoint("src_grows")["last_cursor"] == 8
+
+
+@pytest.mark.asyncio
 async def test_failing_cursor_recorded_as_gap_and_walk_continues():
     calls: list[int] = []
     fetch_page = _make_fetcher(calls, fail_forever={3}, last_page=5)

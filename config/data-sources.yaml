@@ -76,8 +76,8 @@ sources:
     connector: "pipeline/ingest.py:iter_contract_rows"
     implementation_status: working_incomplete
     backfill_strategy: "standalone `scripts/run_ingest.py contracts_monthly` (streamed, batched inserts) — proven, 1,155,000 rows loaded"
-    incremental_strategy: "none — full delete-then-reinsert every run (`_stream_load`); 2026-06-21: _stream_load now wraps failures in StreamLoadError so a mid-stream drop reports real partial-progress instead of 0 (see api/scheduler.py), but this connector's recurring SCHEDULED trigger itself is still unproven"
-    check_frequency: "monthly (3rd of month, 2am ET)"
+    incremental_strategy: "GOAL 11 (2026-06-22): full delete-then-reinsert when the resource has actually changed (still `_stream_load`, unchanged), but a pipeline/conditional_fetch.py CKAN-resource-fingerprint check now gates the whole thing — an unchanged Last-Modified/size skips the download entirely (scheduler_log status='skipped'). This connector's recurring SCHEDULED trigger is still otherwise unproven against real CKAN responses."
+    check_frequency: "weekly (Tue 2am ET) — Goal 11 retuned from monthly per Tasks.md's 'Proactive Disclosure' weekly policy; safe now that the conditional-fetch gate makes an unchanged week a single cheap CKAN check, not a full re-pull"
     last_checked: "2026-06-15T15:07:19Z"
     last_successful_import: "2026-06-15 (standalone backfill only — the scheduled job has never succeeded)"
     last_source_change: null
@@ -109,8 +109,8 @@ sources:
     connector: "pipeline/ingest.py:iter_donation_rows"
     implementation_status: working_incomplete
     backfill_strategy: "manual trigger (triggered_by=manual), full ZIP download + stream parse — 6,230,381 rows loaded"
-    incremental_strategy: "none — full delete-then-reinsert every run; cache re-downloads full 2.2GB CSV. 2026-06-21: _stream_load now reports real partial-progress on a mid-stream failure instead of 0 (StreamLoadError), but the recurring SCHEDULED trigger itself is still unproven — only manual runs have ever succeeded"
-    check_frequency: "quarterly (Jan/Apr/Jul/Oct 6th); daily+ during an election period per spec — not yet implemented"
+    incremental_strategy: "FIXED 2026-06-22 (Goal 11): _ensure_donations_cache() used to reuse the cached ZIP forever once downloaded once — the quarterly cron had never actually refreshed donations past the first download in any real environment. pipeline/conditional_fetch.py now HEAD-fingerprints the ZIP (Last-Modified/size) before every run; the cache is only busted and re-downloaded when that fingerprint changes (scheduler_log status='skipped' otherwise). Still full delete-then-reinsert on an actual change; daily+ during an election period per spec is still not implemented."
+    check_frequency: "weekly (Thu 3:30am ET) — Goal 11 retuned from quarterly per the 'Elections Canada outside election periods' weekly policy, safe now that the conditional-fetch gate exists"
     last_checked: "2026-06-15T17:45:29Z"
     last_successful_import: "2026-06-15T18:06:23Z (manual trigger; the scheduled cron path is unverified)"
     last_source_change: null
@@ -142,8 +142,8 @@ sources:
     connector: "pipeline/ingest.py:fetch_ocl_communication_rows (+ _resolve_ocl_comms_url, added 2026-06-21)"
     implementation_status: working_incomplete
     backfill_strategy: "full ZIP download (browser User-Agent required — site 403s the default UA) — 362,805 rows loaded (corrected 2026-06-21 by real count(*); the previously-cited 694,152 was max(id), inflated by repeated delete-then-reinsert cycles not reusing SQLite autoincrement ids)"
-    incremental_strategy: "none — full delete-then-reinsert on source=='OCL Monthly Communications' every run"
-    check_frequency: "monthly (4th of month, 3am ET); spec wants daily checks + a full reconciliation after the monthly deadline — not implemented"
+    incremental_strategy: "FIXED 2026-06-22 (Goal 11): used to unconditionally delete the cached ZIP and force a full redownload on EVERY run regardless of whether the source had changed — the opposite problem from donations_quarterly's forever-stale cache, equally not incremental. pipeline/conditional_fetch.py now CKAN-fingerprints the resource first; the cache is only busted on an actual change (scheduler_log status='skipped' otherwise). Still full delete-then-reinsert on source=='OCL Monthly Communications' when it does run."
+    check_frequency: "daily (3am ET) — Goal 11 retuned from monthly per the 'Lobby Canada' daily policy, safe now that the conditional-fetch gate makes ~29 of 30 days a single cheap check"
     last_checked: null
     last_successful_import: null
     last_source_change: null
@@ -176,8 +176,8 @@ sources:
     connector: "pipeline/ingest.py:fetch_ocl_registration_rows (production path, used by api/scheduler.py) -- ALSO pipeline/connector_ocl_registrations.py:OCLRegistrationsConnector (new shared-interface proof-of-concept, added 2026-06-21, not wired into the scheduler, run standalone only so far)"
     implementation_status: working_incomplete
     backfill_strategy: "full ZIP download (82.8MB), dedup-by-registration_num on insert — RUN FOR REAL 2026-06-21: 166,564 rows loaded. Independently re-verified via OCLRegistrationsConnector.backfill() the same day: parsed=172,566, valid=166,564 (exact match), added=0 (idempotent against the same live DB)."
-    incremental_strategy: "existence-check upsert by registration_num + DB unique constraint — verified idempotent (ran twice, no duplicates) but is an N+1 query (one SELECT per row, ~3.5 min for 166k rows). OCLRegistrationsConnector.discover() now captures the live Last-Modified header but nothing acts on it yet -- still no real conditional-fetch anywhere."
-    check_frequency: "registered as the `ocl_registrations` job; no cron trigger configured in SOURCE_CONFIGS today — runs only on manual trigger"
+    incremental_strategy: "existence-check upsert by registration_num + DB unique constraint — verified idempotent (ran twice, no duplicates) but is an N+1 query (one SELECT per row, ~3.5 min for 166k rows). FIXED 2026-06-22 (Goal 11): the production api/scheduler.py:_run_ocl_registrations path now calls pipeline/conditional_fetch.py directly (CKAN last_modified/size fingerprint) before fetching — the exact 'discover() captures Last-Modified but nothing acts on it' gap flagged here is closed for the production path; the standalone OCLRegistrationsConnector POC still doesn't use it itself, it was only ever the model this borrowed from."
+    check_frequency: "daily (4:30am ET) — Goal 11 retuned from monthly per the 'Lobby Canada' daily policy. (Correction to this entry's prior claim: SOURCE_CONFIGS already had a real CronTrigger for this job before Goal 11 — `day=4, hour=4, minute=30` monthly — it just wasn't reflected here.)"
     last_checked: "2026-06-21T23:15:02Z"
     last_successful_import: "2026-06-21T23:16:31Z (OCLRegistrationsConnector.backfill(), 112s, added=0 since all 166,564 rows already existed)"
     last_source_change: "2026-06-15T10:01:49Z (Last-Modified header from the live resource, captured by discover() 2026-06-21)"
@@ -244,7 +244,7 @@ sources:
     implementation_status: working
     backfill_strategy: "full RSS pull (Part I + Part II feeds) — 638 entries"
     incremental_strategy: "upsert by guid — skips entries already present; closest thing to real incrementality in this codebase"
-    check_frequency: "weekly, Sat 8am ET"
+    check_frequency: "daily, 8am ET — Goal 11 retuned from Sat-only weekly per Tasks.md's 'Canada Gazette feed checks' daily policy; the RSS pull is ~2s and upserts by guid, so the other 6 days a week cost nothing extra"
     last_checked: "2026-06-15T14:25:05Z"
     last_successful_import: "2026-06-15T14:25:06Z (rows_added=0 — entries pre-existed)"
     last_source_change: null
@@ -342,8 +342,8 @@ sources:
     connector: "pipeline/ingest.py:fetch_appointment_rows"
     implementation_status: blocked_technical
     backfill_strategy: "not run — see known_limitations, the source itself is unreachable as currently coded"
-    incremental_strategy: "FIXED 2026-06-21: _run_appointments now deletes-before-insert (same pattern as bills/contracts/donations); verified with a passing idempotency test. The duplicate-accumulation bug itself is fixed, but the connector can't actually fetch anything to test it against real data."
-    check_frequency: "weekly, Mon 7am ET"
+    incremental_strategy: "FIXED 2026-06-21: _run_appointments now deletes-before-insert (same pattern as bills/contracts/donations); verified with a passing idempotency test. GOAL 11 (2026-06-22): a pipeline/conditional_fetch.py CKAN-fingerprint check now also gates this job (skip when the GIC_DATASET resource is unchanged) — added for cadence consistency with the other CKAN sources even though the connector itself still can't fetch real data (see known_limitations)."
+    check_frequency: "weekly, Mon 7am ET — not explicitly named in Goal 11's policy table; left as-is"
     last_checked: "2026-06-21T22:12:56Z"
     last_successful_import: null
     last_source_change: null
@@ -375,8 +375,8 @@ sources:
     connector: "pipeline/ingest.py:iter_grant_rows (converted from list-returning fetch_grant_rows 2026-06-22)"
     implementation_status: working
     backfill_strategy: "FULL UNCAPPED BACKFILL RUN FOR REAL 2026-06-22 via the production scheduler path: 1,148,041 real rows (up from a 3,000-row capped test 2026-06-21). 22 years covered (2005-2026, plus one 1899 Excel-epoch-placeholder anomaly). Raw 2.25GB CSV preserved byte-for-byte via save_raw_streamed, checksum confirmed against the CKAN-reported size (2,256,228,144 bytes, exact match)."
-    incremental_strategy: "FIXED 2026-06-21: dedup bug (delete-before-insert) and resource-picker bug (was grabbing the 24KB placeholder file). FIXED 2026-06-22: fetch_grant_rows converted to a true streaming iter_grant_rows (was materializing the whole list in memory — the exact risk flagged the day before); _run_grants now goes through _stream_load like contracts/donations. No longer capped, no longer a memory risk."
-    check_frequency: "quarterly (Jan/Apr/Jul/Oct 5th)"
+    incremental_strategy: "FIXED 2026-06-21: dedup bug (delete-before-insert) and resource-picker bug (was grabbing the 24KB placeholder file). FIXED 2026-06-22: fetch_grant_rows converted to a true streaming iter_grant_rows (was materializing the whole list in memory — the exact risk flagged the day before); _run_grants now goes through _stream_load like contracts/donations. No longer capped, no longer a memory risk. GOAL 11 (same day): a pipeline/conditional_fetch.py CKAN-fingerprint check (largest grant/contrib-named CSV resource) now gates the whole 2.25GB re-pull — skipped when unchanged."
+    check_frequency: "weekly (Wed 2:30am ET) — Goal 11 retuned from quarterly per Tasks.md's 'Contracts, grants and contributions' weekly policy, safe with the conditional-fetch gate in place"
     last_checked: "2026-06-22T00:07:49Z"
     last_successful_import: "2026-06-22T00:15:53Z (1,148,041 rows, 485s, via scripts/run_ingest.py grants_quarterly)"
     last_source_change: null
@@ -408,7 +408,7 @@ sources:
     implementation_status: blocked_technical
     backfill_strategy: "designed: RSS pull, 200-entry cap, dedup-by-(decision_number, body) — TRIGGERED FOR REAL 2026-06-21, returned 0 rows (see known_limitations)"
     incremental_strategy: "existence-check upsert by (decision_number, body) — good pattern, untestable until the feed URLs work again"
-    check_frequency: "registered as `tribunal_decisions`; spec wants daily for active proceedings — cadence not yet tuned"
+    check_frequency: "daily, 9am ET — Goal 11 retuned from Sat-only weekly per the 'Court decisions' daily policy (cadence now tuned; still blocked on the CRTC feed URLs themselves, see known_limitations)"
     last_checked: "2026-06-21T22:46:22Z"
     last_successful_import: "2026-06-21T22:46:23Z (status=ok, rows_added=0 — feed returned HTML, not RSS; run twice today, both times in seconds total — see known_limitations re: the reindex fix)"
     last_source_change: null
@@ -443,8 +443,8 @@ sources:
     connector: "pipeline/breadth.py:fetch_gc_news_records"
     implementation_status: working
     backfill_strategy: "large `pick` parameter for history backfill — 20,034 rows loaded"
-    incremental_strategy: "upsert by external_id, daily `pick=500` for the incremental slice — the most genuinely-incremental connector in the codebase"
-    check_frequency: "daily, 5:30am ET"
+    incremental_strategy: "upsert by external_id, `pick=500` for the incremental slice — the most genuinely-incremental connector in the codebase"
+    check_frequency: "every 4 hours (1:30/5:30/9:30/13:30/17:30/21:30 ET) — Goal 11 retuned from once-daily per the 'Government news' every-few-hours policy"
     last_checked: "2026-06-19T09:43:33Z"
     last_successful_import: "2026-06-19T09:43:45Z"
     last_source_change: null
@@ -474,8 +474,8 @@ sources:
     connector: "pipeline/breadth.py:fetch_statcan_records (production, feeds source_records) -- ALSO pipeline/catalogue_discovery.py:discover_statcan_catalogue (Goal 5 metadata-discovery layer, separate table, added 2026-06-21)"
     implementation_status: working_incomplete
     backfill_strategy: "full cube-list fetch, catalogue only. CORRECTED 2026-06-21: the real catalogue is 8,213 tables, not '~300' as stated here and everywhere else previously -- 300 was apparently whatever one earlier capped run happened to load, never the true size. discover_statcan_catalogue() confirmed 8,213 real rows via the same getAllCubesListLite endpoint."
-    incremental_strategy: "none — full replace weekly"
-    check_frequency: "weekly, Sun 4am ET"
+    incremental_strategy: "none — full replace every business day now (was weekly); still no conditional-fetch gate on this one (the cube-list endpoint isn't CKAN, so pipeline/conditional_fetch.py's CKAN-fingerprint path doesn't apply, and the endpoint exposes no HTTP-level Last-Modified to hang fingerprint_url() off of either)"
+    check_frequency: "every business day (Mon-Fri 4am ET) — Goal 11 retuned from weekly per the 'StatCan release metadata' policy. The real per-series fetch (statcan_series_observations below) is still unbuilt; this is catalogue metadata only."
     last_checked: "2026-06-15T14:50:29Z"
     last_successful_import: "2026-06-15T14:50:30Z"
     last_source_change: null
@@ -520,7 +520,7 @@ sources:
       2026-06-22: first chunk of 300 projects, 376 records (300 projects + 66
       documents + 10 comment periods), 0 gaps, ~34 min.
     incremental_strategy: "upsert by external_id; checkpointed per-project crawl resumes across calls"
-    check_frequency: "weekly, Mon 4am ET (one ~300-project chunk per run — see known_limitations)"
+    check_frequency: "daily, 4am ET (one ~300-project chunk per run — see known_limitations) — Goal 11 retuned from weekly per the 'IAAC active projects' daily policy; full coverage now accrues over ~22 daily runs instead of ~22 weekly ones"
     last_checked: "2026-06-22T18:01:46Z"
     last_successful_import: "2026-06-22T18:01:46Z"
     last_source_change: null
@@ -555,7 +555,7 @@ sources:
     implementation_status: working
     backfill_strategy: "full CSV stream — 2,008 incident rows"
     incremental_strategy: "none — full replace weekly; dataset is largely static between reporting cycles"
-    check_frequency: "weekly, Tue 4am ET"
+    check_frequency: "weekly, Tue 4am ET — not explicitly named in Goal 11's policy table (incidents are history, not 'active proceedings' — see cer_applications below); left as-is"
     last_checked: "2026-06-16T08:10:01Z"
     last_successful_import: "2026-06-16T08:10:18Z"
     last_source_change: null
@@ -596,7 +596,7 @@ sources:
       "C36307") are stored as citation links only, never mirrored. Real run
       2026-06-22: 110 applications/proceedings/decisions, 0 gaps, 91s.
     incremental_strategy: "upsert by external_id; full re-walk each trigger (~120 pages, ~1 min — cheap enough not to chunk)"
-    check_frequency: "weekly, Tue 4:30am ET"
+    check_frequency: "daily, 4:30am ET — Goal 11 retuned from weekly per the 'CER active proceedings' daily policy"
     last_checked: "2026-06-22T16:17:50Z"
     last_successful_import: "2026-06-22T16:17:50Z"
     last_source_change: null
@@ -640,8 +640,8 @@ sources:
       Council) list. RIAS is NOT a separate TOC entry — proposed_regulation rows
       carry likely_has_rias:true as a documented policy-based inference, not a
       scraped fact (see module docstring).
-    incremental_strategy: "upsert by external_id; checkpointed per-part (gazette_notices_p1/p2), full historical re-walk is cheap (~2,742 issues, ~0.3s each)"
-    check_frequency: "weekly, Sat 8:30am ET"
+    incremental_strategy: "upsert by external_id; checkpointed per-part (gazette_notices_p1/p2). GOAL 11 (2026-06-22): pipeline/api_paginator.py's checkpoint-skip rule used to lock out the exact issue cursor where a walk last stopped, even after stop_on_empty marked it 'complete' — meaning a part's most-recent issue boundary, where a NEW issue would actually appear, was never re-checked. Fixed so a 'complete' checkpoint re-probes that one boundary cursor on every call (cheap: one extra request) instead of skipping it forever; this connector is one of the direct beneficiaries since its per-part walk hits that exact pattern."
+    check_frequency: "every 4 hours (2:30/6:30/10:30/14:30/18:30/22:30 ET) — Goal 11 retuned from weekly per the 'Canada Gazette notices' every-few-hours policy"
     last_checked: "2026-06-22T16:30:00Z"
     last_successful_import: "2026-06-22T16:30:00Z"
     last_source_change: null
@@ -685,8 +685,8 @@ sources:
       number, date, dept, act, subject, full Précis, attachment PDF link — no
       second per-record fetch needed. Walked per calendar year, each with its own
       checkpoint (same independent-stream pattern as connector_house_votes).
-    incremental_strategy: "upsert by external_id; checkpointed per-year (oic_{year}), full re-walk of 1990-present is ~3,500 pages at 0.4s (~25 min)"
-    check_frequency: "weekly, Sun 5am ET"
+    incremental_strategy: "upsert by external_id; checkpointed per-year (oic_{year}), full re-walk of 1990-present is ~3,500 pages at 0.4s (~25 min) for the INITIAL backfill only — once every year's pages are checkpointed, the Goal 11 api_paginator boundary-recheck fix means a steady-state daily run only re-probes the current year's one terminal page-cursor per year still being added to (cheap), not a 25-minute re-walk."
+    check_frequency: "daily, 5am ET — Goal 11 retuned from weekly per the 'Regulatory notices' daily policy, safe now that the api_paginator boundary fix makes the current year's ongoing growth a cheap re-check instead of a full re-walk"
     last_checked: "2026-06-22T17:00:00Z"
     last_successful_import: "2026-06-22T17:00:00Z"
     last_source_change: null
@@ -699,6 +699,38 @@ sources:
     priority: P1
     responsible_parser: "pipeline/connector_orders_in_council.py"
     health_status: healthy
+
+  - id: ckan_catalogue
+    name: Open Government Catalogue (full CKAN crawl)
+    jurisdiction: federal
+    publisher: "all departments, via open.canada.ca's CKAN catalogue"
+    category: government_publications
+    base_url: "https://open.canada.ca/data/api/3/action/package_search"
+    access_method: ckan
+    license: "Open Government Licence – Canada"
+    terms_url: "https://open.canada.ca/en/open-government-licence-canada"
+    robots_url: "https://open.canada.ca/robots.txt"
+    commercial_reuse_reviewed: true
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/connector_ckan_catalogue.py:fetch_ckan_catalogue_records (Goal 7 walk + Goal 11 source_records mapping/scheduling)"
+    implementation_status: working_incomplete
+    backfill_strategy: "GOAL 7: resumable offset-paginated crawl of the FULL catalogue (~47k datasets total, broader than the org-filtered catalogues elsewhere in this registry), checkpointed per page (sort=metadata_created asc for deterministic resume). Never had a row-mapping into source_records or a scheduler job until Goal 11."
+    incremental_strategy: "GOAL 11 (2026-06-22): added fetch_ckan_catalogue_records() (maps each dataset to one SourceRecord, upsert by external_id=dataset id) and registered it in pipeline/connectors.py. Also the motivating real-world case for the api_paginator 'complete' boundary fix: once this crawl catches up to the live end of the catalogue, walk_cursor_pages used to permanently skip the exact offset where new datasets get appended, making every later run a silent 0-dataset no-op forever. Fixed so a 'complete' checkpoint re-probes that one boundary page each run."
+    check_frequency: "weekly (Sun 4:30am ET) per the 'Open Government catalogue' policy — ~50 pages (~5,000 datasets) per run toward the full catalogue, then cheap boundary rechecks once caught up"
+    last_checked: null
+    last_successful_import: null
+    last_source_change: null
+    checkpoint_state: "ckan_full_catalogue (page-offset checkpoint, see data/checkpoints/)"
+    rate_limit: "0.3s/request (self-imposed)"
+    raw_data_path: "data/raw/open-government/ckan_full_catalogue/..."
+    known_limitations:
+      - "dataset-metadata records only (title/org/resource-count), same maturity tier as the other catalogue-level breadth sources (statcan, transport, geospatial) — not the full per-resource detail"
+      - "distinct from pipeline/catalogue_discovery.py's discover_ckan_catalogue() (Goal 5, capped at max_datasets=2000, no checkpoint) — that one still does its own separate one-shot pull into a different table; the two haven't been reconciled"
+    priority: P2
+    responsible_parser: "pipeline/connector_ckan_catalogue.py"
+    health_status: unknown
 
   # ── Goal 9 (2026-06-22): generic RSS/Atom/RDF government-publication
   # connector. pipeline/feeds.py is ONE parser shared by all 11 entries below
@@ -1100,8 +1132,8 @@ sources:
     connector: "pipeline/breadth.py:fetch_npri_records"
     implementation_status: working_incomplete
     backfill_strategy: "IMPROVED 2026-06-22: removed a `break` that stopped at the first year that parsed; now accumulates every catalogued year. Real run: 181,780 rows across 2022-2024 (was 60,202 rows, one year). 2020/2021 CSVs in the catalogue still didn't yield rows — not investigated further."
-    incremental_strategy: "none — full replace weekly"
-    check_frequency: "weekly, Wed 3am ET"
+    incremental_strategy: "none — full replace monthly"
+    check_frequency: "monthly (10th, 3am ET) — Goal 11 retuned from weekly: this was over-polling a dataset that only updates on an annual reporting cycle, per the 'NPRI ... monthly or release-driven' policy"
     last_checked: "2026-06-22T00:00:21Z"
     last_successful_import: "2026-06-22T00:02:09Z (181,780 rows, 107.4s, via pipeline/connectors.py:run_connector)"
     last_source_change: null
@@ -1393,23 +1425,24 @@ sources:
     commercial_reuse_reviewed: false
     full_text_storage_allowed: true
     attribution_required: true
-    enabled: false
-    connector: none
-    implementation_status: missing
-    backfill_strategy: not designed
-    incremental_strategy: "active-tender feed should be checked every 2-6 hours per spec"
-    check_frequency: "every 2-6 hours for active tenders"
+    enabled: true
+    connector: "pipeline/connector_canadabuys.py:sync_rolling_tender_notices (scheduled, Goal 11) / backfill_tender_notices (manual historical pull, Goal 7)"
+    implementation_status: working_incomplete
+    backfill_strategy: "GOAL 7: a fixed ~9-file walk (one fiscal year per file + 3 rolling snapshots), each saved via save_raw_streamed (558MB historical archive) — checkpointed, resumable, never wired to a recurring schedule until now."
+    incremental_strategy: "GOAL 11 (2026-06-22): wired into the scheduler for the first time — 'Active procurement opportunities' had zero recurring checks despite the connector existing. sync_rolling_tender_notices() re-fetches just the 3 rolling files (open/new/complete-since-2022-08-08) every call, bypassing walk_cursor_pages's checkpoint (which would otherwise lock these out forever after the first successful fetch, since they mutate in place under a fixed cursor index rather than growing the cursor space — see connector_canadabuys.py:backfill_tender_notices's docstring). Still no row-level parsing into source_records — raw-archive only, save_raw's content-hash dedup is the only \"unchanged\" signal, no cheaper HEAD/ETag check confirmed available."
+    check_frequency: "every 4 hours (0:15/4:15/8:15/12:15/16:15/20:15 ET) per the 'Active procurement opportunities' policy"
     last_checked: null
     last_successful_import: null
     last_source_change: null
-    checkpoint_state: none
-    rate_limit: unknown
-    raw_data_path: "not yet designed"
+    checkpoint_state: "canadabuys_tender_notices (historical walk only; the rolling sync bypasses this checkpoint by design)"
+    rate_limit: "0.5s/request (self-imposed)"
+    raw_data_path: "data/raw/canadabuys/canadabuys_tender_notices/..."
     known_limitations:
-      - "open-data/API availability confirmed to exist by name only — has not been reachability-probed yet (same discipline that caught the OCL ZIP issue should apply here before building)"
+      - "raw archive only — no row-level tender/award parsing into source_records yet, so nothing from this source surfaces in search or entity pages despite being scheduled now"
+      - "no cheaper-than-full-download change signal confirmed for the rolling files — every scheduled run re-downloads and re-hashes them even when unchanged (open-data/API availability beyond the flat CSV files was confirmed NOT to exist as a paginated REST API per connector_canadabuys.py's module docstring)"
     priority: P3
-    responsible_parser: none
-    health_status: not_applicable
+    responsible_parser: "pipeline/connector_canadabuys.py"
+    health_status: unknown
 
   - id: gc_infobase
     name: GC InfoBase (budget + performance)
@@ -1484,23 +1517,25 @@ sources:
     commercial_reuse_reviewed: false
     full_text_storage_allowed: null
     attribution_required: true
-    enabled: false
-    connector: none
-    implementation_status: missing
-    backfill_strategy: "Valet API is open, no key required — should be a fast build"
-    incremental_strategy: "release-driven, check every business day"
-    check_frequency: "every business day"
+    enabled: true
+    connector: "pipeline/connector_boc_series.py:backfill_all_series (Goal 7, wired into the scheduler Goal 11)"
+    implementation_status: working_incomplete
+    backfill_strategy: "Valet API is open, no key required. GOAL 7: /lists/series/json returns the full catalogue (15,642 series as of 2026-06-22); each series' observations are pulled via a separate per-series request, walked via the checkpointed api_paginator primitive."
+    incremental_strategy: "GOAL 11 (2026-06-22): wired into the scheduler for the first time — 'Bank of Canada' had zero recurring checks despite the connector existing. KNOWN LIMITATION, documented rather than silently claimed solved: once every one of the ~15,642 series has been walked once, walk_cursor_pages's checkpoint skips them all forever, even though most series gain new observations on a regular release schedule — same root cause as canadabuys's rolling-file lockout, but here there's no small 'active subset' to carve out like sync_rolling_tender_notices() does, since essentially every series updates periodically. A real fix needs either a periodic checkpoint reset or a per-series since-date Valet parameter, neither built yet."
+    check_frequency: "every business day (Mon-Fri 4:15am ET) per the 'Bank of Canada' policy — each run advances the checkpointed crawl by 200 series toward the full catalogue"
     last_checked: null
     last_successful_import: null
     last_source_change: null
-    checkpoint_state: none
-    rate_limit: unknown
-    raw_data_path: "not yet designed"
+    checkpoint_state: "boc_all_series_observations (per-series checkpoint, see data/checkpoints/)"
+    rate_limit: "0.2s/request (self-imposed)"
+    raw_data_path: "data/raw/bank-of-canada/boc_all_series_observations/..."
     known_limitations:
-      - "RSS announcements feed separate from the Valet data API — both named in the ingestion spec, neither built"
+      - "RSS announcements feed (separate from the Valet data API) is NOT this connector — Bank of Canada press releases already flow through pipeline/feeds.py's generic RSS connector (id=boc_news, daily) per Goal 9"
+      - "raw archive + a tiny per-series summary row (count/first_key/last_key) only — no actual observation VALUES land in any DB table yet, so nothing from this source surfaces in search/sector intelligence despite being scheduled now"
+      - "the once-every-series-forever lockout above is real and not yet fixed — see incremental_strategy"
     priority: P2
-    responsible_parser: none
-    health_status: not_applicable
+    responsible_parser: "pipeline/connector_boc_series.py"
+    health_status: unknown
 
   - id: osfi
     name: OSFI — Guidance, Announcements, Financial Data
@@ -1832,7 +1867,7 @@ sources:
     implementation_status: working
     backfill_strategy: "single GET captures the feed's full live window — politics-section Atom feed, 25 items live (2026-05-24..2026-06-22; no deeper pagination on this endpoint, this IS the full backfill), all 25 passing the per-item <rights> check"
     incremental_strategy: "upsert by external_id (Atom <id>/link) — same pattern as pipeline/feeds.py's government connectors"
-    check_frequency: "daily, 6:30am ET"
+    check_frequency: "every 4 hours (6:30/10:30/14:30/18:30/22:30/2:30 ET) — Goal 11 retuned from once-daily per the 'Approved news RSS' every-few-hours policy (distinct from the once-daily government department feeds below, which Tasks.md's 'Government announcements' bucket keeps daily)"
     last_checked: "2026-06-22T20:18:26Z"
     last_successful_import: "2026-06-22T20:18:26Z (real uncapped fetch+parse against the live feed, 25/25 rows passed the rights check; not yet run through the scheduler/inserted into a populated DB — this working copy's polaris.db is empty, see project memory on the canonical Documents copy)"
     last_source_change: null

@@ -10,6 +10,20 @@ Core sources (contracts, donations, lobbying, bills, grants, appointments,
 gazette, parliament) keep their existing typed tables and hand-written jobs in
 api/scheduler.py. Everything new flows through this registry into the unified
 `source_records` table.
+
+Cadence policy (Goal 11, "switch each connector into incremental mode" —
+after the initial historical backfill, tighten the cadence to match how
+often the upstream actually publishes, leaning on checkpoints/conditional-
+fetch so a tighter cadence is still cheap):
+  every few hours — gc_news, gazette_notices, news_connectors() ("Approved
+                    news RSS")
+  daily           — feed_connectors() (government dept RSS), iaac,
+                    cer_applications, orders_in_council
+  business day    — statcan (release metadata only; real per-series fetch
+                    is statcan_series_observations, not yet built)
+  weekly          — cer (incident history, largely static between cycles),
+                    transport, geospatial
+  monthly         — npri (release-driven; was over-polled weekly)
 """
 from __future__ import annotations
 
@@ -22,7 +36,8 @@ import structlog
 from apscheduler.triggers.cron import CronTrigger
 
 from pipeline import breadth, feeds, news_feeds
-from pipeline import connector_cer_applications, connector_gazette_notices, connector_iaac, connector_orders_in_council
+from pipeline import connector_cer_applications, connector_ckan_catalogue, connector_gazette_notices
+from pipeline import connector_iaac, connector_orders_in_council
 
 log = structlog.get_logger()
 
@@ -46,24 +61,25 @@ CONNECTORS: list[SourceConnector] = [
     SourceConnector(
         id="gc_news", name="Government of Canada News", category="Government Publications",
         fetch=breadth.fetch_gc_news_records,
-        trigger=CronTrigger(hour=5, minute=30, timezone="America/Toronto"),
-        cadence="daily", upsert="upsert", embed=True, typical_rows=100,
+        trigger=CronTrigger(hour="1,5,9,13,17,21", minute=30, timezone="America/Toronto"),
+        cadence="every 4 hours", upsert="upsert", embed=True, typical_rows=100,
         description="GC news releases (all departments) via the IO news API.",
     ),
     SourceConnector(
         id="statcan", name="Statistics Canada (catalogue)", category="Economic Context",
         fetch=breadth.fetch_statcan_records,
-        trigger=CronTrigger(day_of_week="sun", hour=4, minute=0, timezone="America/Toronto"),
-        cadence="weekly", upsert="replace", embed=True, typical_rows=6000,
+        trigger=CronTrigger(day_of_week="mon-fri", hour=4, minute=0, timezone="America/Toronto"),
+        cadence="every business day", upsert="replace", embed=True, typical_rows=6000,
         description="StatCan WDS cube catalogue — every economic/social table available.",
     ),
     SourceConnector(
         id="iaac", name="Impact Assessment Agency (IAAC)", category="Major Projects",
         fetch=connector_iaac.fetch_iaac_project_records,
-        trigger=CronTrigger(day_of_week="mon", hour=4, minute=0, timezone="America/Toronto"),
-        cadence="weekly", upsert="upsert", embed=True, typical_rows=300,
+        trigger=CronTrigger(hour=4, minute=0, timezone="America/Toronto"),
+        cadence="daily", upsert="upsert", embed=True, typical_rows=300,
         description="IAAC project registry — proponent/status/location/documents per project "
-                     "(Goal 8; checkpointed, ~300 new projects/week toward full 6,389-project coverage).",
+                     "(Goal 8; checkpointed, ~300 new projects/run toward full 6,389-project "
+                     "coverage; daily per Goal 11's \"IAAC active projects\" policy).",
     ),
     SourceConnector(
         id="cer", name="Canada Energy Regulator (CER)", category="Major Projects",
@@ -75,16 +91,17 @@ CONNECTORS: list[SourceConnector] = [
     SourceConnector(
         id="cer_applications", name="CER Applications, Proceedings & Decisions", category="Major Projects",
         fetch=connector_cer_applications.fetch_cer_application_records,
-        trigger=CronTrigger(day_of_week="tue", hour=4, minute=30, timezone="America/Toronto"),
-        cadence="weekly", upsert="upsert", embed=True, typical_rows=120,
+        trigger=CronTrigger(hour=4, minute=30, timezone="America/Toronto"),
+        cadence="daily", upsert="upsert", embed=True, typical_rows=120,
         description="CER applications/hearings index — applicant, category, proceeding number, "
-                     "decision status, REGDOCS filing reference (Goal 8).",
+                     "decision status, REGDOCS filing reference (Goal 8; daily per Goal 11's "
+                     "\"CER active proceedings\" policy).",
     ),
     SourceConnector(
         id="gazette_notices", name="Canada Gazette — Notices", category="Regulatory",
         fetch=connector_gazette_notices.fetch_gazette_notice_records,
-        trigger=CronTrigger(day_of_week="sat", hour=8, minute=30, timezone="America/Toronto"),
-        cadence="weekly", upsert="upsert", embed=True, typical_rows=2742,
+        trigger=CronTrigger(hour="2,6,10,14,18,22", minute=30, timezone="America/Toronto"),
+        cadence="every 4 hours", upsert="upsert", embed=True, typical_rows=2742,
         description="Per-instrument Gazette notices: proposed/final regulations, statutory "
                      "instruments (incl. many Orders in Council), regulator notices and "
                      "consultations from the Commissions section (Goal 8).",
@@ -92,17 +109,22 @@ CONNECTORS: list[SourceConnector] = [
     SourceConnector(
         id="orders_in_council", name="Orders in Council", category="Regulatory",
         fetch=connector_orders_in_council.fetch_oic_records,
-        trigger=CronTrigger(day_of_week="sun", hour=5, minute=0, timezone="America/Toronto"),
-        cadence="weekly", upsert="upsert", embed=True, typical_rows=3500,
+        trigger=CronTrigger(hour=5, minute=0, timezone="America/Toronto"),
+        cadence="daily", upsert="upsert", embed=True, typical_rows=3500,
         description="Every P.C. number from orders-in-council.canada.ca, 1990-present — "
-                     "department, act, subject, full précis, attachment link (Goal 8).",
+                     "department, act, subject, full précis, attachment link (Goal 8). Daily "
+                     "per Goal 11's \"Regulatory notices\" policy — cheap in steady state: "
+                     "api_paginator's per-year checkpoint means only the current year's "
+                     "boundary cursor gets re-probed once historical years are complete.",
     ),
     SourceConnector(
         id="npri", name="National Pollutant Release Inventory (NPRI)", category="Environment",
         fetch=breadth.fetch_npri_records,
-        trigger=CronTrigger(day_of_week="wed", hour=3, minute=0, timezone="America/Toronto"),
-        cadence="weekly", upsert="replace", embed=False, typical_rows=200000,
-        description="Facility-level pollutant releases (structured/numeric — SQL-served).",
+        trigger=CronTrigger(day=10, hour=3, minute=0, timezone="America/Toronto"),
+        cadence="monthly", upsert="replace", embed=False, typical_rows=200000,
+        description="Facility-level pollutant releases (structured/numeric — SQL-served). "
+                     "Monthly per Goal 11's release-driven policy — was weekly, over-polling "
+                     "a dataset that only updates on an annual reporting cycle.",
     ),
     SourceConnector(
         id="transport", name="Transport Canada Open Data", category="Transport",
@@ -117,6 +139,19 @@ CONNECTORS: list[SourceConnector] = [
         trigger=CronTrigger(day_of_week="fri", hour=4, minute=0, timezone="America/Toronto"),
         cadence="weekly", upsert="replace", embed=True, typical_rows=300,
         description="Federal geospatial data catalogue (NRCan / GeoGratis / CGDI).",
+    ),
+    SourceConnector(
+        id="ckan_catalogue", name="Open Government Catalogue (full crawl)", category="Government Publications",
+        fetch=connector_ckan_catalogue.fetch_ckan_catalogue_records,
+        trigger=CronTrigger(day_of_week="sun", hour=4, minute=30, timezone="America/Toronto"),
+        cadence="weekly", upsert="upsert", embed=True, typical_rows=5000,
+        description="Every dataset on open.canada.ca's CKAN catalogue (Goal 7's resumable "
+                     "page-walk primitive, finally wired into the scheduler for Goal 11's "
+                     "\"Open Government catalogue\" weekly policy) — broader than the "
+                     "per-source org-filtered catalogues elsewhere in this registry. "
+                     "Checkpointed ~5,000 datasets/run toward the full ~47k-dataset catalogue; "
+                     "the api_paginator \"complete\" boundary re-check (Goal 11) means once "
+                     "caught up, later runs cheaply rediscover only newly-published datasets.",
     ),
 ]
 
@@ -158,18 +193,23 @@ def _news_connectors() -> list[SourceConnector]:
     candidates pending a commercial licence (CBC, CTV, Financial Post, ...) are
     documentation-only rows in config/data-sources.yaml, not Python objects
     here — nothing to schedule until one is actually licensed. Staggered right
-    after the government feed slots (which end at 6:25am).
+    after the government feed slots (which end at 6:25am), then repeated
+    every 4 hours — Goal 11's policy puts "Approved news RSS" in the
+    every-few-hours bucket (time-sensitive, unlike the once-daily government
+    department feeds above), and an upsert-by-guid RSS pull is cheap enough
+    to repeat that often.
     """
     start_hour, start_minute = 6, 30
     out = []
     for i, feed in enumerate(news_feeds.NEWS_FEED_DEFS):
         minute = (start_minute + i * 5) % 60
-        hour = start_hour + (start_minute + i * 5) // 60
+        base_hour = (start_hour + (start_minute + i * 5) // 60) % 24
+        hours = ",".join(str((base_hour + offset) % 24) for offset in (0, 4, 8, 12, 16, 20))
         out.append(SourceConnector(
             id=feed.id, name=feed.name, category=feed.category,
             fetch=partial(news_feeds.fetch_news_feed_records, feed),
-            trigger=CronTrigger(hour=hour, minute=minute, timezone="America/Toronto"),
-            cadence="daily", upsert="upsert", embed=True, typical_rows=20,
+            trigger=CronTrigger(hour=hours, minute=minute, timezone="America/Toronto"),
+            cadence="every 4 hours", upsert="upsert", embed=True, typical_rows=20,
             description=f"{feed.publisher} — {feed.license_name} (Goal 10).",
         ))
     return out
