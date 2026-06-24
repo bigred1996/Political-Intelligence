@@ -161,6 +161,17 @@ def validate_synthesis(
     if not (contract.coverage_summary or "").strip():
         errors.append("coverage_summary_empty")
 
+    # 6. Every theme/risk/opportunity item must cite at least one finding —
+    # an unsupported claim must never be presented as fact (Goal B7).
+    for kind, items in (
+        ("theme", contract.themes),
+        ("material_risk", contract.material_risks),
+        ("opportunity", contract.opportunities),
+    ):
+        for i, item in enumerate(items):
+            if not item.finding_ids:
+                errors.append(f"{kind}_{i}_has_no_finding_ids")
+
     return ValidationResult(ok=not errors, errors=errors)
 
 

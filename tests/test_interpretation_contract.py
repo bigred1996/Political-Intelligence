@@ -150,6 +150,23 @@ def test_high_confidence_with_specific_limitations_passes():
     assert result.ok, result.errors
 
 
+# ── non-empty citations (Goal B7 / G4) ───────────────────────────────────
+def test_empty_top_level_citations_is_rejected():
+    contract = _base_contract(cited_record_ids=[])
+    result = validate_contract(contract, ALLOWED)
+    assert not result.ok
+    assert any("cited_record_ids_empty" in e for e in result.errors)
+
+
+def test_claim_with_empty_citations_is_rejected():
+    contract = _base_contract(
+        claims=[Claim(text="An uncited assertion.", label="observed", cited_record_ids=[])]
+    )
+    result = validate_contract(contract, ALLOWED)
+    assert not result.ok
+    assert any("claim_0_has_no_cited_records" in e for e in result.errors)
+
+
 # ── tool-input parsing + correction message ──────────────────────────────
 def test_contract_from_tool_input_round_trips():
     raw = {

@@ -25,10 +25,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.models.interpretation import Interpretation
 from api.routes.records import _ALIASES, _spec_for
 from pipeline.ai_provider import ClaudeInterpretationProvider, ProviderError, ProviderTurn, ProviderUnavailable
-from pipeline.citation_registry import get_retrieval_set, validate_citations
+from pipeline.citation_registry import get_retrieval_set, validate_citations, validate_citations_for_set
 from pipeline.interpretation_contract import (
     InterpretationContract,
     Claim,
+    _ids_from_raw,
     build_correction_message,
     contract_from_tool_input,
     validate_contract,
@@ -175,7 +176,46 @@ async def get_interpretation_response(session: AsyncSession, interpretation_id: 
 
 
 async def _to_response(session: AsyncSession, row: Interpretation, *, from_cache: bool) -> dict[str, Any]:
+    """Re-validate every citation in the persisted contract against the row's
+    OWN retrieval set before returning it — a direct-DB tamper of
+    `row.output`, `row.table`, or `row.pk` must not survive a read (Goal B7).
+    Reuses `validate_citations_for_set`, never reimplemented."""
     output = dict(row.output)
+    own_id = (str(row.table), str(row.pk))
+    claims = [dict(c) for c in (output.get("claims") or [])]
+    to_check = (
+        [own_id]
+        + _ids_from_raw(output.get("cited_record_ids"))
+        + [rid for c in claims for rid in _ids_from_raw(c.get("cited_record_ids"))]
+    )
+    check = await validate_citations_for_set(session, row.retrieval_set_id, to_check)
+    if check["invalid"]:
+        log.warning(
+            "interpretation_dropped_out_of_run_citation",
+            interpretation_id=row.id, dropped=len(check["invalid"]),
+        )
+    valid = set(check["valid"])
+
+    if own_id not in valid:
+        log.warning(
+            "interpretation_row_identity_not_in_retrieval_set",
+            interpretation_id=row.id, table=own_id[0], pk=own_id[1],
+        )
+        output["cited_record_ids"] = []
+        output["claims"] = []
+    else:
+        output["cited_record_ids"] = [
+            {"table": t, "pk": p} for t, p in _ids_from_raw(output.get("cited_record_ids")) if (t, p) in valid
+        ]
+        filtered_claims = []
+        for c in claims:
+            c_ids = [(t, p) for t, p in _ids_from_raw(c.get("cited_record_ids")) if (t, p) in valid]
+            if not c_ids:
+                log.warning("interpretation_dropped_claim_with_no_valid_citations", interpretation_id=row.id)
+                continue
+            filtered_claims.append({**c, "cited_record_ids": [{"table": t, "pk": p} for t, p in c_ids]})
+        output["claims"] = filtered_claims
+
     output["cited_records"] = await _resolve_cited_records(session, output.get("cited_record_ids", []))
     return {
         "id": row.id,

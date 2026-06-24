@@ -377,7 +377,31 @@ async def _forged_citation(tmp_path, monkeypatch):
 
     assert 'href="/records/contracts/1"' not in memo["sections"]["risks"]
     assert 'href="/records/contracts/1"' not in memo["sections"]["evidence_appendix"]
+    # Goal B7 / G3: the whole forged item must be dropped, not just its link —
+    # a claim that has lost every citation must never still print as fact.
+    assert "Forged risk" not in memo["sections"]["risks"]
     await engine.dispose()
+
+
+def test_synthesis_item_with_no_surviving_findings_is_dropped_not_rendered_bare():
+    """Pure unit test for the Goal B7 / G3 fix: build_sections must drop a
+    synthesis item whose findings are filtered down to empty, never render
+    its bare text/title without a citation."""
+    real = _fake_finding("bills", 1)
+    run = _fake_run(synthesis={
+        "themes": [], "diligence_questions": [], "overall_confidence": "low",
+        "coverage_summary": "covered", "generated_by": "claude",
+        "material_risks": [
+            {
+                "text": "Forged unsupported risk claim.", "label": "observed", "title": "Forged",
+                "findings": [{"table": "contracts", "pk": "999", "internal_url": "/records/contracts/999"}],
+            },
+        ],
+        "opportunities": [],
+    })
+    sections = build_sections(_fake_review(), run, _fake_workspace([real]), {("bills", "1")})
+    assert "Forged unsupported risk claim" not in sections["risks"]
+    assert sections["risks"] == INSUFFICIENT
 
 
 def test_empty_workspace_renders_clean(tmp_path, monkeypatch):

@@ -298,6 +298,82 @@ async def _force_refresh_scenario(tmp_path, monkeypatch):
     await engine.dispose()
 
 
+def test_forged_citation_tampered_directly_into_db_row_is_dropped_on_reread(tmp_path, monkeypatch):
+    """The B6 pattern, applied to B2: persist a real, compliant interpretation
+    via the real write path, then hand-tamper the stored row's output JSON
+    directly (bypassing interpret_finding entirely) to add an out-of-run
+    citation, both top-level and on the claim. A re-read via
+    get_interpretation_response must re-validate against the row's own
+    retrieval_set_id and drop the forged citation — Goal B7 / G2."""
+    asyncio.run(_forged_citation_scenario(tmp_path, monkeypatch))
+
+
+async def _forged_citation_scenario(tmp_path, monkeypatch):
+    engine, session_maker = await _make_db(tmp_path, "forged_citation.db")
+    retrieval_set_id = await _seed_retrieval_set(session_maker, [
+        {"table": "bills", "pk": 1}, {"table": "contracts", "pk": 1},
+    ])
+
+    fake = FakeProvider(script=[_good_tool_input("bills", "1")])
+    monkeypatch.setattr(interp_mod, "ClaudeInterpretationProvider", lambda *a, **k: fake)
+
+    async with session_maker() as session:
+        result = await interp_mod.interpret_finding(session, retrieval_set_id, "bills", 1)
+        interpretation_id = result["id"]
+
+    forged = {"table": "source_records", "pk": "999999"}  # genuinely never retrieved this run
+    async with session_maker() as session:
+        row = await interp_mod.get_interpretation(session, interpretation_id)
+        output = dict(row.output)
+        output["cited_record_ids"] = [*output["cited_record_ids"], forged]
+        output["claims"] = [
+            {**c, "cited_record_ids": [*c["cited_record_ids"], forged]} for c in output["claims"]
+        ]
+        row.output = output  # reassign (not in-place mutate) so the plain JSON column persists
+        await session.commit()
+
+    async with session_maker() as session:
+        reread = await interp_mod.get_interpretation_response(session, interpretation_id)
+
+    assert forged not in reread["cited_record_ids"]
+    assert {"table": "bills", "pk": "1"} in reread["cited_record_ids"]
+    for c in reread["claims"]:
+        assert forged not in c["cited_record_ids"]
+    await engine.dispose()
+
+
+def test_row_identity_tampered_outside_retrieval_set_zeroes_all_citations(tmp_path, monkeypatch):
+    """A more severe tamper: the row's own (table, pk) identity is rewritten
+    to something outside the retrieval set's membership. The row's own
+    grounding can no longer be trusted, so every citation must be zeroed,
+    not selectively filtered — Goal B7 / G2."""
+    asyncio.run(_row_identity_tamper_scenario(tmp_path, monkeypatch))
+
+
+async def _row_identity_tamper_scenario(tmp_path, monkeypatch):
+    engine, session_maker = await _make_db(tmp_path, "row_identity_tamper.db")
+    retrieval_set_id = await _seed_retrieval_set(session_maker, [{"table": "bills", "pk": 1}])
+
+    fake = FakeProvider(script=[_good_tool_input("bills", "1")])
+    monkeypatch.setattr(interp_mod, "ClaudeInterpretationProvider", lambda *a, **k: fake)
+
+    async with session_maker() as session:
+        result = await interp_mod.interpret_finding(session, retrieval_set_id, "bills", 1)
+        interpretation_id = result["id"]
+
+    async with session_maker() as session:
+        row = await interp_mod.get_interpretation(session, interpretation_id)
+        row.table, row.pk = "contracts", "424242"  # never a member of retrieval_set_id
+        await session.commit()
+
+    async with session_maker() as session:
+        reread = await interp_mod.get_interpretation_response(session, interpretation_id)
+
+    assert reread["cited_record_ids"] == []
+    assert reread["claims"] == []
+    await engine.dispose()
+
+
 def test_reproducibility_record_can_be_fully_reconstructed(tmp_path, monkeypatch):
     asyncio.run(_reproducibility_scenario(tmp_path, monkeypatch))
 

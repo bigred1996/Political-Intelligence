@@ -256,6 +256,112 @@ async def _out_of_run(tmp_path, monkeypatch):
     await engine.dispose()
 
 
+def test_retrieved_but_uninterpreted_citation_is_rejected_at_write_time(tmp_path, monkeypatch):
+    """Goal B7 / G6: a citation to a record that was genuinely retrieved this
+    run, but never interpreted (cut off by the interpretation cap), has no
+    corresponding row in the evidence appendix — the synthesis prompt only
+    ever shows the model the interpreted set (ALLOWED_FINDING_IDS), so
+    validation must reject this just as it rejects an out-of-run forgery."""
+    asyncio.run(_uninterpreted_citation(tmp_path, monkeypatch))
+
+
+async def _uninterpreted_citation(tmp_path, monkeypatch):
+    engine, session_maker = await _make_db(tmp_path, "uninterpreted.db", n_bills=20)
+    hits = [_hit("bills", i) for i in range(1, 21)]
+    # bills:15 is one of the 20 retrieved hits but falls past the brief tier's
+    # 8-interpretation cap, so it's retrieved without ever being interpreted.
+    synth = ScriptedToolProvider([
+        _good_synth_input(finding=("bills", "15")), _good_synth_input(finding=("bills", "15")),
+    ])
+    _patch(monkeypatch, retrieve_hits=hits, planner=None, synth=synth)
+
+    async with session_maker() as session:
+        run = await run_research(session, "telecom", "brief")  # brief = 8 interpretation cap
+
+    assert run["interpretations_used"] == 8
+    assert run["synthesis"]["generated_by"] == "template_fallback", (
+        "citing a retrieved-but-uninterpreted record must be rejected, forcing fallback"
+    )
+    cited = [
+        (f["table"], f["pk"])
+        for group in ("themes", "material_risks", "opportunities")
+        for item in run["synthesis"][group]
+        for f in item["findings"]
+    ]
+    assert ("bills", "15") not in cited
+    await engine.dispose()
+
+
+def test_forged_content_tampered_directly_into_run_row_is_dropped_on_reread(tmp_path, monkeypatch):
+    """The B6 pattern, applied to B3: after a real run completes, hand-tamper
+    the persisted run row directly (bypassing run_research entirely) — inject
+    a REAL interpretation that genuinely exists in the DB but belongs to a
+    retrieval set never part of this run, an out-of-run coverage gap, and an
+    out-of-run synthesis citation. A re-read via get_research_run_response
+    must drop every forged piece — Goal B7 / G1."""
+    asyncio.run(_forged_run_row_scenario(tmp_path, monkeypatch))
+
+
+async def _forged_run_row_scenario(tmp_path, monkeypatch):
+    from pipeline.citation_registry import save_retrieval_set
+
+    engine, session_maker = await _make_db(tmp_path, "forged_run.db", n_bills=1)
+    synth = ScriptedToolProvider([_good_synth_input()])
+    _patch(monkeypatch, retrieve_hits=[_hit("bills", 1)], planner=None, synth=synth)
+
+    async with session_maker() as session:
+        run = await run_research(session, "telecom", "standard")
+        run_id = run["id"]
+
+    # A real interpretation that genuinely exists in the DB, but against a
+    # retrieval set that was never part of the run above — distinct from a
+    # plain nonexistent-id forgery, which the pre-existing "if i in
+    # interp_by_id" guard already caught.
+    async with session_maker() as session:
+        other_set = await save_retrieval_set(
+            session, "unrelated query", [{"table": "contracts", "pk": 1}],
+            planner="fallback", embedding_model="test",
+        )
+        outside_interp = await interp_mod.interpret_finding(session, other_set.id, "contracts", 1)
+
+    async with session_maker() as session:
+        run_row = await research_mod.get_research_run(session, run_id)
+        rounds = list(run_row.rounds or [])
+        rounds[0] = {
+            **rounds[0],
+            "interpretation_ids": [*rounds[0]["interpretation_ids"], outside_interp["id"]],
+            "coverage_gaps": [
+                *rounds[0]["coverage_gaps"],
+                {"type": "non_evidentiary", "table": "contracts", "pk": "1", "title": "forged gap"},
+            ],
+        }
+        run_row.rounds = rounds
+
+        synthesis = dict(run_row.synthesis or {})
+        synthesis["material_risks"] = [
+            *(synthesis.get("material_risks") or []),
+            {
+                "text": "Forged risk citing a record outside this run.", "label": "observed", "title": "Forged",
+                "finding_ids": [{"table": "contracts", "pk": "1"}],
+            },
+        ]
+        run_row.synthesis = synthesis
+        await session.commit()
+
+    async with session_maker() as session:
+        reread = await get_research_run_response(session, run_id)
+
+    all_interp_ids = {i["id"] for rd in reread["rounds"] for i in rd["interpretations"]}
+    assert outside_interp["id"] not in all_interp_ids
+
+    all_gaps = [(g.get("table"), g.get("pk")) for rd in reread["rounds"] for g in rd["coverage_gaps"]]
+    assert ("contracts", "1") not in all_gaps
+
+    risk_titles = [it.get("title") for it in reread["synthesis"]["material_risks"]]
+    assert "Forged" not in risk_titles
+    await engine.dispose()
+
+
 def test_pseudo_hit_becomes_coverage_gap_without_crashing(tmp_path, monkeypatch):
     asyncio.run(_pseudo(tmp_path, monkeypatch))
 

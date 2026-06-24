@@ -160,6 +160,9 @@ def _synthesis_list(items: list[dict[str, Any]]) -> str:
 
 
 def _filtered_synthesis(synthesis: dict[str, Any], valid_keys: set[tuple[str, str]]) -> dict[str, Any]:
+    """Drop a synthesis item entirely once its citations are filtered down to
+    nothing — an unsupported claim must never render as fact, just minus its
+    link (Goal B7)."""
     out = dict(synthesis)
     for key in ("themes", "material_risks", "opportunities"):
         items = []
@@ -168,6 +171,9 @@ def _filtered_synthesis(synthesis: dict[str, Any], valid_keys: set[tuple[str, st
                 fd for fd in it.get("findings", [])
                 if (str(fd.get("table")), str(fd.get("pk"))) in valid_keys
             ]
+            if not findings:
+                log.warning("memo_dropped_unsupported_synthesis_item", title=it.get("title") or it.get("text"))
+                continue
             items.append({**it, "findings": findings})
         out[key] = items
     return out

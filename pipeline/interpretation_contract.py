@@ -175,6 +175,15 @@ def validate_contract(
         if not limitation or _DISMISSIVE_LIMITATION_RE.match(limitation):
             errors.append("evidence_limitations_missing_or_dismissive_for_low_confidence")
 
+    # 6. Every claim must be backed by at least one citation, and the
+    # contract overall must cite at least one record — an uncited claim is
+    # unsupported and must never be presented as fact (Goal B7).
+    if not contract.cited_record_ids:
+        errors.append("cited_record_ids_empty")
+    for i, c in enumerate(contract.claims):
+        if not c.cited_record_ids:
+            errors.append(f"claim_{i}_has_no_cited_records")
+
     return ValidationResult(ok=not errors, errors=errors)
 
 

@@ -264,7 +264,6 @@ async def run_research(
     rounds: list[dict[str, Any]] = []
     interpretation_ids: list[str] = []         # flat, de-duplicated
     interpreted: dict[tuple[str, str], dict[str, Any]] = {}  # (table,pk) -> B2 response
-    union_ids: set[tuple[str, str]] = set()    # every retrieved record id, for citation validation
     seen_queries: set[str] = set()
     interp_used = 0
     model_calls = 0
@@ -312,8 +311,6 @@ async def run_research(
                 embedding_model=result["embedding_model"],
             )
             round_rec["retrieval_set_ids"].append(saved.id)
-            for t, p in saved.record_ids:
-                union_ids.add((str(t), str(p)))
 
             # Interpret evidentiary hits in score order; pseudo-hits become
             # coverage gaps, never an interpret call (would crash B2).
@@ -350,8 +347,12 @@ async def run_research(
             break
 
     # --- cross-finding synthesis ---
+    # allowed_ids is the INTERPRETED set, not the broader retrieval union — it
+    # must match exactly what ALLOWED_FINDING_IDS shows the model in
+    # `_synth_user` below, so every citation that passes validation also has a
+    # corresponding row in the evidence appendix (workspace findings).
     findings = list(interpreted.values())
-    allowed_ids = sorted(union_ids)
+    allowed_ids = sorted({(str(f["table"]), str(f["pk"])) for f in findings})
     synthesis, synth_calls, synth_degraded = await _synthesize(
         synth_provider, topic, findings, allowed_ids
     )
@@ -389,12 +390,25 @@ async def _resolve_finding(session: AsyncSession, table: str, pk: str) -> dict[s
     }
 
 
-async def _resolve_items(session: AsyncSession, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+async def _resolve_items(
+    session: AsyncSession, items: list[dict[str, Any]], allowed: set[tuple[str, str]],
+) -> list[dict[str, Any]]:
+    """Resolve each item's finding_ids to fresh internal links, dropping any
+    id outside the run's own retrieval-set union, and dropping the WHOLE item
+    if nothing it cites survives — an unsupported claim is never rendered as
+    fact (see Goal B7)."""
     out = []
     for item in items or []:
         resolved = []
         for ref in item.get("finding_ids", []):
-            resolved.append(await _resolve_finding(session, str(ref["table"]), str(ref["pk"])))
+            key = (str(ref["table"]), str(ref["pk"]))
+            if key not in allowed:
+                log.warning("research_dropped_unsupported_synthesis_item_citation", table=key[0], pk=key[1])
+                continue
+            resolved.append(await _resolve_finding(session, key[0], key[1]))
+        if not resolved:
+            log.warning("research_dropped_unsupported_synthesis_item", title=item.get("title") or item.get("text"))
+            continue
         out.append({**item, "findings": resolved})
     return out
 
@@ -402,7 +416,14 @@ async def _resolve_items(session: AsyncSession, items: list[dict[str, Any]]) -> 
 async def _serialize_run(session: AsyncSession, run: ResearchRun) -> dict[str, Any]:
     """Rehydrate the full reproducible trail for one run — every round's
     queries + retrieval sets, every interpretation, and the synthesis with each
-    cited finding resolved to a fresh internal link. No model is called."""
+    cited finding resolved to a fresh internal link. No model is called.
+
+    Goal B7: every piece pulled from the stored `rounds`/`synthesis` JSON is
+    re-validated against the union of this run's OWN retrieval sets before
+    being returned — a direct-DB tamper of either column must not survive a
+    read. This is the single root fix: the workspace (`pipeline.diligence`)
+    and the frontend both consume this function's output, so fixing it here
+    protects both transitively."""
     # Interpretations, loaded once and indexed by id.
     interp_by_id: dict[str, Any] = {}
     for iid in run.interpretation_ids or []:
@@ -410,6 +431,7 @@ async def _serialize_run(session: AsyncSession, run: ResearchRun) -> dict[str, A
         if resp is not None:
             interp_by_id[iid] = resp
 
+    allowed: set[tuple[str, str]] = set()
     rounds_out = []
     for rd in run.rounds or []:
         sets_out = []
@@ -420,20 +442,43 @@ async def _serialize_run(session: AsyncSession, run: ResearchRun) -> dict[str, A
                 "query": rs.query if rs else None,
                 "result_count": rs.result_count if rs else 0,
             })
+            if rs is not None:
+                for t, p in rs.record_ids:
+                    allowed.add((str(t), str(p)))
+
+        interpretations = []
+        for iid in rd.get("interpretation_ids", []):
+            interp = interp_by_id.get(iid)
+            if interp is None:
+                continue
+            key = (str(interp.get("table")), str(interp.get("pk")))
+            if key not in allowed:
+                log.warning("research_dropped_out_of_run_interpretation", table=key[0], pk=key[1])
+                continue
+            interpretations.append(interp)
+
+        coverage_gaps = []
+        for g in rd.get("coverage_gaps", []):
+            tbl, pk = g.get("table"), g.get("pk")
+            if tbl and pk and (str(tbl), str(pk)) not in allowed:
+                log.warning("research_dropped_out_of_run_coverage_gap", table=str(tbl), pk=str(pk))
+                continue
+            coverage_gaps.append(g)
+
         rounds_out.append({
             "round": rd.get("round"),
             "queries": rd.get("queries", []),
             "retrieval_sets": sets_out,
-            "interpretations": [interp_by_id[i] for i in rd.get("interpretation_ids", []) if i in interp_by_id],
-            "coverage_gaps": rd.get("coverage_gaps", []),
+            "interpretations": interpretations,
+            "coverage_gaps": coverage_gaps,
             "gap_assessment": rd.get("gap_assessment", {}),
         })
 
     synthesis = dict(run.synthesis or {})
     if synthesis:
-        synthesis["themes"] = await _resolve_items(session, synthesis.get("themes", []))
-        synthesis["material_risks"] = await _resolve_items(session, synthesis.get("material_risks", []))
-        synthesis["opportunities"] = await _resolve_items(session, synthesis.get("opportunities", []))
+        synthesis["themes"] = await _resolve_items(session, synthesis.get("themes", []), allowed)
+        synthesis["material_risks"] = await _resolve_items(session, synthesis.get("material_risks", []), allowed)
+        synthesis["opportunities"] = await _resolve_items(session, synthesis.get("opportunities", []), allowed)
 
     return {
         "id": run.id,
