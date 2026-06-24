@@ -33,6 +33,7 @@ fastembed==0.5.1           # local BGE-small embeddings for semantic search (no 
 
 # PDF generation
 weasyprint==62.3
+pydyf==0.11.0              # pinned: pydyf>=0.12 dropped Stream.transform that weasyprint 62.3 calls (AttributeError on every write_pdf)
 
 # Utilities
 python-ulid==3.0.0         # for report IDs
