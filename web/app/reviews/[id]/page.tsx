@@ -89,9 +89,23 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         title={review.company || "Diligence workspace"}
         subtitle={subtitle(review)}
         action={
-          <Link href="/reviews" className="text-[12px] px-3 py-1.5 rounded border border-outline-variant text-on-surface-variant hover:border-primary transition-colors focus-ring">
-            + New review
-          </Link>
+          <div className="flex items-center gap-2">
+            {run && review.status !== "failed" && (
+              <>
+                <a href={`/memo/${review.id}`} target="_blank" rel="noopener noreferrer"
+                  className="text-[12px] px-3 py-1.5 rounded border border-primary text-primary hover:bg-primary/10 transition-colors focus-ring">
+                  View memo
+                </a>
+                <a href={`/memo/${review.id}/pdf`} target="_blank" rel="noopener noreferrer"
+                  className="text-[12px] px-3 py-1.5 rounded border border-primary text-primary hover:bg-primary/10 transition-colors focus-ring">
+                  Download PDF
+                </a>
+              </>
+            )}
+            <Link href="/reviews" className="text-[12px] px-3 py-1.5 rounded border border-outline-variant text-on-surface-variant hover:border-primary transition-colors focus-ring">
+              + New review
+            </Link>
+          </div>
         }
       />
 
