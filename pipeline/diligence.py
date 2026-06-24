@@ -132,7 +132,10 @@ async def create_review(session: AsyncSession, inputs: dict[str, Any]) -> dict[s
 
     topic = compose_seed_topic(norm)
     try:
-        run = await run_research(session, topic, norm["depth_tier"])
+        # Anchor retrieval on the company so the run only ever pulls THIS
+        # entity's records — never another company's via a shared token like
+        # "Resources"/"Energy" or a semantic near-miss on the name.
+        run = await run_research(session, topic, norm["depth_tier"], entity=norm["company"])
         review.research_run_id = run["id"]
         review.status = "failed" if run["status"] == "error" else "ready"
     except Exception as exc:  # noqa: BLE001 — surface any run failure as a clean review state

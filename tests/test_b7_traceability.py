@@ -51,7 +51,7 @@ def _hit(table: str, pk, score: float = 0.9, title: str | None = None) -> dict:
 
 
 def _fake_retrieve(hits: list[dict]):
-    async def _retrieve(session, query, *, limit=15, balanced=False):
+    async def _retrieve(session, query, *, limit=15, balanced=False, entity=None):  # noqa: F811
         return {"results": list(hits), "plan": {"planner": "fallback"}, "embedding_model": "test"}
     return _retrieve
 

@@ -318,6 +318,7 @@ def _balance_by_table(hits: list[dict[str, Any]], limit: int) -> list[dict[str, 
 
 async def retrieve(
     session: AsyncSession, query: str, *, limit: int = 40, balanced: bool = False,
+    entity: str | None = None,
 ) -> dict[str, Any]:
     """Run the full deterministic retrieval pipeline for a natural-language query.
 
@@ -328,23 +329,46 @@ async def retrieve(
     `balanced=True` round-robins the final results across source tables rather
     than truncating by score — the research loop needs every matched source
     represented, not 60 of whichever source scores highest.
+
+    `entity` switches to ENTITY-ANCHORED retrieval: match the named entity's
+    canonical column (plus a raw-name ILIKE), with NO loose keyword-OR and NO
+    semantic text-similarity. Required for company due-diligence — a free-text
+    seed like "Greenfire Resources" otherwise OR-matches the common token
+    "Resources" across every company and lets the vector index confuse
+    "Greenfire" with "Green Freight"/"Wildfire", attributing other companies'
+    records to the target. Tabular records ARE the entity's footprint; semantic
+    prose matching only adds noise here.
     """
     bounded_limit = min(max(limit, 1), 100)
     plan = fallback_plan(query)
-    canonical = normalize(plan.entity_text) if plan.entity_text else None
 
-    structured = await structured_search(
-        session,
-        keywords=plan.keywords or None,
-        canonical=canonical,
-        entity_text=plan.entity_text,
-        date_from=plan.date_from,
-        date_to=plan.date_to,
-        min_amount=plan.min_amount,
-        sources=plan.sources,
-        per_table_limit=25,
-    )
-    semantic = semantic_search(plan.semantic_query, k=max(40, bounded_limit), sources=plan.sources)
+    if entity:
+        structured = await structured_search(
+            session,
+            keywords=None,
+            canonical=normalize(entity),
+            entity_text=entity,
+            date_from=plan.date_from,
+            date_to=plan.date_to,
+            min_amount=plan.min_amount,
+            sources=None,
+            per_table_limit=25,
+        )
+        semantic = []
+    else:
+        canonical = normalize(plan.entity_text) if plan.entity_text else None
+        structured = await structured_search(
+            session,
+            keywords=plan.keywords or None,
+            canonical=canonical,
+            entity_text=plan.entity_text,
+            date_from=plan.date_from,
+            date_to=plan.date_to,
+            min_amount=plan.min_amount,
+            sources=plan.sources,
+            per_table_limit=25,
+        )
+        semantic = semantic_search(plan.semantic_query, k=max(40, bounded_limit), sources=plan.sources)
     # In balanced mode keep a wider merged pool so a flood of high-scoring
     # semantic hits can't evict the structured tabular sources before the
     # round-robin ever sees them.

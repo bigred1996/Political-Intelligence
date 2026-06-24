@@ -356,7 +356,12 @@ async def _synthesize(
 
 async def run_research(
     session: AsyncSession, topic: str, depth_tier: str = DEFAULT_TIER,
+    entity: str | None = None,
 ) -> dict[str, Any]:
+    """`entity` (when the run is about one company — i.e. diligence) anchors
+    every round's retrieval on that entity's canonical name instead of loose
+    keyword/semantic matching, so the report can never attribute another
+    company's records to the target. None = thematic research (unchanged)."""
     tier, max_rounds, max_interp = resolve_tier(depth_tier)
 
     run = ResearchRun(
@@ -426,7 +431,7 @@ async def run_research(
         candidates: list[tuple[str, str, str, str]] = []
         for q in new_queries:
             seen_queries.add(_norm_query(q))
-            result = await retrieve(session, q, limit=PER_QUERY_LIMIT, balanced=True)
+            result = await retrieve(session, q, limit=PER_QUERY_LIMIT, balanced=True, entity=entity)
             saved = await save_retrieval_set(
                 session, q, result["results"],
                 planner=result["plan"].get("planner", "fallback"),
