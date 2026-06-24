@@ -124,7 +124,13 @@ class _ClaudeToolProvider:
     def __init__(self, model: str | None = None):
         if not settings.anthropic_api_key:
             raise ProviderUnavailable("ANTHROPIC_API_KEY not set")
-        self.model = model or settings.claude_model
+        self.model = model or self._default_model()
+
+    def _default_model(self) -> str:
+        """The model this provider uses when none is passed explicitly.
+        Subclasses override to run on a different tier (e.g. synthesis on Opus
+        while interpretation/planner stay on the cheaper workhorse)."""
+        return settings.claude_model
 
     @property
     def _tool_name(self) -> str:
@@ -308,10 +314,16 @@ class ClaudeResearchPlanner(_ClaudeToolProvider):
 
 
 class ClaudeSynthesisProvider(_ClaudeToolProvider):
-    """Forced `build_synthesis` tool-call — cross-finding synthesis (Goal B3)."""
+    """Forced `build_synthesis` tool-call — cross-finding synthesis (Goal B3).
+    Runs on the stronger `synthesis_model` (Opus by default): this is the one
+    call per report that does the cross-finding reasoning, so quality matters
+    most here and the per-report cost of upgrading a single call is negligible."""
 
     name = "claude"
     tool = SYNTHESIS_TOOL
+
+    def _default_model(self) -> str:
+        return settings.synthesis_model
     # Synthesis emits the full structure (themes + risks + opportunities +
     # diligence questions + coverage_summary), each item carrying multiple
     # citations. At 2000 the JSON tool-call truncated mid-structure and the
