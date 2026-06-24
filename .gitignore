@@ -25,6 +25,7 @@ polaris.db
 *.db
 *.sqlite
 *.sqlite3
+*.partial-bak
 data/cache/
 data/index/
 data/raw/
