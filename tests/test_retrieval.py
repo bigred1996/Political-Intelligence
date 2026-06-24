@@ -182,11 +182,14 @@ def test_no_ai_provider_imports_in_retrieval_module():
     assert "from search.planner import fallback_plan" in source
 
 
-def test_retrieve_route_persists_set_and_validate_citations_rejects_outside_id(tmp_path):
-    asyncio.run(_api_scenario(tmp_path))
+def test_retrieve_route_persists_set_and_validate_citations_rejects_outside_id(tmp_path, monkeypatch):
+    asyncio.run(_api_scenario(tmp_path, monkeypatch))
 
 
-async def _api_scenario(tmp_path):
+async def _api_scenario(tmp_path, monkeypatch):
+    # Hermetic like the sibling tests: don't let a real on-disk index (built from
+    # the production DB, not this seeded one) leak foreign records into results.
+    monkeypatch.setattr(retrieval_mod, "semantic_search", lambda *a, **k: [])
     engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'api_retrieval.db'}", future=True)
     session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with engine.begin() as conn:

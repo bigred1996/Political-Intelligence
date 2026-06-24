@@ -40,7 +40,10 @@ from pipeline.interpretation import (
     get_interpretation_response,
     interpret_finding,
 )
+from pipeline.interpretation_contract import find_conclusion_language
 from pipeline.synthesis_contract import (
+    _VALID_CONFIDENCE,
+    _VALID_LABELS,
     SynthesisContract,
     SynthesisItem,
     build_correction_message,
@@ -63,7 +66,13 @@ TIERS: dict[str, tuple[int, int]] = {
 DEFAULT_TIER = "standard"
 
 MAX_QUERIES_PER_ROUND = 4   # secondary guard: bound queries planned per round
-PER_QUERY_LIMIT = 15        # secondary guard: retrieval breadth per query
+# Retrieval breadth per query. Kept wide on purpose: the final retrieve() ranking
+# is pure score-descending, so a dominant exact-match source (contracts) floods
+# the head — a small pool would be ALL contracts and `_interleave_by_table` would
+# have nothing else to spread the interpretation cap across. A wide pool lets the
+# round-robin actually draw on donations/lobbying/bills/etc. The interpretation
+# cap (TIERS) still bounds how many of these become B2 calls.
+PER_QUERY_LIMIT = 60
 
 
 def resolve_tier(depth_tier: str | None) -> tuple[str, int, int]:
@@ -76,6 +85,34 @@ def resolve_tier(depth_tier: str | None) -> tuple[str, int, int]:
 
 def _norm_query(q: str) -> str:
     return " ".join((q or "").lower().split())
+
+
+def _interleave_by_table(
+    candidates: list[tuple[str, str, str, str]],
+) -> list[tuple[str, str, str, str]]:
+    """Round-robin the round's evidentiary candidates across source tables so a
+    single dominant source (contracts always outnumber everything) can't consume
+    the whole interpretation cap. Dedup by (table, pk) keeping first occurrence —
+    candidates arrive in retrieval-score order, so per-table order is preserved.
+    Each tuple is (retrieval_set_id, table, pk, title)."""
+    per_table: dict[str, list[tuple[str, str, str, str]]] = {}
+    seen: set[tuple[str, str]] = set()
+    for cand in candidates:
+        _, table, pk, _ = cand
+        key = (table, pk)
+        if key in seen:
+            continue
+        seen.add(key)
+        per_table.setdefault(table, []).append(cand)
+    # One pass takes the next item from every non-empty per-table queue, in
+    # descending queue size (broadest sources first), until all are drained.
+    queues = sorted(per_table.values(), key=len, reverse=True)
+    ordered: list[tuple[str, str, str, str]] = []
+    while queues:
+        queues = [q for q in queues if q]
+        for q in queues:
+            ordered.append(q.pop(0))
+    return ordered
 
 
 # --- planner --------------------------------------------------------------
@@ -200,12 +237,89 @@ def _fallback_synthesis(findings: list[dict[str, Any]], reason: str) -> Synthesi
     )
 
 
+def _deterministic_coverage(findings: list[dict[str, Any]]) -> str:
+    """A coverage_summary built from the run when the model omits or fouls its
+    own — never empty, never conclusion language, so it always passes rule #5."""
+    by_table: dict[str, int] = {}
+    for f in findings:
+        by_table[str(f["table"])] = by_table.get(str(f["table"]), 0) + 1
+    parts = ", ".join(f"{t} ({n})" for t, n in sorted(by_table.items()))
+    return (
+        f"Coverage: {len(findings)} interpreted finding(s) across "
+        f"{len(by_table)} source table(s): {parts}. Some model-proposed "
+        "synthesis items were dropped during validation; see the evidence "
+        "appendix for the full finding set this run is grounded in."
+    )
+
+
+def _salvage_item(
+    item: SynthesisItem, allowed: set[tuple[str, str]],
+) -> SynthesisItem | None:
+    """Sanitize one theme/risk/opportunity: keep only in-run citations, drop the
+    item entirely if it cites nothing valid or contains conclusion language,
+    coerce an unknown epistemic label to the weakest ('speculative'). Returns
+    None to drop the item — every hard rule is still honored item-by-item."""
+    ids = [rid for rid in item.finding_ids if rid in allowed]
+    if not ids:
+        return None
+    if find_conclusion_language(item.title) or find_conclusion_language(item.text):
+        return None
+    label = item.label if item.label in _VALID_LABELS else "speculative"
+    return SynthesisItem(text=item.text, label=label, finding_ids=ids, title=item.title)
+
+
+def _salvage_synthesis(
+    contract: SynthesisContract, allowed_ids: list[tuple[str, str]],
+    findings: list[dict[str, Any]],
+) -> SynthesisContract | None:
+    """Recover the model's real analysis when full validation fails: drop only
+    the offending items/questions rather than discarding everything. Returns
+    None if nothing survives (caller then uses the deterministic placeholder)."""
+    allowed = {(str(t), str(p)) for t, p in allowed_ids}
+    themes = [s for s in (_salvage_item(i, allowed) for i in contract.themes) if s]
+    risks = [s for s in (_salvage_item(i, allowed) for i in contract.material_risks) if s]
+    opps = [s for s in (_salvage_item(i, allowed) for i in contract.opportunities) if s]
+    if not (themes or risks or opps):
+        return None
+    dq = [q for q in contract.diligence_questions if q.strip() and not find_conclusion_language(q)]
+    conf = contract.overall_confidence if contract.overall_confidence in _VALID_CONFIDENCE else "low"
+    cov = (contract.coverage_summary or "").strip()
+    if not cov or find_conclusion_language(cov):
+        cov = _deterministic_coverage(findings)
+    return SynthesisContract(
+        themes=themes, material_risks=risks, opportunities=opps,
+        diligence_questions=dq or ["Have these findings been reviewed by an analyst?"],
+        overall_confidence=conf, coverage_summary=cov, generated_by="claude_salvaged",
+    )
+
+
+def _pick_richer(a: SynthesisContract, b: SynthesisContract) -> SynthesisContract:
+    """The re-prompt sometimes returns a thinner (more truncated) object than the
+    first attempt — salvage from whichever carried more analysis."""
+    return a if len(a.all_items()) >= len(b.all_items()) else b
+
+
+def _salvage_or_fallback(
+    contract: SynthesisContract, findings: list[dict[str, Any]],
+    allowed_ids: list[tuple[str, str]], reason: str,
+) -> SynthesisContract:
+    salvaged = _salvage_synthesis(contract, allowed_ids, findings)
+    if salvaged is not None and validate_synthesis(salvaged, allowed_ids).ok:
+        log.info(
+            "synthesis_salvaged", reason=reason, themes=len(salvaged.themes),
+            risks=len(salvaged.material_risks), opportunities=len(salvaged.opportunities),
+        )
+        return salvaged
+    return _fallback_synthesis(findings, reason)
+
+
 async def _synthesize(
     provider: ClaudeSynthesisProvider | None, topic: str,
     findings: list[dict[str, Any]], allowed_ids: list[tuple[str, str]],
 ) -> tuple[SynthesisContract, int, bool]:
     """Returns (contract, model_calls, degraded). Reuses validate_synthesis for
-    every hard rule; one re-prompt on violation, then a deterministic fallback."""
+    every hard rule; one re-prompt on violation, then item-level salvage of the
+    model's analysis, and only a deterministic placeholder if nothing survives."""
     if provider is None or not findings:
         reason = "no findings" if not findings else "provider_unavailable"
         return _fallback_synthesis(findings, reason), 0, provider is not None
@@ -226,13 +340,16 @@ async def _synthesize(
     try:
         turn2 = await provider.continue_call(system, turn, build_correction_message(result.errors))
     except ProviderError as exc:
-        return _fallback_synthesis(findings, f"reprompt_failed: {exc}"), 2, True
+        return _salvage_or_fallback(contract, findings, allowed_ids, f"reprompt_failed: {exc}"), 2, True
 
     contract2 = contract_from_tool_input(turn2.tool_input, generated_by=provider.name)
     if validate_synthesis(contract2, allowed_ids).ok:
         return contract2, 2, False
     log.warning("synthesis_validation_failed_after_reprompt")
-    return _fallback_synthesis(findings, "validation_failed_after_reprompt"), 2, True
+    # Don't throw away a real analysis over a few bad items — salvage the richer
+    # of the two attempts; placeholder only if nothing survives validation.
+    best = _pick_richer(contract, contract2)
+    return _salvage_or_fallback(best, findings, allowed_ids, "validation_failed_after_reprompt"), 2, True
 
 
 # --- orchestrator ---------------------------------------------------------
@@ -302,18 +419,20 @@ async def run_research(
             "gap_assessment": {"material_gaps_remain": gaps_remain},
         }
 
+        # First retrieve every query in the round and collect its evidentiary
+        # candidates; pseudo-hits become coverage gaps (never an interpret call —
+        # they'd crash B2). Defer interpretation until all queries are in so the
+        # cap can be spent round-robin across source tables, not first-come.
+        candidates: list[tuple[str, str, str, str]] = []
         for q in new_queries:
             seen_queries.add(_norm_query(q))
-            result = await retrieve(session, q, limit=PER_QUERY_LIMIT)
+            result = await retrieve(session, q, limit=PER_QUERY_LIMIT, balanced=True)
             saved = await save_retrieval_set(
                 session, q, result["results"],
                 planner=result["plan"].get("planner", "fallback"),
                 embedding_model=result["embedding_model"],
             )
             round_rec["retrieval_set_ids"].append(saved.id)
-
-            # Interpret evidentiary hits in score order; pseudo-hits become
-            # coverage gaps, never an interpret call (would crash B2).
             for hit in result["results"]:
                 table, pk = str(hit["table"]), str(hit["pk"])
                 if not is_evidentiary(table):
@@ -321,21 +440,26 @@ async def run_research(
                         {"type": "non_evidentiary", "table": table, "pk": pk, "title": hit.get("title", "")}
                     )
                     continue
-                key = (table, pk)
-                if key in interpreted:
-                    continue  # already interpreted this run — don't spend the cap twice
-                if interp_used >= max_interp:
-                    round_rec["coverage_gaps"].append(
-                        {"type": "interpretation_cap_reached", "table": table, "pk": pk}
-                    )
-                    continue
-                interp = await interpret_finding(session, saved.id, table, pk)
-                interp_used += 1
-                if interp.get("from_cache") is False:
-                    model_calls += 1
-                interpreted[key] = interp
-                interpretation_ids.append(interp["id"])
-                round_rec["interpretation_ids"].append(interp["id"])
+                candidates.append((saved.id, table, pk, hit.get("title", "")))
+
+        # Interpret round-robin across tables so one dominant source can't eat
+        # the whole cap; overflow past the cap is logged as a coverage gap.
+        for saved_id, table, pk, _title in _interleave_by_table(candidates):
+            key = (table, pk)
+            if key in interpreted:
+                continue  # already interpreted this run — don't spend the cap twice
+            if interp_used >= max_interp:
+                round_rec["coverage_gaps"].append(
+                    {"type": "interpretation_cap_reached", "table": table, "pk": pk}
+                )
+                continue
+            interp = await interpret_finding(session, saved_id, table, pk)
+            interp_used += 1
+            if interp.get("from_cache") is False:
+                model_calls += 1
+            interpreted[key] = interp
+            interpretation_ids.append(interp["id"])
+            round_rec["interpretation_ids"].append(interp["id"])
 
         rounds.append(round_rec)
 

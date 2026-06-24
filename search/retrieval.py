@@ -295,12 +295,39 @@ async def _search_reports(session: AsyncSession, keywords: list[str], limit: int
     } for r in rows]
 
 
-async def retrieve(session: AsyncSession, query: str, *, limit: int = 40) -> dict[str, Any]:
+def _balance_by_table(hits: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    """Round-robin across source tables instead of a pure score cut, so a source
+    that dominates the score head (semantic `source_records`, or exact-match
+    `contracts`) can't crowd every other source out of the result. `hits` is
+    already score-sorted, so per-table order stays score-ranked. Used by the
+    research loop (`balanced=True`) where breadth across sources is the point;
+    the score-ranked default is kept for /search and /api/retrieve."""
+    by_table: dict[str, list[dict[str, Any]]] = {}
+    for h in hits:
+        by_table.setdefault(h["table"] or "", []).append(h)
+    queues = sorted(by_table.values(), key=len, reverse=True)
+    out: list[dict[str, Any]] = []
+    while queues and len(out) < limit:
+        queues = [q for q in queues if q]
+        for q in queues:
+            if len(out) >= limit:
+                break
+            out.append(q.pop(0))
+    return out
+
+
+async def retrieve(
+    session: AsyncSession, query: str, *, limit: int = 40, balanced: bool = False,
+) -> dict[str, Any]:
     """Run the full deterministic retrieval pipeline for a natural-language query.
 
     Returns a dict with the query, the (deterministic) plan used, the flat
     ranked `results` list, the same results grouped `by_type`, source counts,
     and an explicit `empty` flag — never silently returns nothing.
+
+    `balanced=True` round-robins the final results across source tables rather
+    than truncating by score — the research loop needs every matched source
+    represented, not 60 of whichever source scores highest.
     """
     bounded_limit = min(max(limit, 1), 100)
     plan = fallback_plan(query)
@@ -318,7 +345,11 @@ async def retrieve(session: AsyncSession, query: str, *, limit: int = 40) -> dic
         per_table_limit=25,
     )
     semantic = semantic_search(plan.semantic_query, k=max(40, bounded_limit), sources=plan.sources)
-    tabular = _merge(structured, semantic, bounded_limit * 3)
+    # In balanced mode keep a wider merged pool so a flood of high-scoring
+    # semantic hits can't evict the structured tabular sources before the
+    # round-robin ever sees them.
+    merge_cap = bounded_limit * (8 if balanced else 3)
+    tabular = _merge(structured, semantic, merge_cap)
 
     pseudo: list[dict[str, Any]] = []
     pseudo += await _search_politicians(session, plan.keywords, plan.semantic_query)
@@ -330,7 +361,7 @@ async def retrieve(session: AsyncSession, query: str, *, limit: int = 40) -> dic
 
     hits = [_to_hit(h) for h in tabular] + [_to_hit(h) for h in pseudo]
     hits.sort(key=lambda h: (-h["score"], h["table"] or "", str(h["pk"])))
-    hits = hits[:bounded_limit]
+    hits = _balance_by_table(hits, bounded_limit) if balanced else hits[:bounded_limit]
 
     by_type: dict[str, list[dict[str, Any]]] = {}
     for h in hits:

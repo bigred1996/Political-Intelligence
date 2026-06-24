@@ -46,7 +46,7 @@ def _hit(table: str, pk, score: float = 0.9, title: str | None = None) -> dict:
 
 def _fake_retrieve(hits: list[dict]):
     """Return the same scripted hit list for any query."""
-    async def _retrieve(session, query, *, limit=15):
+    async def _retrieve(session, query, *, limit=15, balanced=False):
         return {
             "results": list(hits),
             "plan": {"planner": "fallback"},
@@ -236,9 +236,47 @@ def test_out_of_run_synthesis_citation_is_rejected(tmp_path, monkeypatch):
 
 async def _out_of_run(tmp_path, monkeypatch):
     engine, session_maker = await _make_db(tmp_path, "outofrun.db", n_bills=1)
-    # Synthesis cites contracts:999999 (never retrieved) twice → both rejected →
-    # deterministic fallback, and the bogus id must not survive anywhere.
+    # The synthesis mixes a valid in-run citation (bills:1) with a bogus one
+    # (contracts:999999, never retrieved). Validation fails, the re-prompt also
+    # fails, then item-level salvage drops ONLY the bogus citation and keeps the
+    # real analysis — the forged id must not survive anywhere.
     synth = ScriptedToolProvider([_bad_synth_input(), _bad_synth_input()])
+    _patch(monkeypatch, retrieve_hits=[_hit("bills", 1)], planner=None, synth=synth)
+
+    async with session_maker() as session:
+        run = await run_research(session, "telecom", "brief")
+
+    assert run["synthesis"]["generated_by"] == "claude_salvaged"
+    cited = [
+        (f["table"], f["pk"])
+        for group in ("themes", "material_risks", "opportunities")
+        for item in run["synthesis"][group]
+        for f in item["findings"]
+    ]
+    assert ("contracts", "999999") not in cited, "an out-of-run citation must never reach the result"
+    assert ("bills", "1") in cited, "the valid in-run citation must be preserved by salvage"
+    assert synth.calls == 2, "expected one re-prompt before salvage"
+    await engine.dispose()
+
+
+def test_unsalvageable_synthesis_falls_back_to_template(tmp_path, monkeypatch):
+    """When EVERY synthesis citation is out-of-run, nothing survives item-level
+    salvage and the run must fall back to the deterministic placeholder."""
+    asyncio.run(_unsalvageable(tmp_path, monkeypatch))
+
+
+async def _unsalvageable(tmp_path, monkeypatch):
+    engine, session_maker = await _make_db(tmp_path, "unsalvageable.db", n_bills=1)
+
+    def _all_bad() -> dict:
+        # Every theme/risk/opportunity cites ONLY contracts:999999 (never retrieved).
+        data = _good_synth_input()
+        for group in ("themes", "material_risks", "opportunities"):
+            for item in data.get(group, []):
+                item["finding_ids"] = [{"table": "contracts", "pk": "999999"}]
+        return data
+
+    synth = ScriptedToolProvider([_all_bad(), _all_bad()])
     _patch(monkeypatch, retrieve_hits=[_hit("bills", 1)], planner=None, synth=synth)
 
     async with session_maker() as session:
@@ -251,8 +289,7 @@ async def _out_of_run(tmp_path, monkeypatch):
         for item in run["synthesis"][group]
         for f in item["findings"]
     ]
-    assert ("contracts", "999999") not in cited, "an out-of-run citation must never reach the result"
-    assert synth.calls == 2, "expected one re-prompt before falling back"
+    assert ("contracts", "999999") not in cited
     await engine.dispose()
 
 

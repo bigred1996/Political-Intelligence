@@ -312,4 +312,10 @@ class ClaudeSynthesisProvider(_ClaudeToolProvider):
 
     name = "claude"
     tool = SYNTHESIS_TOOL
-    max_tokens = 2000
+    # Synthesis emits the full structure (themes + risks + opportunities +
+    # diligence questions + coverage_summary), each item carrying multiple
+    # citations. At 2000 the JSON tool-call truncated mid-structure and the
+    # trailing required field (coverage_summary) was silently dropped, failing
+    # validation and collapsing every run to the placeholder fallback. Give it
+    # real headroom so the model can finish the object.
+    max_tokens = 6000
