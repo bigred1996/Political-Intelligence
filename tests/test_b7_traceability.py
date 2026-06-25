@@ -195,7 +195,7 @@ async def _happy_path_scenario(tmp_path, monkeypatch):
     assert n == 2
     bars = risk_distribution(workspace["findings"])
     assert sum(b["value"] for b in bars) == n
-    assert memo["sections"]["evidence_appendix"].count("<tr>") == n + 1  # rows + header
+    assert memo["sections"]["appendix"].count("<tr>") == n + 1  # rows + header
 
     # Every synthesis citation in the memo's own run is a real, in-run record —
     # checked with validate_citations itself, never a hand-rolled equivalent.
@@ -320,7 +320,7 @@ def test_fallback_content_never_contains_conclusion_language():
         assert find_conclusion_language(item.text) == [], item.text
 
 
-def test_section_order_is_stable_seventeen_sections():
+def test_section_order_is_stable_seven_sections():
     """Sanity pin so a future change to SECTION_ORDER doesn't silently change
     the contract the rest of this file (and the PDF) assumes."""
-    assert len(SECTION_ORDER) == 17
+    assert len(SECTION_ORDER) == 7

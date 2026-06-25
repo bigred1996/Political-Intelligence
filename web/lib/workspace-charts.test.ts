@@ -10,6 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  categorySeverityMatrix,
   connectedNetwork,
   findingsByYear,
   riskDistribution,
@@ -50,6 +51,31 @@ test("riskDistribution: counts by level, severity order, no empty buckets", () =
     { key: "elevated", label: "Elevated", value: 1 },
     { key: "watch", label: "Watch", value: 1 },
   ]);
+});
+
+test("categorySeverityMatrix: grids present categories × severity, lists absent ones", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const withCat = (category: string, risk_level: string) => ({ ...finding({ risk_level }), category }) as any;
+  const m = categorySeverityMatrix([
+    withCat("political_attention", "elevated"),
+    withCat("political_attention", "watch"),
+    withCat("legislative_regulatory", "high"),
+  ]);
+  // Present categories follow CAT_ORDER (political before legislative); cols are high→watch.
+  assert.deepEqual(m.rows, ["Political & reputational", "Legislative & regulatory"]);
+  assert.deepEqual(m.colKeys, ["high", "elevated", "watch"]);
+  assert.deepEqual(m.values, [
+    [0, 1, 1], // political: 0 high, 1 elevated, 1 watch
+    [1, 0, 0], // legislative: 1 high
+  ]);
+  // Tracked-but-unobserved categories are reported, never rendered as empty rows.
+  assert.deepEqual(m.absentRows, ["Government support", "Lobbying & stakeholders"]);
+});
+
+test("categorySeverityMatrix: empty input yields an empty grid (no fabricated rows)", () => {
+  const m = categorySeverityMatrix([]);
+  assert.equal(m.rows.length, 0);
+  assert.equal(m.values.length, 0);
 });
 
 test("sectorExposure: counts by resolved sector, busiest first, untracked excluded", () => {

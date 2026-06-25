@@ -83,6 +83,53 @@ export function sourceCoverageBars(coverage: WorkspaceSourceCoverage[]): ChartBa
   return coverage.map((c) => ({ key: c.source_type, label: c.label, value: c.count }));
 }
 
+// Diligence category → human label / display order. Mirrors pipeline.diligence
+// CATEGORY + pipeline.memo_builder.CAT_LABEL so the web heat matrix and the PDF
+// memo's signature exhibit read identically.
+const CAT_LABEL: Record<string, string> = {
+  political_attention: "Political & reputational",
+  legislative_regulatory: "Legislative & regulatory",
+  govt_support: "Government support",
+  lobbying_stakeholders: "Lobbying & stakeholders",
+  other: "Other signals",
+};
+const CAT_ORDER = ["political_attention", "legislative_regulatory", "govt_support", "lobbying_stakeholders", "other"];
+
+/** The category × severity heat matrix — the memo's signature exhibit, ported
+    to the workspace. `rows`/`cols`/`values` form the grid (count per cell);
+    `keys` carry the category slug per row so a cell click can drill to a filter;
+    `absentRows` are the tracked categories with zero findings (shown as one
+    muted line, never empty rows). */
+export type HeatMatrix = {
+  rows: string[];
+  keys: string[];
+  cols: string[];
+  colKeys: string[];
+  values: number[][];
+  absentRows: string[];
+};
+
+export function categorySeverityMatrix(findings: WorkspaceFinding[]): HeatMatrix {
+  const grid = new Map<string, Record<string, number>>();
+  for (const f of findings) {
+    const cat = f.category || "other";
+    const lvl = RISK_ORDER.includes(f.meta.risk_level as (typeof RISK_ORDER)[number]) ? f.meta.risk_level : "watch";
+    const row = grid.get(cat) ?? { high: 0, elevated: 0, watch: 0 };
+    row[lvl] = (row[lvl] ?? 0) + 1;
+    grid.set(cat, row);
+  }
+  const present = CAT_ORDER.filter((c) => grid.has(c));
+  const absent = CAT_ORDER.filter((c) => !grid.has(c) && c !== "other").map((c) => CAT_LABEL[c]);
+  return {
+    rows: present.map((c) => CAT_LABEL[c] ?? c),
+    keys: present,
+    cols: RISK_ORDER.map((r) => RISK_LABEL[r]),
+    colKeys: [...RISK_ORDER],
+    values: present.map((c) => RISK_ORDER.map((lvl) => grid.get(c)?.[lvl] ?? 0)),
+    absentRows: absent,
+  };
+}
+
 // Connected-entity kind → network edge colour bucket. The radial primitive only
 // knows four edge types; this maps the directory tables onto them deterministically.
 const KIND_TO_TYPE: Record<string, NetNode["type"]> = {

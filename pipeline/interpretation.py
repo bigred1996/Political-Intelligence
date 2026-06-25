@@ -110,6 +110,16 @@ def _build_prompt(finding: dict[str, Any], context: list[dict[str, Any]], allowe
         "speculative, matching how certain that specific claim actually is.\n"
         "5. If confidence is not high, or the evidence is thin, state exactly "
         "why in evidence_limitations — never 'none' or 'n/a'.\n"
+        "\nLENGTH & STYLE — this feeds a one-page client memo, so be terse and "
+        "scannable. Do NOT pad, and do NOT restate the same point across fields:\n"
+        "- source_fact: ONE sentence, <=25 words — the bare who/what/when/how-much. "
+        "State the entity name once; do not repeat it inside the other fields.\n"
+        "- interpretation: at most 2 sentences. Lead with the single most "
+        "material point; drop hedging boilerplate.\n"
+        "- impact: exactly ONE sentence — the single 'so what' a partner needs.\n"
+        "- recommendation: ONE sentence.\n"
+        "Never re-describe the literal record again inside interpretation/impact "
+        "— assume the reader has already seen source_fact.\n"
         "Call build_interpretation with your answer."
     )
     allowed_str = ", ".join(f"{t}:{p}" for t, p in allowed_ids_shown)

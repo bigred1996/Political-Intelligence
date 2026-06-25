@@ -36,19 +36,30 @@ INTERPRETATION_TOOL: dict[str, Any] = {
         "properties": {
             "source_fact": {
                 "type": "string",
-                "description": "ONLY what the record literally states. No inference, no opinion, no characterization.",
+                "description": (
+                    "ONE sentence, <=25 words. ONLY what the record literally states "
+                    "(who/what/when/how-much). No inference, opinion, or characterization. "
+                    "Name the entity once."
+                ),
             },
             "interpretation": {
                 "type": "string",
-                "description": "What the fact may mean commercially. Never a buy/sell/proceed/valuation conclusion.",
+                "description": (
+                    "At most 2 sentences. What the fact may mean commercially, lead with the "
+                    "most material point. Do not restate source_fact. Never a "
+                    "buy/sell/proceed/valuation conclusion."
+                ),
             },
             "impact": {
                 "type": "string",
-                "description": "Potential commercial or transaction impact. Never a buy/sell/proceed/valuation conclusion.",
+                "description": (
+                    "Exactly ONE sentence — the single 'so what' for a partner. Never a "
+                    "buy/sell/proceed/valuation conclusion."
+                ),
             },
             "recommendation": {
                 "type": "string",
-                "description": "ONLY a diligence question, a monitoring step, or an expert-review suggestion.",
+                "description": "ONE sentence — only a diligence question, a monitoring step, or an expert-review suggestion.",
             },
             "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
             "evidence_limitations": {

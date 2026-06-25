@@ -9,7 +9,6 @@ import {
 } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
 import {
-  ChartFrame,
   ConfidenceBadge,
   EmptyState,
   InterpretationBadge,
@@ -18,8 +17,9 @@ import {
   Pill,
   SeverityBadge,
 } from "@/components/ui";
-import { BarList, RadialNetwork, TrendBars } from "@/components/dataviz";
+import { BarList, HeatMatrix, RadialNetwork, TrendBars } from "@/components/dataviz";
 import {
+  categorySeverityMatrix,
   connectedNetwork,
   findingsByYear,
   riskDistribution,
@@ -61,6 +61,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const riskBars = useMemo(() => riskDistribution(filtered), [filtered]);
   const sectorBars = useMemo(() => sectorExposure(filtered), [filtered]);
   const yearBars = useMemo(() => findingsByYear(filtered), [filtered]);
+  const heatMatrix = useMemo(() => categorySeverityMatrix(filtered), [filtered]);
   // Source coverage + connections are run-level overviews (full run, like a legend).
   const coverageBars = useMemo(() => sourceCoverageBars(data?.workspace.source_coverage ?? []), [data]);
   const netNodes = useMemo(() => connectedNetwork(data?.workspace.connected ?? []), [data]);
@@ -81,7 +82,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   const { review, run, workspace } = data;
   const s = run?.synthesis;
-  const byCat = (cat: string) => filtered.filter((f) => f.category === cat);
 
   return (
     <div className="animate-rise space-y-gutter pb-16">
@@ -136,187 +136,162 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
       {run && (
         <>
-          {/* 1. Executive overview */}
-          <Section title="Executive overview" empty={!s?.coverage_summary}>
-            {s && (
-              <div className="p-4 space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <ConfidenceBadge value={s.overall_confidence} />
-                  <Pill>synthesis: {s.generated_by}</Pill>
-                  <Pill>{run.rounds_used} round(s)</Pill>
-                  <Pill>{workspace.findings.length} finding(s)</Pill>
-                  <Pill>{workspace.source_coverage.length} source(s)</Pill>
-                </div>
-                <p className="font-body-md text-body-md text-on-surface leading-relaxed">{s.coverage_summary}</p>
+          {/* 1. Executive summary — coverage narrative + "what we found" themes,
+              mirroring the memo's lead section. */}
+          <Section title="Executive summary" empty={!s?.coverage_summary && (s?.themes.length ?? 0) === 0}>
+            <div className="p-4 space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                {s && <ConfidenceBadge value={s.overall_confidence} />}
+                {s && <Pill>synthesis: {s.generated_by}</Pill>}
+                <Pill>{run.rounds_used} round(s)</Pill>
+                <Pill>{workspace.findings.length} finding(s)</Pill>
+                <Pill>{workspace.source_coverage.length} source(s)</Pill>
               </div>
-            )}
+              {s?.coverage_summary && (
+                <p className="font-body-md text-body-md text-on-surface leading-relaxed">{s.coverage_summary}</p>
+              )}
+              {s && s.themes.length > 0 && (
+                <div className="divide-y divide-outline-variant/40 border-t border-outline-variant/40">
+                  {s.themes.map((t, i) => <SynthRow key={i} item={t} heading={t.title} />)}
+                </div>
+              )}
+            </div>
           </Section>
 
-          {/* Filter bar */}
+          {/* Filter bar — narrows every list + chart below with no server round-trip. */}
           <FilterBar facets={workspace.facets} filters={filters} setFilters={setFilters}
             shown={filtered.length} total={findings.length} />
 
-          {/* 2. Company & sector exposure */}
-          <Section title="Company & sector exposure"
-            empty={filtered.length === 0 && (review.sectors?.length ?? 0) === 0}>
-            <div className="p-4 space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <span className="text-[12px] text-on-surface-variant">Declared scope:</span>
-                {(review.sectors ?? []).length
-                  ? review.sectors.map((s2) => <Pill key={s2}>{s2}</Pill>)
-                  : <span className="text-[12px] text-on-surface-variant">no sector declared</span>}
+          {/* 2. Risk snapshot — the memo's signature exhibit. Stat band + category ×
+              severity heat matrix + the supporting charts, all reacting to the filter
+              above; a chart/cell click drills the matching filter. */}
+          <Panel title="Risk snapshot · where the exposure concentrates" bodyClass="p-4 space-y-5">
+            <StatBand
+              findings={filtered.length}
+              sources={workspace.source_coverage.length}
+              period={periodLabel(yearBars)}
+              topRisk={riskBars[0]?.label ?? "None"}
+              confidence={s?.overall_confidence ?? "—"}
+            />
+            <HeatMatrix matrix={heatMatrix} onSelect={(k) => setFilters({ ...filters, risk_level: k ?? "" })} activeKey={filters.risk_level || null} />
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-on-surface-variant items-center">
+              <span>Declared scope:</span>
+              {(review.sectors ?? []).length
+                ? review.sectors.map((s2) => <Pill key={s2}>{s2}</Pill>)
+                : <span>none declared</span>}
+            </div>
+            <div className="grid md:grid-cols-3 gap-5">
+              <MiniChart label="Severity mix">
+                <BarList items={riskBars} color="var(--color-risk-high)" onSelect={(k) => toggle("risk_level", k)} activeKey={filters.risk_level || null} />
+              </MiniChart>
+              <MiniChart label="Activity over time">
+                <TrendBars data={yearBars} onSelect={toggleYear} activeYear={activeYear} />
+              </MiniChart>
+              <MiniChart label="Sector exposure">
+                <BarList items={sectorBars} onSelect={(k) => toggle("sector", k)} activeKey={filters.sector || null} />
+              </MiniChart>
+            </div>
+          </Panel>
+
+          {/* 3. Material developments — the interactive findings list (the analyst's
+              working core; every card drills to its /records page). */}
+          <Section title={`Material developments (${filtered.length})`} empty={filtered.length === 0}>
+            <div className="divide-y divide-outline-variant/40">
+              {timelineItems(filtered).concat(filtered.filter((f) => !f.meta.date))
+                .map((f) => <FindingCard key={`${f.table}:${f.pk}`} f={f} />)}
+            </div>
+          </Section>
+
+          {/* 4. Material risks & opportunities — side by side, mirroring the memo. */}
+          <div className="grid md:grid-cols-2 gap-gutter">
+            <Section title={`Material risks (${s?.material_risks.length ?? 0})`} empty={!s?.material_risks.length}>
+              <div className="divide-y divide-outline-variant/40">
+                {s?.material_risks.map((r, i) => <SynthRow key={i} item={r} />)}
               </div>
-              {workspace.facets.sectors.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-[12px] text-on-surface-variant">Evidence touches:</span>
-                  {workspace.facets.sectors.map((sec) => {
-                    const n = filtered.filter((f) => f.meta.sector_slug === sec.slug).length;
-                    return <Pill key={sec.slug}>{sec.name} · {n}</Pill>;
-                  })}
-                </div>
-              ) : <Insufficient note="No retrieved record resolved to a tracked sector." />}
-            </div>
-          </Section>
+            </Section>
+            <Section title={`Opportunities (${s?.opportunities.length ?? 0})`} empty={!s?.opportunities.length}>
+              <div className="divide-y divide-outline-variant/40">
+                {s?.opportunities.map((o, i) => <SynthRow key={i} item={o} />)}
+              </div>
+            </Section>
+          </div>
 
-          {/* Sector exposure chart — backs the section above; click a bar to filter. */}
-          <ChartFrame title="Sector exposure" subtitle="Findings by resolved sector — click a bar to filter">
-            <BarList items={sectorBars} onSelect={(k) => toggle("sector", k)} activeKey={filters.sector || null} />
-          </ChartFrame>
-
-          {/* Risk distribution chart — overview for the findings below; click to filter. */}
-          <ChartFrame title="Risk distribution" subtitle="Findings by risk level — click a bar to filter">
-            <BarList items={riskBars} color="var(--color-risk-high)" onSelect={(k) => toggle("risk_level", k)} activeKey={filters.risk_level || null} />
-          </ChartFrame>
-
-          {/* 3. Material findings */}
-          <Section title={`Material findings (${filtered.length})`} empty={filtered.length === 0}>
-            <div className="divide-y divide-outline-variant/40">
-              {filtered.map((f) => <FindingCard key={`${f.table}:${f.pk}`} f={f} />)}
-            </div>
-          </Section>
-
-          {/* 4–7. Themed sections */}
-          <CategorySection title="Legislative & regulatory" items={byCat("legislative_regulatory")} />
-          <CategorySection title="Lobbying & stakeholders" items={byCat("lobbying_stakeholders")} />
-          <CategorySection title="Government support & dependency" items={byCat("govt_support")} />
-          <CategorySection title="Political & reputational attention" items={byCat("political_attention")} />
-
-          {/* Connection map — visual overview of the connected directory hits.
-              The chip list below remains the exhaustive, linkable enumeration. */}
-          {workspace.connected.length > 0 && (
-            <ChartFrame title="Connection map" subtitle={`${workspace.connected.length} connected ${workspace.connected.length === 1 ? "entity" : "entities"}`}>
-              <RadialNetwork center={review.company || "Subject"} nodes={netNodes} />
-            </ChartFrame>
-          )}
-
-          {/* 8. Connected people & orgs */}
-          <Section title={`Connected people & organizations (${workspace.connected.length})`}
+          {/* 5. Stakeholders & connections — radial map + the exhaustive linkable list. */}
+          <Section title={`Political stakeholders & connections (${workspace.connected.length})`}
             empty={workspace.connected.length === 0}>
-            <div className="p-4 flex flex-wrap gap-2">
-              {workspace.connected.map((c) => (
-                <LinkChip key={`${c.table}:${c.pk}`} href={c.internal_url} title={c.title}>
-                  <span className="material-symbols-outlined text-[14px]">
-                    {c.kind === "politicians" ? "account_balance" : c.kind === "committees" ? "groups" : "corporate_fare"}
-                  </span>
-                  {c.title}
-                </LinkChip>
-              ))}
-            </div>
-          </Section>
-
-          {/* Findings-over-time chart — backs the timeline; click a column to scope to that year. */}
-          <ChartFrame title="Findings over time"
-            subtitle={workspace.facets.date_min ? `${workspace.facets.date_min} – ${workspace.facets.date_max} · click a year to filter` : "Findings by year — click a column to filter"}>
-            <TrendBars data={yearBars} onSelect={toggleYear} activeYear={activeYear} />
-          </ChartFrame>
-
-          {/* 9. Timeline & events */}
-          <Section title="Timeline & events" empty={timelineItems(filtered).length === 0}>
-            <div className="divide-y divide-outline-variant/40">
-              {timelineItems(filtered).map((f) => (
-                <Link key={`${f.table}:${f.pk}`} href={f.internal_url ?? "#"}
-                  className="flex items-start gap-3 p-3 hover:bg-surface-container-high transition-colors focus-ring">
-                  <span className="font-data-tabular text-[12px] text-on-surface-variant w-24 shrink-0">{f.meta.date}</span>
-                  <span className="min-w-0">
-                    <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">{f.meta.source_label}</span>
-                    <p className="text-[13px] text-on-surface leading-snug">{f.title}</p>
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </Section>
-
-          {/* 10. Risks & opportunities (separated) */}
-          <Section title={`Material risks (${s?.material_risks.length ?? 0})`} empty={!s?.material_risks.length}>
-            <div className="divide-y divide-outline-variant/40">
-              {s?.material_risks.map((r, i) => <SynthRow key={i} item={r} />)}
-            </div>
-          </Section>
-          <Section title={`Opportunities (${s?.opportunities.length ?? 0})`} empty={!s?.opportunities.length}>
-            <div className="divide-y divide-outline-variant/40">
-              {s?.opportunities.map((o, i) => <SynthRow key={i} item={o} />)}
-            </div>
-          </Section>
-
-          {/* Themes (cross-finding clusters) */}
-          <Section title={`Themes (${s?.themes.length ?? 0})`} empty={!s?.themes.length}>
-            <div className="divide-y divide-outline-variant/40">
-              {s?.themes.map((t, i) => <SynthRow key={i} item={t} heading={t.title} />)}
-            </div>
-          </Section>
-
-          {/* 11. Questions for management */}
-          <Section title={`Questions for management (${s?.diligence_questions.length ?? 0})`}
-            empty={!s?.diligence_questions.length}>
-            <ul className="p-4 list-disc pl-8 space-y-1.5">
-              {s?.diligence_questions.map((q, i) => (
-                <li key={i} className="text-[13px] text-on-surface leading-snug">{q}</li>
-              ))}
-            </ul>
-          </Section>
-
-          {/* 12. Further research */}
-          <Section title={`Further research (${workspace.further_research.length})`}
-            empty={workspace.further_research.length === 0}>
-            <div className="p-4 flex flex-wrap gap-2">
-              {workspace.further_research.map((g, i) => (
-                g.internal_url ? (
-                  <LinkChip key={i} href={g.internal_url} title={g.title}>
-                    {g.type.replace(/_/g, " ")}{g.table ? ` · ${g.table}:${g.pk}` : ""}
-                  </LinkChip>
-                ) : (
-                  <span key={i} className="text-[11px] px-1.5 py-0.5 rounded status-chip-amber">
-                    {g.type.replace(/_/g, " ")}
-                  </span>
-                )
-              ))}
-            </div>
-          </Section>
-
-          {/* 13. Source coverage — run-level overview; click a bar to filter the lists by source. */}
-          <Section title="Source coverage" empty={workspace.source_coverage.length === 0}>
-            <div className="p-4 space-y-3">
-              <BarList items={coverageBars} onSelect={(k) => toggle("source_type", k)} activeKey={filters.source_type || null} />
+            <div className="p-4 space-y-4">
+              {workspace.connected.length > 0 && (
+                <div className="max-w-sm mx-auto">
+                  <RadialNetwork center={review.company || "Subject"} nodes={netNodes} />
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
-                {workspace.source_coverage.map((sc) => (
-                  <Pill key={sc.source_type}>{sc.label} · {sc.count}</Pill>
+                {workspace.connected.map((c) => (
+                  <LinkChip key={`${c.table}:${c.pk}`} href={c.internal_url} title={c.title}>
+                    <span className="material-symbols-outlined text-[14px]">
+                      {c.kind === "politicians" ? "account_balance" : c.kind === "committees" ? "groups" : "corporate_fare"}
+                    </span>
+                    {c.title}
+                  </LinkChip>
                 ))}
               </div>
             </div>
           </Section>
 
-          {/* 14. Evidence library */}
-          <Section title={`Evidence library (${filtered.length})`} empty={filtered.length === 0}>
-            <div className="divide-y divide-outline-variant/40">
-              {filtered.map((f) => (
-                <Link key={`${f.table}:${f.pk}`} href={f.internal_url ?? "#"}
-                  className="flex items-center gap-3 p-3 hover:bg-surface-container-high transition-colors focus-ring">
-                  <SeverityBadge severity={f.meta.risk_level} />
-                  <span className="font-label-caps text-label-caps text-on-surface-variant uppercase shrink-0">{f.table}:{f.pk}</span>
-                  <span className="text-[13px] text-on-surface truncate flex-1">{f.title}</span>
-                  {f.meta.date && <span className="font-data-tabular text-[11px] text-on-surface-variant">{f.meta.date}</span>}
-                </Link>
-              ))}
+          {/* 6. Diligence actions — questions for management + further-research gaps. */}
+          <Section title="Diligence actions"
+            empty={!(s?.diligence_questions.length ?? 0) && workspace.further_research.length === 0}>
+            <div className="p-4 space-y-4">
+              {(s?.diligence_questions.length ?? 0) > 0 && (
+                <div>
+                  <div className="font-label-caps text-label-caps text-on-surface-variant uppercase mb-2">Questions for management</div>
+                  <ol className="list-decimal pl-6 space-y-1.5">
+                    {s?.diligence_questions.map((q, i) => (
+                      <li key={i} className="text-[13px] text-on-surface leading-snug">{q}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {workspace.further_research.length > 0 && (
+                <div>
+                  <div className="font-label-caps text-label-caps text-on-surface-variant uppercase mb-2">Lines to pursue</div>
+                  <div className="flex flex-wrap gap-2">
+                    {workspace.further_research.map((g, i) => (
+                      g.internal_url ? (
+                        <LinkChip key={i} href={g.internal_url} title={g.title}>
+                          {g.type.replace(/_/g, " ")}{g.table ? ` · ${g.table}:${g.pk}` : ""}
+                        </LinkChip>
+                      ) : (
+                        <span key={i} className="text-[11px] px-1.5 py-0.5 rounded status-chip-amber">
+                          {g.type.replace(/_/g, " ")}
+                        </span>
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Section>
+
+          {/* 7. Evidence appendix — source coverage + the full linkable record list. */}
+          <Section title={`Evidence appendix (${filtered.length})`} empty={filtered.length === 0}>
+            <div className="p-4 space-y-4">
+              {workspace.source_coverage.length > 0 && (
+                <MiniChart label="Source coverage">
+                  <BarList items={coverageBars} onSelect={(k) => toggle("source_type", k)} activeKey={filters.source_type || null} />
+                </MiniChart>
+              )}
+              <div className="divide-y divide-outline-variant/40 border-t border-outline-variant/40">
+                {filtered.map((f) => (
+                  <Link key={`${f.table}:${f.pk}`} href={f.internal_url ?? "#"}
+                    className="flex items-center gap-3 py-2 hover:bg-surface-container-high transition-colors focus-ring">
+                    <SeverityBadge severity={f.meta.risk_level} />
+                    <span className="font-label-caps text-label-caps text-on-surface-variant uppercase shrink-0">{f.meta.source_label}</span>
+                    <span className="text-[13px] text-on-surface truncate flex-1">{f.title}</span>
+                    {f.meta.date && <span className="font-data-tabular text-[11px] text-on-surface-variant">{f.meta.date}</span>}
+                  </Link>
+                ))}
+              </div>
             </div>
           </Section>
         </>
@@ -349,6 +324,35 @@ function timelineItems(items: WorkspaceFinding[]): WorkspaceFinding[] {
   return items.filter((f) => f.meta.date).sort((a, b) => String(b.meta.date).localeCompare(String(a.meta.date)));
 }
 
+function periodLabel(yearBars: { year: string }[]): string {
+  if (yearBars.length === 0) return "—";
+  if (yearBars.length === 1) return yearBars[0].year;
+  return `${yearBars[0].year}–${yearBars[yearBars.length - 1].year}`;
+}
+
+// The memo's at-a-glance strip — the answer in five numbers — ported to the workspace.
+function StatBand({ findings, sources, period, topRisk, confidence }: {
+  findings: number; sources: number; period: string; topRisk: string; confidence: string;
+}) {
+  const stats: [string, string][] = [
+    [String(findings), "Findings"],
+    [String(sources), "Sources"],
+    [period, "Period"],
+    [topRisk, "Top risk band"],
+    [confidence.charAt(0).toUpperCase() + confidence.slice(1), "Confidence"],
+  ];
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-5 divide-x divide-outline-variant/40 rounded-sm border border-outline-variant/40 overflow-hidden">
+      {stats.map(([n, l]) => (
+        <div key={l} className="px-3 py-2.5">
+          <div className="font-data-tabular text-[20px] font-bold text-on-surface leading-none">{n}</div>
+          <div className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-1">{l}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── sub-components ──────────────────────────────────────────────────────
 function subtitle(review: ReviewWorkspaceResponse["review"]): string {
   const bits = [
@@ -367,13 +371,13 @@ function Section({ title, empty, children }: { title: string; empty: boolean; ch
   );
 }
 
-function CategorySection({ title, items }: { title: string; items: WorkspaceFinding[] }) {
+// A labeled chart cell for the Risk-snapshot / appendix grids.
+function MiniChart({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <Section title={`${title} (${items.length})`} empty={items.length === 0}>
-      <div className="divide-y divide-outline-variant/40">
-        {items.map((f) => <FindingCard key={`${f.table}:${f.pk}`} f={f} />)}
-      </div>
-    </Section>
+    <div className="space-y-1.5">
+      <div className="font-label-caps text-label-caps text-on-surface-variant uppercase">{label}</div>
+      {children}
+    </div>
   );
 }
 

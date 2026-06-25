@@ -254,3 +254,83 @@ export function BarList({
     </div>
   );
 }
+
+// ── Category × severity heat matrix ───────────────────────────────────────
+// The diligence memo's signature exhibit, ported to the workspace so both
+// surfaces read the same. Cell shade scales with the count within the grid;
+// an empty cell is a hairline placeholder, never a fabricated bar. Optional
+// `onSelect(severityKey)` drills the column's severity into the risk filter.
+const HEAT_COL_COLOR: Record<string, string> = {
+  high: "var(--color-risk-high)",
+  elevated: "var(--color-risk-med)",
+  watch: "var(--color-up)",
+};
+
+export function HeatMatrix({
+  matrix,
+  onSelect,
+  activeKey,
+}: {
+  matrix: { rows: string[]; keys: string[]; cols: string[]; colKeys: string[]; values: number[][]; absentRows: string[] };
+  onSelect?: (severityKey: string | null) => void;
+  activeKey?: string | null;
+}) {
+  if (matrix.rows.length === 0) return <NoData h={60} />;
+  const max = Math.max(1, ...matrix.values.flat());
+  return (
+    <div className="space-y-2">
+      <div className="overflow-hidden rounded-sm">
+        {/* header row */}
+        <div className="flex items-stretch gap-[3px] mb-[3px]">
+          <div className="w-44 shrink-0" />
+          {matrix.cols.map((c, j) => {
+            const sevKey = matrix.colKeys[j];
+            const active = activeKey === sevKey;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => onSelect?.(active ? null : sevKey)}
+                aria-pressed={active}
+                className={`flex-1 text-center mono text-[10px] uppercase tracking-wider py-1 rounded-sm focus-ring ${
+                  active ? "text-fg" : "text-fg-dim hover:text-fg"
+                }`}
+              >
+                {c}
+              </button>
+            );
+          })}
+        </div>
+        {matrix.rows.map((r, i) => (
+          <div key={r} className="flex items-stretch gap-[3px] mb-[3px]">
+            <div className="w-44 shrink-0 text-[12px] font-medium text-fg flex items-center pr-2 leading-tight">{r}</div>
+            {matrix.values[i].map((v, j) => {
+              const sevKey = matrix.colKeys[j];
+              const op = v > 0 ? 0.4 + 0.6 * (v / max) : 0;
+              return (
+                <button
+                  key={j}
+                  type="button"
+                  onClick={() => v > 0 && onSelect?.(activeKey === sevKey ? null : sevKey)}
+                  className="flex-1 h-9 rounded-sm flex items-center justify-center text-[12px] font-semibold focus-ring"
+                  style={
+                    v > 0
+                      ? { background: HEAT_COL_COLOR[sevKey], opacity: op, color: "#fff", cursor: onSelect ? "pointer" : "default" }
+                      : { background: "var(--color-panel-2)", color: "var(--color-fg-dim)", cursor: "default" }
+                  }
+                >
+                  {v > 0 ? v : "·"}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {matrix.absentRows.length > 0 && (
+        <p className="text-[11px] text-fg-dim italic">
+          Not observed in this run: {matrix.absentRows.join(", ").toLowerCase()}.
+        </p>
+      )}
+    </div>
+  );
+}

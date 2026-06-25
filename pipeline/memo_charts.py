@@ -129,6 +129,75 @@ def _esc(s: str) -> str:
     return escape(str(s), quote=True)
 
 
+_SVG_DIM = re.compile(r'(<svg\b[^>]*?)\s+width="[\d.]+"\s+height="[\d.]+"')
+
+
+def responsive(svg: str) -> str:
+    """Strip the fixed px width/height (keeping viewBox) so a chart scales to
+    its container instead of overflowing a flex/grid column. The memo's CSS
+    sets the column width; the SVG just fills it and keeps its aspect ratio."""
+    return _SVG_DIM.sub(r'\1 style="width:100%;height:auto"', svg)
+
+
+# category × severity heat matrix — the memo's signature exhibit (KPMG-style,
+# one company's exposure read across diligence categories and severity bands).
+def render_matrix_svg(
+    row_labels: list[str], col_labels: list[str], values: list[list[int]],
+    colors: list[str], *, width: int = 520, label_w: int = 170,
+) -> str:
+    if not row_labels or not col_labels:
+        return '<div class="chart-empty">No data</div>'
+    head_h, row_h, gap = 26, 30, 3
+    grid_w = width - label_w
+    cell_w = (grid_w - gap * (len(col_labels) - 1)) / len(col_labels)
+    height = head_h + len(row_labels) * (row_h + gap)
+    parts = []
+    # column headers
+    for j, c in enumerate(col_labels):
+        x = label_w + j * (cell_w + gap) + cell_w / 2
+        parts.append(
+            f'<text x="{x:.1f}" y="16" font-size="10" font-weight="700" '
+            f'text-anchor="middle" fill="{TEXT_DIM}">{_esc(c)}</text>'
+        )
+    max_v = max((max(r) for r in values if r), default=0) or 1
+    for i, r in enumerate(row_labels):
+        y = head_h + i * (row_h + gap)
+        parts.append(
+            f'<text x="0" y="{y + row_h/2 + 4:.1f}" font-size="10.5" font-weight="600" '
+            f'fill="{TEXT}">{_esc(r[:26])}</text>'
+        )
+        for j, c in enumerate(col_labels):
+            v = values[i][j]
+            x = label_w + j * (cell_w + gap)
+            base = colors[j] if j < len(colors) else PRIMARY
+            if v <= 0:
+                fill, txt_fill, label = PANEL_BG, "#C9C2B0", "·"
+                stroke = f' stroke="{BORDER}"'
+            else:
+                # shade intensity scales with count within the column's max
+                op = 0.45 + 0.55 * (v / max_v)
+                fill, txt_fill, label, stroke = base, "#FFFFFF", str(v), ""
+                parts.append(
+                    f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell_w:.1f}" height="{row_h}" '
+                    f'rx="3" fill="{base}" opacity="{op:.2f}"/>'
+                )
+                parts.append(
+                    f'<text x="{x + cell_w/2:.1f}" y="{y + row_h/2 + 4:.1f}" font-size="11" '
+                    f'font-weight="700" text-anchor="middle" fill="{txt_fill}">{label}</text>'
+                )
+                continue
+            parts.append(
+                f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell_w:.1f}" height="{row_h}" '
+                f'rx="3" fill="{fill}"{stroke}/>'
+                f'<text x="{x + cell_w/2:.1f}" y="{y + row_h/2 + 4:.1f}" font-size="11" '
+                f'text-anchor="middle" fill="{txt_fill}">{label}</text>'
+            )
+    return (
+        f'<svg viewBox="0 0 {width} {height:.0f}" width="{width}" height="{height:.0f}" '
+        f'xmlns="http://www.w3.org/2000/svg">' + "".join(parts) + "</svg>"
+    )
+
+
 def render_bar_list_svg(bars: list[ChartBar], *, color: str = PRIMARY, width: int = 480) -> str:
     """Horizontal bar list, one row per bar — static counterpart of BarList."""
     if not bars:

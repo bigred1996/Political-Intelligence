@@ -1,29 +1,28 @@
-"""Goal B6 — branded PDF memo: section content, built ONLY from a stored
+"""Goal B6 — branded diligence memo: section content, built ONLY from a stored
 Review's workspace (Goal B4) + research run (Goal B3). No model call, no new
 retrieval, no recomputed evidence — every number and every cited record here
-already exists in `get_review_response()`'s output. The PDF's data IS the
+already exists in `get_review_response()`'s output. The memo's data IS the
 workspace's data.
 
-Two layers, like `pipeline/report_builder.py`'s split, but adapted (not
-reused) because the data shape and the no-AI-call constraint are both
-different here:
+Redesigned (2026-06) from 17 dense category sections into 7 consolidated,
+exec-facing sections — KPMG/BCG-style: a stat band, a category × severity heat
+matrix, one-line "so-what" takeaways, a Risks|Opportunities split, and the full
+record list pushed to an appendix. The *data contract* and the B7 citation
+safety path are unchanged:
 
   * `build_sections()` is PURE (no DB, no AI) — one function per section,
-    assembled into a dict, the same "dict-of-renderers" shape
-    `report_builder.build_sections` uses. Fully unit-testable on a literal
-    workspace dict.
+    assembled into a dict keyed by SECTION_ORDER. Fully unit-testable on a
+    literal workspace dict.
   * `get_memo_response()` is the only async/DB-touching piece: it rehydrates
-    the review+run+workspace (`pipeline.diligence.get_review_response`,
-    itself zero model calls) and re-validates every record this module is
-    about to cite against the run's OWN retrieval sets, reusing
+    the review+run+workspace (`pipeline.diligence.get_review_response`, itself
+    zero model calls) and re-validates every record this module is about to
+    cite against the run's OWN retrieval sets, reusing
     `pipeline.citation_registry.validate_citations` exactly as B3's synthesis
     validator does — never reimplemented. Anything that fails (would only
-    happen on a corrupted/forged input) is silently dropped from the
-    rendered output, never shown, never crashes.
+    happen on a corrupted/forged input) is silently dropped, never shown.
 """
 from __future__ import annotations
 
-import re
 from html import escape
 from typing import Any
 
@@ -32,16 +31,10 @@ import structlog
 from pipeline.citation_registry import get_retrieval_set, validate_citations
 from pipeline.diligence import get_review_response
 from pipeline.memo_charts import (
-    AMBER,
-    PRIMARY,
-    connected_network,
-    findings_by_year,
-    render_bar_list_svg,
-    render_radial_network_svg,
-    render_trend_bars_svg,
-    risk_distribution,
-    sector_exposure,
-    source_coverage_bars,
+    AMBER, PRIMARY, RISK_COLOR, RISK_LABEL, RISK_ORDER,
+    connected_network, findings_by_year, render_bar_list_svg,
+    render_matrix_svg, render_radial_network_svg, render_trend_bars_svg,
+    responsive, risk_distribution, sector_exposure, source_coverage_bars,
 )
 
 log = structlog.get_logger()
@@ -53,111 +46,93 @@ _GOVT_SUPPORT = "govt_support"
 _LOBBYING = "lobbying_stakeholders"
 _POLITICAL = "political_attention"
 
+CAT_LABEL = {
+    _POLITICAL: "Political & reputational",
+    _LEGISLATIVE: "Legislative & regulatory",
+    _GOVT_SUPPORT: "Government support",
+    _LOBBYING: "Lobbying & stakeholders",
+    "other": "Other signals",
+}
+CAT_ORDER = [_POLITICAL, _LEGISLATIVE, _GOVT_SUPPORT, _LOBBYING, "other"]
+RISK_RANK = {"high": 3, "elevated": 2, "watch": 1}
+
+# 7 consolidated sections (was 17). Order is the reading order of the memo.
 SECTION_ORDER = [
-    "exec_summary", "overall_risk", "company_sector_exposure", "material_developments",
-    "legislative_regulatory", "govt_support_dependencies", "lobbying_stakeholders",
-    "political_reputational_attention", "key_actors", "cross_source_connections",
-    "upcoming_events", "risks", "opportunities", "questions_for_management",
-    "further_investigation", "evidence_appendix", "coverage_limitations",
+    "exec_summary", "risk_snapshot", "material_developments",
+    "risks_opportunities", "stakeholders", "diligence_actions", "appendix",
 ]
 SECTION_TITLES = {
-    "exec_summary": "Executive Summary",
-    "overall_risk": "Overall Risk",
-    "company_sector_exposure": "Company & Sector Exposure",
-    "material_developments": "Material Developments",
-    "legislative_regulatory": "Legislative & Regulatory",
-    "govt_support_dependencies": "Government Support & Dependencies",
-    "lobbying_stakeholders": "Lobbying & Stakeholders",
-    "political_reputational_attention": "Political & Reputational Attention",
-    "key_actors": "Key Actors",
-    "cross_source_connections": "Cross-Source Connections",
-    "upcoming_events": "Upcoming Events",
-    "risks": "Risks",
-    "opportunities": "Opportunities",
-    "questions_for_management": "Questions for Management",
-    "further_investigation": "Further Investigation",
-    "evidence_appendix": "Evidence Appendix",
-    "coverage_limitations": "Coverage & Limitations",
+    "exec_summary": "Executive summary",
+    "risk_snapshot": "Where the exposure concentrates",
+    "material_developments": "Material developments",
+    "risks_opportunities": "Material risks & opportunities",
+    "stakeholders": "Political stakeholders & connections",
+    "diligence_actions": "Diligence actions",
+    "appendix": "Evidence appendix & coverage",
+}
+SECTION_KICKERS = {
+    "exec_summary": "Bottom line",
+    "risk_snapshot": "Risk snapshot",
+    "material_developments": "What's moving",
+    "risks_opportunities": "So what",
+    "stakeholders": "Who",
+    "diligence_actions": "Next",
+    "appendix": "Evidence",
 }
 
 INSUFFICIENT = '<p class="insufficient">Insufficient evidence in this run for this section.</p>'
 NO_RUN = '<p class="insufficient">No completed research run for this review.</p>'
 
-EXEC_SUMMARY_WORD_CAP = 300
-SECTION_WORD_CAP = 500  # analytical sections: 300–500 words MAX (appendix is unbounded)
+# How many findings render in the body before the rest fall to the appendix.
+DEV_TAKEAWAY_LIMIT = 7
+RISK_OPP_LIMIT = 6
 
 
-# ── word-cap enforcement (generic — trims trailing <li> items, never mid-sentence) ──
+# ── small text/markup helpers ───────────────────────────────────────────────
 
-_TAG_RE = re.compile(r"<[^>]+>")
-_LI_RE = re.compile(r"<li>.*?</li>", re.S)
-
-
-def _word_count(html: str) -> int:
-    return len(_TAG_RE.sub(" ", html).split())
+def _clean(s: Any) -> str:
+    return escape(str(s or "").strip())
 
 
-def _cap_words(html: str, max_words: int) -> str:
-    """Trim trailing list items until under the cap, never truncate mid-item.
-    A non-list section that's already over cap is left alone — its content is
-    a handful of fixed sentences by construction, not an unbounded list."""
-    if _word_count(html) <= max_words:
-        return html
-    items = _LI_RE.findall(html)
-    if not items:
-        return html
-    prefix = html[: html.index(items[0])]
-    suffix = html[html.index(items[-1]) + len(items[-1]):]
-    used = _word_count(prefix) + _word_count(suffix)
-    kept: list[str] = []
-    for it in items:
-        w = _word_count(it)
-        if kept and used + w > max_words:
-            break
-        kept.append(it)
-        used += w
-    dropped = len(items) - len(kept)
-    note = f'<p class="more-note">+{dropped} more finding(s) — see Evidence appendix.</p>' if dropped else ""
-    return prefix + "".join(kept) + suffix + note
+def _trim(text: Any, words: int) -> str:
+    parts = str(text or "").split()
+    return str(text or "") if len(parts) <= words else " ".join(parts[:words]) + "…"
 
 
-# ── shared render helpers ───────────────────────────────────────────────────
+def _links(findings: list[dict[str, Any]], cap: int = 3) -> str:
+    shown = [f for f in findings if f.get("internal_url")][:cap]
+    html = "".join(
+        f'<a class="rec" href="{escape(f["internal_url"])}">{escape(str(f["table"]))}:{escape(str(f["pk"]))}</a>'
+        for f in shown
+    )
+    extra = len([f for f in findings if f.get("internal_url")]) - len(shown)
+    if extra > 0:
+        html += f'<span class="rec-more">+{extra}</span>'
+    return html
+
 
 def _tag(value: str, kind: str = "") -> str:
     cls = f"tag tag-{escape(value)}" if not kind else f"tag tag-{kind}-{escape(value)}"
     return f'<span class="{cls}">{escape(value)}</span>'
 
 
-def _finding_bullet(f: dict[str, Any]) -> str:
-    """claim → evidence → so-what, one bullet per finding: source_fact is the
-    claim/evidence, interpretation+impact is the so-what, the link is the
-    underlying evidentiary record."""
-    meta = f.get("meta", {})
-    bits = [escape(f.get("source_fact") or f.get("title") or "")]
-    if f.get("interpretation"):
-        bits.append(escape(f["interpretation"]))
-    if f.get("impact"):
-        bits.append(f'<span class="so-what">{escape(f["impact"])}</span>')
-    link = (
-        f' <a class="rec-link" href="{escape(f["internal_url"])}">{escape(f["table"])}:{escape(str(f["pk"]))}</a>'
-        if f.get("internal_url") else ""
-    )
-    risk_html = _tag(meta.get("risk_level", "watch"), "risk")
-    return f"<li>{risk_html} {' — '.join(bits)}{link}</li>"
+def _strip_provider_error(text: str) -> str:
+    """Never leak a raw API/provider error string into the deliverable."""
+    if text and any(m in text for m in ("provider_error", "credit balance", "invalid_request_error", "request_id")):
+        return ""
+    return text or ""
 
 
-def _synthesis_list(items: list[dict[str, Any]]) -> str:
-    rows = []
-    for it in items:
-        label = it.get("label", "observed")
-        title = f'<strong>{escape(it["title"])}</strong> — ' if it.get("title") else ""
-        links = "".join(
-            f'<a class="rec-link" href="{escape(fd["internal_url"])}">{escape(fd["table"])}:{escape(str(fd["pk"]))}</a>'
-            for fd in it.get("findings", []) if fd.get("internal_url")
-        )
-        rows.append(f"<li>{_tag(label, 'label')} {title}{escape(it.get('text', ''))} {links}</li>")
-    return f"<ul>{''.join(rows)}</ul>"
+# noise the deterministic-fallback paths emit that must never reach the page
+_NOISE = ("interpretation_cap_reached", "interpretation cap reached", "non evidentiary", "non_evidentiary")
 
+
+def _is_noise(s: Any) -> bool:
+    low = str(s or "").lower()
+    return any(n in low for n in _NOISE)
+
+
+# ── synthesis citation filter (B7) ──────────────────────────────────────────
 
 def _filtered_synthesis(synthesis: dict[str, Any], valid_keys: set[tuple[str, str]]) -> dict[str, Any]:
     """Drop a synthesis item entirely once its citations are filtered down to
@@ -181,204 +156,228 @@ def _filtered_synthesis(synthesis: dict[str, Any], valid_keys: set[tuple[str, st
 
 # ── section builders (pure: ctx in, html out) ───────────────────────────────
 
+def _stat_band(ctx: dict[str, Any]) -> str:
+    """The 'answer in five numbers' strip under the cover (rendered by the shell,
+    returned here so the data stays in the pure layer)."""
+    run, findings, synthesis = ctx["run"], ctx["findings"], ctx["synthesis"]
+    bars = risk_distribution(findings)
+    top = bars[0]["label"] if bars else "None"
+    years = [y["year"] for y in findings_by_year(findings)]
+    span = f"{years[0]}–{years[-1]}" if len(years) > 1 else (years[0] if years else "—")
+    conf = (synthesis.get("overall_confidence") or "low").title() if run else "—"
+    stats = [
+        (str(len(findings)), "Findings"),
+        (str(len(ctx["coverage"])), "Sources"),
+        (span, "Period"),
+        (top, "Top risk band"),
+        (conf, "Confidence"),
+    ]
+    cells = "".join(
+        f'<div class="stat"><div class="stat-n">{escape(v)}</div><div class="stat-l">{escape(label)}</div></div>'
+        for v, label in stats
+    )
+    return f'<div class="statband">{cells}</div>'
+
+
 def _s_exec_summary(ctx: dict[str, Any]) -> str:
     run, findings, synthesis = ctx["run"], ctx["findings"], ctx["synthesis"]
     if run is None:
         return NO_RUN
-    bars = risk_distribution(findings)
-    top_risk = bars[0]["label"] if bars else "none observed"
-    parts = [
-        f"<p><strong>{escape(ctx['review']['company'])}</strong> — "
-        f"{escape(ctx['review'].get('depth_tier', 'standard')).title()}-tier diligence review. "
-        f"{len(findings)} finding(s) across {len(ctx['coverage'])} source(s), "
-        f"{run.get('rounds_used', 0)} research round(s). Overall confidence: "
-        f"<strong>{escape(synthesis.get('overall_confidence', 'low'))}</strong>. "
-        f"Highest risk band observed: <strong>{escape(top_risk)}</strong>.</p>"
-    ]
-    if synthesis.get("coverage_summary"):
-        parts.append(f"<p>{escape(synthesis['coverage_summary'])}</p>")
-    if synthesis.get("material_risks") or synthesis.get("opportunities"):
-        parts.append(
-            f"<p>{len(synthesis.get('material_risks', []))} material risk(s) and "
-            f"{len(synthesis.get('opportunities', []))} opportunity(ies) identified "
-            "— see Risks / Opportunities.</p>"
+    narrative = _strip_provider_error(synthesis.get("coverage_summary") or "")
+    if narrative:
+        narrative = escape(_trim(narrative, 75))
+    else:
+        bars = risk_distribution(findings)
+        top = bars[0]["label"].lower() if bars else "no"
+        narrative = (
+            f"Across {len(findings)} retrieved finding(s) from {len(ctx['coverage'])} source(s), the "
+            f"highest observed risk band is <strong>{escape(top)}</strong>. Synthesis below is drawn "
+            "only from records retrieved in this run."
         )
-    return "".join(parts)
+    rows = ""
+    for t in (synthesis.get("themes") or [])[:5]:
+        rows += (
+            f'<tr><td class="th-cell"><strong>{_clean(t.get("title") or "Theme")}</strong></td>'
+            f'<td>{_clean(_trim(t.get("text"), 45))} <span class="links">{_links(t.get("findings", []))}</span></td></tr>'
+        )
+    table = (
+        '<table class="exec"><thead><tr><th>What we found</th><th>Why it matters</th></tr></thead>'
+        f"<tbody>{rows}</tbody></table>" if rows else ""
+    )
+    return f'<p class="lead">{narrative}</p>{table}'
 
 
-def _s_overall_risk(ctx: dict[str, Any]) -> str:
+def _heat_matrix(findings: list[dict[str, Any]]) -> str:
+    """Category (rows) × severity (cols) count matrix — the memo's signature
+    exhibit. Only categories that appear get a row; absent ones are summarized
+    in one muted line, never four empty cards."""
+    grid: dict[str, dict[str, int]] = {}
+    for f in findings:
+        c = f.get("category", "other")
+        lvl = f["meta"].get("risk_level", "watch")
+        lvl = lvl if lvl in RISK_ORDER else "watch"
+        grid.setdefault(c, {k: 0 for k in RISK_ORDER})[lvl] += 1
+    present = [c for c in CAT_ORDER if c in grid]
+    absent = [CAT_LABEL[c] for c in CAT_ORDER if c not in grid and c != "other"]
+    if not present:
+        return INSUFFICIENT
+    cols = list(RISK_ORDER)  # high, elevated, watch
+    col_labels = [RISK_LABEL[c] for c in cols]
+    colors = [RISK_COLOR[c] for c in cols]
+    values = [[grid[c][lvl] for lvl in cols] for c in present]
+    matrix = responsive(render_matrix_svg([CAT_LABEL[c] for c in present], col_labels, values, colors))
+    muted = (
+        f'<p class="muted">Not observed in this run: {escape(", ".join(absent).lower())}.</p>'
+        if absent else ""
+    )
+    return f'<div class="exhibit">{matrix}</div>{muted}'
+
+
+def _s_risk_snapshot(ctx: dict[str, Any]) -> str:
     findings = ctx["findings"]
     if not findings:
         return INSUFFICIENT
-    bars = risk_distribution(findings)
-    chart = render_bar_list_svg(bars, color=PRIMARY)
-    counts = ", ".join(f"{b['value']} {b['label'].lower()}" for b in bars)
-    high = sorted(
-        (f for f in findings if f["meta"].get("risk_level") == "high"),
-        key=lambda f: f["meta"].get("date") or "", reverse=True,
+    heat = _heat_matrix(findings)
+    dist = responsive(render_bar_list_svg(risk_distribution(findings), color=PRIMARY, width=380))
+    years = findings_by_year(findings)
+    tl = responsive(render_trend_bars_svg(years, color=PRIMARY, width=380, height=120)) if years else ""
+    sect = sector_exposure(findings)
+    sect_svg = responsive(render_bar_list_svg(sect, color=AMBER, width=380)) if sect else ""
+    cols = (
+        f'<div class="ex"><div class="ex-t">Severity mix</div>{dist}</div>'
+        f'<div class="ex"><div class="ex-t">Activity over time</div>{tl}</div>'
     )
-    body = f'<div class="chart">{chart}</div><p>{len(findings)} finding(s): {counts}.</p>'
-    if high:
-        body += f'<p class="lead">Highest-severity findings:</p><ul>{"".join(_finding_bullet(f) for f in high)}</ul>'
-    return body
+    if sect_svg:
+        cols += f'<div class="ex"><div class="ex-t">Sector exposure</div>{sect_svg}</div>'
+    return f'{heat}<div class="exrow">{cols}</div>'
 
 
-def _s_company_sector_exposure(ctx: dict[str, Any]) -> str:
-    declared = ctx["review"].get("sectors") or []
-    bars = sector_exposure(ctx["findings"])
-    declared_html = ", ".join(escape(s) for s in declared) if declared else "none declared"
-    if bars:
-        touched_html = ", ".join(f"{escape(b['label'])} ({b['value']})" for b in bars)
-        chart = f'<div class="chart">{render_bar_list_svg(bars, color=PRIMARY)}</div>'
-    else:
-        touched_html = "no tracked sector resolved from retrieved evidence"
-        chart = ""
-    return f"<p>Declared scope: {declared_html}.</p><p>Evidence touches: {touched_html}.</p>{chart}"
+def _takeaway(f: dict[str, Any]) -> str:
+    lvl = f["meta"].get("risk_level", "watch")
+    date = f["meta"].get("date") or ""
+    headline = _clean(_trim(f.get("source_fact") or f.get("title"), 26))
+    sowhat = _clean(_trim(f.get("impact") or f.get("interpretation") or "", 40))
+    dot = f'<span class="dot" style="background:{RISK_COLOR.get(lvl, PRIMARY)}"></span>'
+    link = _links([f], cap=1)
+    so_html = f'<div class="take-s">{sowhat} {link}</div>' if sowhat else (f'<div class="take-s">{link}</div>' if link else "")
+    return (
+        f'<li>{dot}<div class="take"><div class="take-h">{headline}'
+        f'<span class="take-d">{escape(date)}</span></div>{so_html}</div></li>'
+    )
 
 
 def _s_material_developments(ctx: dict[str, Any]) -> str:
     findings = ctx["findings"]
     if not findings:
         return INSUFFICIENT
-    years = findings_by_year(findings)
-    chart = f'<div class="chart">{render_trend_bars_svg(years, color=PRIMARY)}</div>' if years else ""
-    ordered = sorted(findings, key=lambda f: f["meta"].get("date") or "", reverse=True)
-    return f"{chart}<ul>{''.join(_finding_bullet(f) for f in ordered)}</ul>"
-
-
-def _category_section(category: str):
-    def _builder(ctx: dict[str, Any]) -> str:
-        items = [f for f in ctx["findings"] if f.get("category") == category]
-        if not items:
-            return INSUFFICIENT
-        return f"<ul>{''.join(_finding_bullet(f) for f in items)}</ul>"
-    return _builder
-
-
-def _s_key_actors(ctx: dict[str, Any]) -> str:
-    actors = [c for c in ctx["connected"] if c["kind"] in ("politicians", "committees")]
-    if not actors:
-        return INSUFFICIENT
-    items = "".join(
-        f'<li><a href="{escape(c["internal_url"])}">{escape(c["title"])}</a> {_tag(c["kind"])}</li>'
-        for c in actors
+    ordered = sorted(
+        findings,
+        key=lambda f: (RISK_RANK.get(f["meta"].get("risk_level"), 1), f["meta"].get("date") or ""),
+        reverse=True,
     )
-    return f"<ul>{items}</ul>"
+    top = ordered[:DEV_TAKEAWAY_LIMIT]
+    items = "".join(_takeaway(f) for f in top)
+    more = len(findings) - len(top)
+    note = f'<p class="muted">+{more} further finding(s) in the evidence appendix.</p>' if more > 0 else ""
+    return f'<ul class="takes">{items}</ul>{note}'
 
 
-def _s_cross_source_connections(ctx: dict[str, Any]) -> str:
+def _synthesis_bullets(items: list[dict[str, Any]]) -> str:
+    out = ""
+    for it in items[:RISK_OPP_LIMIT]:
+        txt = _clean(_trim(it.get("text") or it.get("title"), 40))
+        if not txt:
+            continue
+        out += f'<li>{txt} <span class="links">{_links(it.get("findings", []))}</span></li>'
+    return f"<ul>{out}</ul>" if out else '<p class="muted">None identified in this run.</p>'
+
+
+def _s_risks_opportunities(ctx: dict[str, Any]) -> str:
+    syn = ctx["synthesis"]
+    risks, opps = syn.get("material_risks") or [], syn.get("opportunities") or []
+    if not risks and not opps:
+        return INSUFFICIENT
+    return (
+        '<div class="twocol">'
+        f'<div><div class="col-t risk">Material risks</div>{_synthesis_bullets(risks)}</div>'
+        f'<div><div class="col-t opp">Opportunities &amp; angles</div>{_synthesis_bullets(opps)}</div>'
+        "</div>"
+    )
+
+
+def _s_stakeholders(ctx: dict[str, Any]) -> str:
     connected = ctx["connected"]
     if not connected:
         return INSUFFICIENT
     nodes = connected_network(connected)
-    chart = render_radial_network_svg(ctx["review"].get("company") or "Subject", nodes)
-    items = "".join(
-        f'<li><a href="{escape(c["internal_url"])}">{escape(c["title"])}</a> {_tag(c["kind"])}</li>'
-        for c in connected
+    chart = responsive(render_radial_network_svg(ctx["review"].get("company") or "Subject", nodes, size=300))
+    actors = "".join(
+        f'<li><a href="{escape(c["internal_url"])}">{escape(c["title"])}</a> {_tag(c.get("kind", ""))}</li>'
+        for c in connected[:10]
     )
-    return f'<div class="chart">{chart}</div><ul>{items}</ul>'
+    return f'<div class="netwrap"><div class="net">{chart}</div><ul class="actors">{actors}</ul></div>'
 
 
-def _s_upcoming_events(ctx: dict[str, Any]) -> str:
-    dated = [f for f in ctx["findings"] if f["meta"].get("date")]
-    if not dated:
-        return INSUFFICIENT
-    ordered = sorted(dated, key=lambda f: f["meta"]["date"], reverse=True)[:10]
-    note = (
-        '<p class="note">Nessus retrieves historical public records, not a forward calendar — '
-        "the most recently dated activity is shown as the closest available signal for "
-        "forthcoming developments.</p>"
-    )
-    return f"{note}<ul>{''.join(_finding_bullet(f) for f in ordered)}</ul>"
+def _s_diligence_actions(ctx: dict[str, Any]) -> str:
+    qs = [q for q in (ctx["synthesis"].get("diligence_questions") or []) if not _is_noise(q)]
+    gaps = [
+        g for g in ctx["further"]
+        if g.get("title") and not _is_noise(g.get("title")) and not _is_noise(g.get("type"))
+    ]
+    parts = ""
+    if qs:
+        q_html = "".join(f"<li>{_clean(q)}</li>" for q in qs[:6])
+        parts += f'<div class="col-t">Questions for management</div><ol class="qs">{q_html}</ol>'
+    if gaps:
+        g_html = ""
+        for g in gaps[:6]:
+            title = _clean(g.get("title") or g.get("type"))
+            g_html += (
+                f'<li><a href="{escape(g["internal_url"])}">{title}</a></li>'
+                if g.get("internal_url") else f"<li>{title}</li>"
+            )
+        parts += f'<div class="col-t">Lines to pursue</div><ul>{g_html}</ul>'
+    return parts or INSUFFICIENT
 
 
-def _s_risks(ctx: dict[str, Any]) -> str:
-    items = ctx["synthesis"].get("material_risks", [])
-    return _synthesis_list(items) if items else INSUFFICIENT
-
-
-def _s_opportunities(ctx: dict[str, Any]) -> str:
-    items = ctx["synthesis"].get("opportunities", [])
-    return _synthesis_list(items) if items else INSUFFICIENT
-
-
-def _s_questions_for_management(ctx: dict[str, Any]) -> str:
-    qs = ctx["synthesis"].get("diligence_questions", [])
-    if not qs:
-        return INSUFFICIENT
-    return f"<ol>{''.join(f'<li>{escape(q)}</li>' for q in qs)}</ol>"
-
-
-def _s_further_investigation(ctx: dict[str, Any]) -> str:
-    gaps = ctx["further"]
-    if not gaps:
-        return INSUFFICIENT
-    items = []
-    for g in gaps:
-        label = _tag(str(g.get("type", "")).replace("_", " "))
-        title = escape(g.get("title") or g.get("type", ""))
-        if g.get("internal_url"):
-            items.append(f'<li><a href="{escape(g["internal_url"])}">{title}</a> {label}</li>')
-        else:
-            items.append(f"<li>{title} {label}</li>")
-    return f"<ul>{''.join(items)}</ul>"
-
-
-def _s_evidence_appendix(ctx: dict[str, Any]) -> str:
-    findings = ctx["findings"]
+def _s_appendix(ctx: dict[str, Any]) -> str:
+    findings, run, synthesis = ctx["findings"], ctx["run"], ctx["synthesis"]
     if not findings:
         return INSUFFICIENT
-    rows = []
+    rows = ""
     for f in sorted(findings, key=lambda f: (f["meta"].get("source_label", ""), f["meta"].get("date") or "")):
-        link = f'<a href="{escape(f["internal_url"])}">record</a>' if f.get("internal_url") else ""
-        rows.append(
-            f"<tr><td>{escape(f['meta'].get('source_label', ''))}</td>"
-            f"<td>{escape(f['table'])}:{escape(str(f['pk']))}</td>"
-            f"<td>{escape(f['meta'].get('date') or '')}</td><td>{link}</td></tr>"
+        link = f'<a href="{escape(f["internal_url"])}">open</a>' if f.get("internal_url") else ""
+        lvl = f["meta"].get("risk_level", "watch")
+        rows += (
+            f'<tr><td>{escape(f["meta"].get("source_label", ""))}</td>'
+            f'<td>{_tag(lvl, "risk")}</td>'
+            f'<td>{_clean(_trim(f.get("source_fact") or f.get("title"), 32))}</td>'
+            f'<td>{escape(f["meta"].get("date") or "")}</td><td>{link}</td></tr>'
         )
-    return (
-        "<table><thead><tr><th>Source</th><th>Record</th><th>Date</th><th>Link</th></tr></thead>"
-        f"<tbody>{''.join(rows)}</tbody></table>"
+    table = (
+        '<table class="appx"><thead><tr><th>Source</th><th>Risk</th><th>Record</th>'
+        f'<th>Date</th><th></th></tr></thead><tbody>{rows}</tbody></table>'
     )
-
-
-def _s_coverage_limitations(ctx: dict[str, Any]) -> str:
-    run, synthesis = ctx["run"], ctx["synthesis"]
-    if run is None:
-        return NO_RUN
-    bars = source_coverage_bars(ctx["coverage"])
-    chart = f'<div class="chart">{render_bar_list_svg(bars, color=AMBER)}</div>' if bars else ""
-    method = (
-        "AI-assisted (Claude)" if synthesis.get("generated_by") == "claude"
-        else "Deterministic fallback — analyst review required"
+    cov = source_coverage_bars(ctx["coverage"])
+    cov_svg = responsive(render_bar_list_svg(cov, color=AMBER, width=380)) if cov else ""
+    cov_block = f'<div class="ex-t">Source coverage</div><div class="exhibit-sm">{cov_svg}</div>' if cov_svg else ""
+    method = "AI-assisted (Claude)" if synthesis.get("generated_by") == "claude" else "Deterministic fallback — analyst review required"
+    meta = (
+        f'<p class="muted">Method: {method} · {run.get("rounds_used", 0)}/{run.get("max_rounds", 0)} rounds · '
+        f'{run.get("model_call_count", 0)} model calls · provider {escape(run.get("provider", "none"))}. '
+        "Every cited record is independently retrievable at /records/&lt;table&gt;/&lt;pk&gt;.</p>"
     )
-    stats = (
-        f"<p>Rounds: {run.get('rounds_used', 0)}/{run.get('max_rounds', 0)} &middot; "
-        f"Interpretations: {run.get('interpretations_used', 0)}/{run.get('max_interpretations', 0)} &middot; "
-        f"Model calls: {run.get('model_call_count', 0)} &middot; Provider: {escape(run.get('provider', 'none'))} "
-        f"&middot; Synthesis method: {method}.</p>"
-    )
-    return f"{chart}{stats}"
+    return f"{cov_block}{table}{meta}"
 
 
 _BUILDERS = {
     "exec_summary": _s_exec_summary,
-    "overall_risk": _s_overall_risk,
-    "company_sector_exposure": _s_company_sector_exposure,
+    "risk_snapshot": _s_risk_snapshot,
     "material_developments": _s_material_developments,
-    "legislative_regulatory": _category_section(_LEGISLATIVE),
-    "govt_support_dependencies": _category_section(_GOVT_SUPPORT),
-    "lobbying_stakeholders": _category_section(_LOBBYING),
-    "political_reputational_attention": _category_section(_POLITICAL),
-    "key_actors": _s_key_actors,
-    "cross_source_connections": _s_cross_source_connections,
-    "upcoming_events": _s_upcoming_events,
-    "risks": _s_risks,
-    "opportunities": _s_opportunities,
-    "questions_for_management": _s_questions_for_management,
-    "further_investigation": _s_further_investigation,
-    "evidence_appendix": _s_evidence_appendix,
-    "coverage_limitations": _s_coverage_limitations,
+    "risks_opportunities": _s_risks_opportunities,
+    "stakeholders": _s_stakeholders,
+    "diligence_actions": _s_diligence_actions,
+    "appendix": _s_appendix,
 }
 
 
@@ -386,8 +385,10 @@ def build_sections(
     review: dict[str, Any], run: dict[str, Any] | None, workspace: dict[str, Any],
     valid_keys: set[tuple[str, str]],
 ) -> dict[str, str]:
-    """Pure: every section built only from the (already-validated) workspace
-    + run dicts already returned by `get_review_response`. No DB, no AI."""
+    """Pure: every section built only from the (already-validated) workspace +
+    run dicts already returned by `get_review_response`. No DB, no AI. The
+    `valid_keys` gate is the B7 guarantee — a record absent from it can never
+    reach a rendered section."""
     findings = [f for f in workspace.get("findings", []) if (str(f["table"]), str(f["pk"])) in valid_keys]
     connected = [c for c in workspace.get("connected", []) if (str(c["table"]), str(c["pk"])) in valid_keys]
     further = [
@@ -400,15 +401,8 @@ def build_sections(
         "review": review, "run": run, "findings": findings, "connected": connected,
         "synthesis": synthesis, "coverage": workspace.get("source_coverage", []), "further": further,
     }
-
-    out: dict[str, str] = {}
-    for key in SECTION_ORDER:
-        html = _BUILDERS[key](ctx)
-        if key == "exec_summary":
-            html = _cap_words(html, EXEC_SUMMARY_WORD_CAP)
-        elif key != "evidence_appendix":
-            html = _cap_words(html, SECTION_WORD_CAP)
-        out[key] = html
+    out: dict[str, str] = {key: _BUILDERS[key](ctx) for key in SECTION_ORDER}
+    out["_stat_band"] = _stat_band(ctx)  # not a section; the shell consumes it
     return out
 
 
@@ -433,10 +427,10 @@ async def _collect_run_allowed_ids(session, run: dict[str, Any]) -> set[tuple[st
 
 
 async def get_memo_response(session, review_id: str) -> dict[str, Any] | None:
-    """The PDF memo's data: rehydrated review/run/workspace + every cited
-    record re-validated against the run's own retrieval sets (defense in
-    depth — every finding already passed this check once at B2/B3 time; this
-    is the same primitive, re-run, never a second implementation)."""
+    """The memo's data: rehydrated review/run/workspace + every cited record
+    re-validated against the run's own retrieval sets (defense in depth — every
+    finding already passed this check once at B2/B3 time; this is the same
+    primitive, re-run, never a second implementation)."""
     resp = await get_review_response(session, review_id)
     if resp is None:
         return None
@@ -444,9 +438,13 @@ async def get_memo_response(session, review_id: str) -> dict[str, Any] | None:
 
     if run is None:
         sections = {key: NO_RUN for key in SECTION_ORDER}
+        sections["_stat_band"] = _stat_band({
+            "run": None, "findings": [], "synthesis": {}, "coverage": [],
+        })
         return {
             "review": review, "run": None, "sections": sections,
             "section_titles": SECTION_TITLES, "section_order": SECTION_ORDER,
+            "section_kickers": SECTION_KICKERS,
         }
 
     allowed = await _collect_run_allowed_ids(session, run)
@@ -472,4 +470,5 @@ async def get_memo_response(session, review_id: str) -> dict[str, Any] | None:
     return {
         "review": review, "run": run, "sections": sections,
         "section_titles": SECTION_TITLES, "section_order": SECTION_ORDER,
+        "section_kickers": SECTION_KICKERS,
     }

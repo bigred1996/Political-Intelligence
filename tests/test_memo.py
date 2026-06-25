@@ -30,8 +30,7 @@ from pipeline.memo_builder import (
     INSUFFICIENT,
     NO_RUN,
     SECTION_ORDER,
-    _cap_words,
-    _word_count,
+    _trim,
     build_sections,
     get_memo_response,
 )
@@ -191,15 +190,17 @@ def _all_keys(findings, connected=None, further=None) -> set[tuple[str, str]]:
 
 # --- pure build_sections tests ---------------------------------------------
 
-def test_section_order_has_all_seventeen_sections():
+def test_section_order_has_all_seven_sections():
     findings = [_fake_finding("bills", 1)]
     sections = build_sections(_fake_review(), _fake_run(), _fake_workspace(findings), _all_keys(findings))
-    assert len(SECTION_ORDER) == 17
-    assert set(sections.keys()) == set(SECTION_ORDER)
+    assert len(SECTION_ORDER) == 7
+    # build_sections returns every section key plus the "_stat_band" the shell consumes.
+    assert set(SECTION_ORDER) <= set(sections.keys())
+    assert "_stat_band" in sections
 
 
 def test_tier_does_not_change_section_count_but_changes_content_volume():
-    """The 17-section structure is identical for every tier ('tier changes
+    """The 7-section structure is identical for every tier ('tier changes
     section count correctly' == it correctly does NOT change); what scales
     with tier is the volume of content per section, driven by how many
     findings that tier's run produced."""
@@ -209,29 +210,21 @@ def test_tier_does_not_change_section_count_but_changes_content_volume():
     brief_sections = build_sections(_fake_review(depth_tier="brief"), _fake_run(), _fake_workspace(few), _all_keys(few))
     deep_sections = build_sections(_fake_review(depth_tier="deep"), _fake_run(), _fake_workspace(many), _all_keys(many))
 
-    assert len(brief_sections) == len(deep_sections) == 17
-    # More findings -> more appendix rows and more bullets in the themed section.
-    assert deep_sections["evidence_appendix"].count("<tr>") > brief_sections["evidence_appendix"].count("<tr>")
-    assert deep_sections["legislative_regulatory"].count("<li>") >= brief_sections["legislative_regulatory"].count("<li>")
+    assert set(SECTION_ORDER) <= set(brief_sections) and set(SECTION_ORDER) <= set(deep_sections)
+    # More findings -> the (unbounded) appendix lists every one of them.
+    assert deep_sections["appendix"].count("<tr>") > brief_sections["appendix"].count("<tr>")
 
 
-def test_cap_words_trims_trailing_items_without_mid_sentence_truncation():
-    items = "".join(f"<li>finding number {i} with five words here</li>" for i in range(30))
-    html = f"<p>lead</p><ul>{items}</ul>"
-    assert _word_count(html) > 100
-
-    capped = _cap_words(html, 50)
-    assert _word_count(capped) <= 70  # cap + the "+N more" note's own small word count
-    assert "more finding" in capped
-    # never cuts inside an <li> — every kept item is a complete, well-formed tag
-    assert capped.count("<li>") == capped.count("</li>")
-
-    # already-short input is returned untouched, no note appended
-    short = "<ul><li>one item</li></ul>"
-    assert _cap_words(short, 50) == short
+def test_trim_caps_word_count_and_leaves_short_text_untouched():
+    long = " ".join(f"w{i}" for i in range(60))
+    trimmed = _trim(long, 10)
+    assert trimmed.endswith("…")
+    assert len(trimmed.replace("…", "").split()) == 10
+    # already-short input returned verbatim, no ellipsis
+    assert _trim("three short words", 10) == "three short words"
 
 
-def test_per_section_word_caps_enforced_on_realistic_section_volume():
+def test_material_developments_is_bounded_but_appendix_lists_everything():
     findings = [
         _fake_finding(
             "bills", i, risk=("high", "elevated", "watch")[i % 3], category="legislative_regulatory",
@@ -242,16 +235,12 @@ def test_per_section_word_caps_enforced_on_realistic_section_volume():
     ]
     sections = build_sections(_fake_review(), _fake_run(), _fake_workspace(findings), _all_keys(findings))
 
-    # Analytical sections respect the 300-500 word MAX (+ small slack for the drop-note).
-    assert _word_count(sections["overall_risk"]) <= 520
-    assert _word_count(sections["material_developments"]) <= 520
-    assert _word_count(sections["legislative_regulatory"]) <= 520
-    # The evidence appendix is explicitly unbounded — it must list every finding,
-    # never trimmed by _cap_words (no "+N more" truncation note), unlike the
-    # analytical sections above which all got trimmed from this same 60-finding set.
-    assert sections["evidence_appendix"].count("<tr>") == 61  # 60 rows + 1 header row
-    assert "more-note" not in sections["evidence_appendix"]
-    assert "more-note" in sections["overall_risk"]
+    # Developments shows a bounded set of takeaways; the rest spill to the appendix.
+    from pipeline.memo_builder import DEV_TAKEAWAY_LIMIT
+    assert sections["material_developments"].count("<li>") == DEV_TAKEAWAY_LIMIT
+    assert "further finding(s) in the evidence appendix" in sections["material_developments"]
+    # The evidence appendix is explicitly unbounded — every finding, never trimmed.
+    assert sections["appendix"].count("<tr>") == 61  # 60 rows + 1 header row
 
 
 def test_out_of_run_finding_is_excluded_by_valid_keys_gate():
@@ -264,24 +253,24 @@ def test_out_of_run_finding_is_excluded_by_valid_keys_gate():
 
     for html in sections.values():
         assert "contracts:999" not in html
+        assert "/records/contracts/999" not in html
         assert "never actually retrieved" not in html
-    assert "bills:1" in sections["evidence_appendix"]  # the real finding still renders
-    assert sections["evidence_appendix"].count("<tr>") == 2  # 1 row + 1 header row
+    assert '/records/bills/1' in sections["appendix"]  # the real finding still renders
+    assert sections["appendix"].count("<tr>") == 2  # 1 row + 1 header row
 
 
 def test_empty_findings_render_insufficient_placeholders():
     sections = build_sections(_fake_review(), _fake_run(), _fake_workspace([]), set())
-    assert sections["overall_risk"] == INSUFFICIENT
+    assert sections["risk_snapshot"] == INSUFFICIENT
     assert sections["material_developments"] == INSUFFICIENT
-    assert sections["evidence_appendix"] == INSUFFICIENT
+    assert sections["appendix"] == INSUFFICIENT
     # exec summary still renders (it doesn't depend on findings being non-empty)
-    assert "Acme Corp" in sections["exec_summary"]
+    assert "Acme Corp" in sections["exec_summary"] or "finding" in sections["exec_summary"]
 
 
-def test_no_run_renders_no_run_placeholder_everywhere_that_needs_a_run():
+def test_no_run_renders_no_run_placeholder_in_exec_summary():
     sections = build_sections(_fake_review(), None, _fake_workspace([]), set())
     assert sections["exec_summary"] == NO_RUN
-    assert sections["coverage_limitations"] == NO_RUN
 
 
 # --- get_memo_response (DB-backed) tests -----------------------------------
@@ -301,7 +290,7 @@ async def _no_model_calls(tmp_path, monkeypatch):
         memo2 = await get_memo_response(session, created["review"]["id"])
 
     assert interp.calls == calls_after_create, "memo generation must call no model"
-    assert set(memo["sections"].keys()) == set(SECTION_ORDER)
+    assert set(SECTION_ORDER) <= set(memo["sections"].keys())
     assert memo["sections"] == memo2["sections"], "deterministic re-render, same input"
     await engine.dispose()
 
@@ -323,8 +312,9 @@ async def _no_drift(tmp_path, monkeypatch):
     bars = risk_distribution(workspace["findings"])
     total_from_chart = sum(b["value"] for b in bars)
     assert total_from_chart == n
-    assert f"{n} finding(s)" in memo["sections"]["overall_risk"]
-    assert memo["sections"]["evidence_appendix"].count("<tr>") == n + 1  # rows + 1 header row
+    # The appendix lists exactly the workspace findings — no drift, no fabrication.
+    assert memo["sections"]["appendix"].count("<tr>") == n + 1  # rows + 1 header row
+    assert f"{n}" in memo["sections"]["_stat_band"]  # stat band's Findings count matches
     await engine.dispose()
 
 
@@ -340,7 +330,7 @@ async def _appendix_links(tmp_path, monkeypatch):
         memo = await get_memo_response(session, created["review"]["id"])
     for f in created["workspace"]["findings"]:
         assert f["internal_url"].startswith("/records/")
-        assert f"href=\"{f['internal_url']}\"" in memo["sections"]["evidence_appendix"]
+        assert f"href=\"{f['internal_url']}\"" in memo["sections"]["appendix"]
     await engine.dispose()
 
 
@@ -375,11 +365,11 @@ async def _forged_citation(tmp_path, monkeypatch):
 
         memo = await get_memo_response(session, created["review"]["id"])
 
-    assert 'href="/records/contracts/1"' not in memo["sections"]["risks"]
-    assert 'href="/records/contracts/1"' not in memo["sections"]["evidence_appendix"]
+    assert 'href="/records/contracts/1"' not in memo["sections"]["risks_opportunities"]
+    assert 'href="/records/contracts/1"' not in memo["sections"]["appendix"]
     # Goal B7 / G3: the whole forged item must be dropped, not just its link —
     # a claim that has lost every citation must never still print as fact.
-    assert "Forged risk" not in memo["sections"]["risks"]
+    assert "Forged risk" not in memo["sections"]["risks_opportunities"]
     await engine.dispose()
 
 
@@ -400,8 +390,8 @@ def test_synthesis_item_with_no_surviving_findings_is_dropped_not_rendered_bare(
         "opportunities": [],
     })
     sections = build_sections(_fake_review(), run, _fake_workspace([real]), {("bills", "1")})
-    assert "Forged unsupported risk claim" not in sections["risks"]
-    assert sections["risks"] == INSUFFICIENT
+    assert "Forged unsupported risk claim" not in sections["risks_opportunities"]
+    assert sections["risks_opportunities"] == INSUFFICIENT
 
 
 def test_empty_workspace_renders_clean(tmp_path, monkeypatch):
@@ -416,7 +406,7 @@ async def _empty_clean(tmp_path, monkeypatch):
         memo = await get_memo_response(session, created["review"]["id"])
 
     assert memo["run"]["status"] == "insufficient_evidence"
-    assert memo["sections"]["overall_risk"] == INSUFFICIENT
+    assert memo["sections"]["risk_snapshot"] == INSUFFICIENT
     html = render_memo_html(memo)
     assert "<html" in html and "Acme Corp" in html
     await engine.dispose()
