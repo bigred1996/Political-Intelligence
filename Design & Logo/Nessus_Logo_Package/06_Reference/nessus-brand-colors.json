@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Parliament Navy",
+    "hex": "#041632",
+    "rgb": "4, 22, 50",
+    "cmyk": "92, 56, 0, 80"
+  },
+  {
+    "name": "Navy Surface",
+    "hex": "#1B2B48",
+    "rgb": "27, 43, 72",
+    "cmyk": "63, 40, 0, 72"
+  },
+  {
+    "name": "Nessus Gold",
+    "hex": "#C6A15B",
+    "rgb": "198, 161, 91",
+    "cmyk": "0, 19, 54, 22"
+  },
+  {
+    "name": "Document White",
+    "hex": "#F7F9FB",
+    "rgb": "247, 249, 251",
+    "cmyk": "2, 1, 0, 2"
+  },
+  {
+    "name": "Pure White",
+    "hex": "#FFFFFF",
+    "rgb": "255, 255, 255",
+    "cmyk": "0, 0, 0, 0"
+  },
+  {
+    "name": "Near Black",
+    "hex": "#151717",
+    "rgb": "21, 23, 23",
+    "cmyk": "9, 0, 0, 91"
+  }
+]

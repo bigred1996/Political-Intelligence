@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&amp;display=swap">
+<style>
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;background:#f7f9fb;color:#191c1e;font-family:'Public Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  ::selection{background:#1b2b48;color:#fff;}
+</style>
+</helmet>
+
+<div id="top" style="width:100%;overflow-x:hidden;background:#f7f9fb;">
+
+  <!-- ░░ NAV ░░ -->
+  <header style="position:sticky;top:0;z-index:50;background:#041632;border-bottom:1px solid rgba(183,199,235,0.14);">
+    <sc-if value="{{ showAnnouncementBar }}" hint-placeholder-val="{{ true }}">
+      <div style="background:#030f24;border-bottom:1px solid rgba(183,199,235,0.10);">
+        <div style="max-width:1200px;margin:0 auto;padding:8px 32px;display:flex;align-items:center;justify-content:center;gap:10px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#42d18a;box-shadow:0 0 0 3px rgba(66,209,138,0.18);"></span>
+          <span style="font:600 12px/16px 'Public Sans';letter-spacing:0.04em;color:#b7c7eb;">Now in private beta · Canada-first political &amp; regulatory intelligence</span>
+        </div>
+      </div>
+    </sc-if>
+    <div style="max-width:1200px;margin:0 auto;padding:15px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;">
+      <a href="#top" style="display:flex;align-items:center;gap:11px;text-decoration:none;">
+        <span style="width:34px;height:34px;border-radius:7px;background:#ffffff;color:#041632;display:flex;align-items:center;justify-content:center;">
+          <span style="font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 1;font-size:21px;line-height:1;">account_balance</span>
+        </span>
+        <span style="display:flex;flex-direction:column;line-height:1;">
+          <span style="font:700 19px/1 'Public Sans';letter-spacing:0.06em;color:#ffffff;">NESSUS</span>
+          <span style="font:700 9px/1.4 'Public Sans';letter-spacing:0.18em;color:#5f6f91;text-transform:uppercase;margin-top:3px;">Intelligence Grade</span>
+        </span>
+      </a>
+      <nav style="display:flex;gap:30px;align-items:center;">
+        <a href="#problem" style="text-decoration:none;font:500 14px/1 'Public Sans';color:#b7c7eb;" style-hover="color:#ffffff;">The Problem</a>
+        <a href="#how" style="text-decoration:none;font:500 14px/1 'Public Sans';color:#b7c7eb;" style-hover="color:#ffffff;">How It Works</a>
+        <a href="#product" style="text-decoration:none;font:500 14px/1 'Public Sans';color:#b7c7eb;" style-hover="color:#ffffff;">Product</a>
+        <a href="#reports" style="text-decoration:none;font:500 14px/1 'Public Sans';color:#b7c7eb;" style-hover="color:#ffffff;">Reports</a>
+        <a href="#use-cases" style="text-decoration:none;font:500 14px/1 'Public Sans';color:#b7c7eb;" style-hover="color:#ffffff;">Use Cases</a>
+        <a href="#why" style="text-decoration:none;font:500 14px/1 'Public Sans';color:#b7c7eb;" style-hover="color:#ffffff;">Why Nessus</a>
+      </nav>
+      <a href="#beta" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;background:#ffffff;color:#041632;font:600 14px/1 'Public Sans';padding:11px 18px;border-radius:7px;" style-hover="background:#b7c7eb;">
+        Join the Beta
+        <span style="font-family:'Material Symbols Outlined';font-size:17px;line-height:1;">arrow_forward</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- ░░ HERO ░░ -->
+  <section data-screen-label="Hero" style="position:relative;background:#041632;overflow:hidden;">
+    <div style="position:absolute;inset:0;background:radial-gradient(70% 60% at 50% -10%, rgba(43,67,110,0.65), rgba(4,22,50,0) 70%);pointer-events:none;"></div>
+    <sc-if value="{{ gridTexture }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;inset:0;background-image:radial-gradient(rgba(183,199,235,0.16) 1px, transparent 1px);background-size:24px 24px;opacity:0.5;pointer-events:none;mask-image:linear-gradient(to bottom, #000 0%, transparent 78%);-webkit-mask-image:linear-gradient(to bottom, #000 0%, transparent 78%);"></div>
+    </sc-if>
+    <div style="position:relative;max-width:980px;margin:0 auto;padding:84px 32px 0;text-align:center;">
+      <div style="display:inline-flex;align-items:center;gap:9px;border:1px solid rgba(183,199,235,0.28);border-radius:999px;padding:7px 15px;margin-bottom:28px;">
+        <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;color:#b7c7eb;">public</span>
+        <span style="font:700 11px/1 'Public Sans';letter-spacing:0.14em;text-transform:uppercase;color:#b7c7eb;">Canada-First Political &amp; Regulatory Intelligence</span>
+      </div>
+      <h1 style="font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(42px,5.6vw,72px);line-height:1.02;letter-spacing:-0.025em;color:#ffffff;margin:0 0 22px;text-wrap:balance;">
+        Turn political noise<br>into investment signal.
+      </h1>
+      <p style="font:400 19px/30px 'Public Sans';color:#aeb9d2;max-width:660px;margin:0 auto 36px;text-wrap:pretty;">Nessus combines government data, news, regulatory developments, economic data and proprietary intelligence to show how political change affects industries, sectors and strategic decisions.</p>
+      <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:30px;">
+        <a href="#beta" style="text-decoration:none;display:inline-flex;align-items:center;gap:9px;background:#ffffff;color:#041632;font:600 16px/1 'Public Sans';padding:15px 26px;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.25);" style-hover="background:#b7c7eb;">
+          Join the Beta
+          <span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;">arrow_forward</span>
+        </a>
+        <a href="#how" style="text-decoration:none;display:inline-flex;align-items:center;gap:9px;background:transparent;color:#ffffff;font:600 16px/1 'Public Sans';padding:15px 24px;border-radius:8px;border:1px solid rgba(183,199,235,0.35);" style-hover="border-color:#b7c7eb;background:rgba(183,199,235,0.08);">
+          Learn More
+        </a>
+      </div>
+      <p style="font:500 13px/1 'Public Sans';letter-spacing:0.02em;color:#5f6f91;margin:0 0 56px;">
+        Built for private equity, M&amp;A, corporate strategy &amp; consulting teams.
+      </p>
+    </div>
+
+    <!-- PRODUCT MOCK overlapping into next section -->
+    <div style="position:relative;max-width:1120px;margin:0 auto;padding:0 32px;transform:translateY(64px);">
+      <div style="border-radius:14px;overflow:hidden;background:#ffffff;border:1px solid rgba(255,255,255,0.10);box-shadow:0 40px 90px -30px rgba(3,15,36,0.65), 0 0 0 1px rgba(4,22,50,0.04);">
+        <!-- topbar -->
+        <div style="display:flex;align-items:center;gap:14px;padding:11px 16px;background:#041632;border-bottom:1px solid rgba(183,199,235,0.12);">
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span style="width:22px;height:22px;border-radius:5px;background:#fff;color:#041632;display:flex;align-items:center;justify-content:center;"><span style="font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 1;font-size:15px;line-height:1;">account_balance</span></span>
+            <span style="font:700 13px/1 'Public Sans';letter-spacing:0.05em;color:#fff;">NESSUS</span>
+          </span>
+          <div style="flex:1;max-width:420px;margin:0 auto;display:flex;align-items:center;gap:8px;background:#0c2042;border:1px solid rgba(183,199,235,0.18);border-radius:7px;padding:7px 12px;">
+            <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;color:#5f6f91;">search</span>
+            <span style="font:400 12px/1 'Public Sans';color:#5f6f91;">Ask Nessus — "What's moving Canadian fintech this week?"</span>
+          </div>
+          <span style="display:flex;align-items:center;gap:7px;">
+            <span style="width:26px;height:26px;border-radius:50%;background:#1b2b48;border:1px solid rgba(183,199,235,0.25);display:flex;align-items:center;justify-content:center;font:600 10px/1 'Public Sans';color:#b7c7eb;">AR</span>
+          </span>
+        </div>
+        <div style="display:flex;">
+          <!-- mini sidebar -->
+          <div style="width:172px;flex:none;background:#fbfcfd;border-right:1px solid #e2e8f0;padding:14px 12px;display:flex;flex-direction:column;gap:3px;">
+            <div style="font:700 9px/1 'Public Sans';letter-spacing:0.16em;text-transform:uppercase;color:#75777e;padding:6px 8px 8px;">Workspace</div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:6px;background:rgba(4,22,50,0.06);border-right:3px solid #041632;color:#041632;"><span style="font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 1;font-size:16px;">space_dashboard</span><span style="font:600 12px/1 'Public Sans';">Dashboard</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:6px;color:#44474d;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">rss_feed</span><span style="font:500 12px/1 'Public Sans';">Live Feed</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:6px;color:#44474d;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">category</span><span style="font:500 12px/1 'Public Sans';">Sectors</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:6px;color:#44474d;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">visibility</span><span style="font:500 12px/1 'Public Sans';">Watchlists</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:6px;color:#44474d;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">forum</span><span style="font:500 12px/1 'Public Sans';">Ask Nessus</span></div>
+            <div style="font:700 9px/1 'Public Sans';letter-spacing:0.16em;text-transform:uppercase;color:#75777e;padding:14px 8px 8px;">Intelligence</div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:6px;color:#44474d;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">hub</span><span style="font:500 12px/1 'Public Sans';">Evidence Graph</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:6px;color:#44474d;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">database</span><span style="font:500 12px/1 'Public Sans';">Records</span></div>
+          </div>
+          <!-- main -->
+          <div style="flex:1;min-width:0;background:#f7f9fb;padding:18px;">
+            <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:21px;line-height:1;color:#041632;margin-bottom:14px;">Intelligence Dashboard</div>
+            <!-- stat cards -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;">
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:13px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;"><span style="font:700 9px/1.3 'Public Sans';letter-spacing:0.12em;text-transform:uppercase;color:#75777e;">Active Legislative Items</span><span style="font-family:'Material Symbols Outlined';font-size:17px;color:#75777e;">gavel</span></div>
+                <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:27px;line-height:1;color:#041632;margin:9px 0 5px;">214</div>
+                <span style="font:500 11px/1 'Public Sans';color:#059669;">38 Gazette entries</span>
+              </div>
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:13px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;"><span style="font:700 9px/1.3 'Public Sans';letter-spacing:0.12em;text-transform:uppercase;color:#75777e;">Material Risks</span><span style="font-family:'Material Symbols Outlined';font-size:17px;color:#ba1a1a;">warning</span></div>
+                <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:27px;line-height:1;color:#041632;margin:9px 0 5px;">7</div>
+                <span style="font:500 11px/1 'Public Sans';color:#ba1a1a;">Requires review</span>
+              </div>
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:13px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;"><span style="font:700 9px/1.3 'Public Sans';letter-spacing:0.12em;text-transform:uppercase;color:#75777e;">Linked Evidence</span><span style="font-family:'Material Symbols Outlined';font-size:17px;color:#75777e;">monitoring</span></div>
+                <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:27px;line-height:1;color:#041632;margin:9px 0 5px;">1,482</div>
+                <span style="font:500 11px/1 'Public Sans';color:#75777e;">63 findings</span>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:12px;">
+              <!-- material developments -->
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:9px;overflow:hidden;">
+                <div style="padding:11px 13px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:7px;"><span style="font-family:'Material Symbols Outlined';font-size:17px;color:#041632;">bolt</span><span style="font-family:'Source Serif 4',serif;font-weight:600;font-size:14px;color:#041632;">Material Developments</span></div>
+                <div style="padding:13px;border-bottom:1px solid #eef1f5;">
+                  <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+                    <span style="font:700 9px/1 'Public Sans';letter-spacing:0.06em;text-transform:uppercase;background:#e0e3e5;color:#191c1e;padding:4px 7px;border-radius:4px;">Technology</span>
+                    <span style="font:700 9px/1 'Public Sans';letter-spacing:0.06em;text-transform:uppercase;background:rgba(186,26,26,0.10);color:#ba1a1a;padding:4px 7px;border-radius:4px;">Elevated</span>
+                    <span style="margin-left:auto;font:500 10px/1 'Public Sans';color:#75777e;">2h ago</span>
+                  </div>
+                  <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:15px;line-height:1.25;color:#041632;margin-bottom:8px;">Bill C-27 advances to clause-by-clause review</div>
+                  <div style="background:#f2f4f6;border-left:2px solid #041632;border-radius:0 5px 5px 0;padding:8px 11px;">
+                    <span style="font:700 9px/1 'Public Sans';letter-spacing:0.08em;text-transform:uppercase;color:#041632;">Why It Matters</span>
+                    <p style="font:400 12px/17px 'Public Sans';color:#44474d;margin:5px 0 0;">Federal privacy &amp; AI overhaul moves forward — new compliance costs land squarely on data-heavy portfolio companies.</p>
+                  </div>
+                  <div style="display:flex;gap:7px;margin-top:9px;">
+                    <span style="display:inline-flex;align-items:center;gap:4px;font:500 10px/1 'Public Sans';background:#eceef0;border:1px solid #e2e8f0;color:#505f76;padding:4px 7px;border-radius:4px;"><span style="font-family:'Material Symbols Outlined';font-size:13px;">description</span>9 sources</span>
+                    <span style="display:inline-flex;align-items:center;gap:4px;font:500 10px/1 'Public Sans';background:rgba(4,22,50,0.07);border:1px solid rgba(4,22,50,0.14);color:#041632;padding:4px 7px;border-radius:4px;"><span style="font-family:'Material Symbols Outlined';font-size:13px;">database</span>Open evidence</span>
+                  </div>
+                </div>
+                <div style="padding:13px;">
+                  <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+                    <span style="font:700 9px/1 'Public Sans';letter-spacing:0.06em;text-transform:uppercase;background:#e0e3e5;color:#191c1e;padding:4px 7px;border-radius:4px;">Energy</span>
+                    <span style="font:700 9px/1 'Public Sans';letter-spacing:0.06em;text-transform:uppercase;background:rgba(245,158,11,0.12);color:#d97706;padding:4px 7px;border-radius:4px;">Watch</span>
+                    <span style="margin-left:auto;font:500 10px/1 'Public Sans';color:#75777e;">5h ago</span>
+                  </div>
+                  <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:15px;line-height:1.25;color:#041632;">CER opens consultation on interprovincial transmission</div>
+                </div>
+              </div>
+              <!-- right column -->
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:9px;overflow:hidden;">
+                  <div style="padding:9px 12px;border-bottom:1px solid #e2e8f0;background:#f7f9fb;"><span style="font:700 9px/1 'Public Sans';letter-spacing:0.12em;text-transform:uppercase;color:#75777e;">Sector Activity</span></div>
+                  <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+                    <div><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font:600 11px/1 'Public Sans';color:#191c1e;">Financial Services</span><span style="font:600 11px/1 'Public Sans';color:#ba1a1a;">High</span></div><div style="height:6px;border-radius:99px;background:#e0e3e5;overflow:hidden;"><div style="height:100%;width:88%;background:#ba1a1a;border-radius:99px;"></div></div></div>
+                    <div><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font:600 11px/1 'Public Sans';color:#191c1e;">Energy</span><span style="font:600 11px/1 'Public Sans';color:#d97706;">Elevated</span></div><div style="height:6px;border-radius:99px;background:#e0e3e5;overflow:hidden;"><div style="height:100%;width:67%;background:#d97706;border-radius:99px;"></div></div></div>
+                    <div><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font:600 11px/1 'Public Sans';color:#191c1e;">Technology</span><span style="font:600 11px/1 'Public Sans';color:#d97706;">Elevated</span></div><div style="height:6px;border-radius:99px;background:#e0e3e5;overflow:hidden;"><div style="height:100%;width:61%;background:#d97706;border-radius:99px;"></div></div></div>
+                    <div><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font:600 11px/1 'Public Sans';color:#191c1e;">Mining &amp; Metals</span><span style="font:600 11px/1 'Public Sans';color:#059669;">Watch</span></div><div style="height:6px;border-radius:99px;background:#e0e3e5;overflow:hidden;"><div style="height:100%;width:34%;background:#059669;border-radius:99px;"></div></div></div>
+                  </div>
+                </div>
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:9px;overflow:hidden;">
+                  <div style="padding:9px 12px;border-bottom:1px solid #e2e8f0;background:#f7f9fb;"><span style="font:700 9px/1 'Public Sans';letter-spacing:0.12em;text-transform:uppercase;color:#75777e;">Stream Status</span></div>
+                  <div style="padding:12px;display:flex;flex-direction:column;gap:9px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font:500 11px/1 'Public Sans';color:#191c1e;">Parliament of Canada</span><span style="display:flex;align-items:center;gap:5px;font:600 11px/1 'Public Sans';color:#059669;"><span style="width:6px;height:6px;border-radius:50%;background:#059669;"></span>412</span></div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font:500 11px/1 'Public Sans';color:#191c1e;">Lobbying Registry</span><span style="display:flex;align-items:center;gap:5px;font:600 11px/1 'Public Sans';color:#059669;"><span style="width:6px;height:6px;border-radius:50%;background:#059669;"></span>187</span></div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font:500 11px/1 'Public Sans';color:#191c1e;">Canada Gazette</span><span style="display:flex;align-items:center;gap:5px;font:600 11px/1 'Public Sans';color:#059669;"><span style="width:6px;height:6px;border-radius:50%;background:#059669;"></span>54</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="height:104px;background:#f7f9fb;"></div>
+  </section>
+
+  <!-- ░░ PROBLEM ░░ -->
+  <section id="problem" data-screen-label="Problem" style="background:#f7f9fb;padding:96px 32px 88px;">
+    <div style="max-width:1120px;margin:0 auto;">
+      <div style="max-width:720px;margin-bottom:48px;">
+        <div style="font:700 11px/1 'Public Sans';letter-spacing:0.14em;text-transform:uppercase;color:#75777e;margin-bottom:16px;">The Problem</div>
+        <h2 style="font-family:'Source Serif 4',serif;font-weight:600;font-size:clamp(34px,4vw,52px);line-height:1.04;letter-spacing:-0.02em;color:#041632;margin:0 0 18px;">The signal lives between the sources.</h2>
+        <p style="font:400 19px/30px 'Public Sans';color:#44474d;margin:0;text-wrap:pretty;"></p><div>The forces shaping Canadian industries are documented across government records, regulatory decisions, economic data, news reporting and across the web.</div><div><br></div><div>Fragmented across systems that were built to publish records, not produce intelligence. Understanding what changed, why it matters and where the impact may appear requires extensive manual research and interpretation.</div><p></p>
+      </div>
+      <!-- fragmentation visual -->
+      <!-- fragmentation visual (node cloud -> shredded document -> question) -->
+      <div style="position:relative;width:100%;height:clamp(440px,48vw,540px);background:radial-gradient(120% 110% at 16% 42%, #0a1f3f 0%, #041632 52%, #030f24 100%);border:1px solid rgba(183,199,235,0.14);border-radius:14px;overflow:hidden;margin-bottom:44px;">
+        <div style="position:absolute;inset:0;background-image:radial-gradient(rgba(183,199,235,0.10) 1px, transparent 1px);background-size:26px 26px;opacity:0.45;"></div>
+
+        <!-- faint connecting lines among the cloud -->
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;">
+          <defs>
+            <linearGradient id="nessusFade" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#b7c7eb" stop-opacity="0.5"></stop>
+              <stop offset="1" stop-color="#b7c7eb" stop-opacity="0"></stop>
+            </linearGradient>
+          </defs>
+          <g fill="none" stroke="#7f93bd" stroke-width="1" vector-effect="non-scaling-stroke">
+            <path d="M14,24 L31,17" stroke-opacity="0.45"></path>
+            <path d="M14,24 L25,36" stroke-opacity="0.4"></path>
+            <path d="M31,17 L25,36" stroke-opacity="0.3" stroke-dasharray="2 3"></path>
+            <path d="M25,36 L10,44" stroke-opacity="0.4"></path>
+            <path d="M10,44 L21,50" stroke-opacity="0.35"></path>
+            <path d="M21,50 L32,53" stroke-opacity="0.4"></path>
+            <path d="M25,36 L39,46" stroke-opacity="0.3" stroke-dasharray="2 3"></path>
+            <path d="M39,46 L32,53" stroke-opacity="0.4"></path>
+            <path d="M17,66 L21,50" stroke-opacity="0.35"></path>
+            <path d="M17,66 L13,80" stroke-opacity="0.4"></path>
+            <path d="M13,80 L35,76" stroke-opacity="0.28" stroke-dasharray="1 4"></path>
+            <path d="M35,76 L39,46" stroke-opacity="0.32"></path>
+            <path d="M32,53 L41,62" stroke-opacity="0.3"></path>
+            <path d="M31,17 L44,32" stroke-opacity="0.3" stroke-dasharray="2 3"></path>
+          </g>
+          <!-- lines reaching toward the document but fading into the noise -->
+          <g fill="none" stroke="url(#nessusFade)" stroke-width="1.3" vector-effect="non-scaling-stroke">
+            <path d="M39,46 C44,46 47,46 50,46"></path>
+            <path d="M44,32 C47,34 48,36 50,39"></path>
+            <path d="M35,76 C42,70 46,64 49,60"></path>
+            <path d="M32,53 C40,53 45,52 49,51"></path>
+          </g>
+        </svg>
+
+        <!-- source node cloud (overlapping bubbles) -->
+        <div style="position:absolute;left:14%;top:24%;width:106px;height:106px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(183,199,235,0.10);border:1px solid rgba(183,199,235,0.22);display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;"><span style="font:600 13px/1.2 'Public Sans';color:#dbe4f6;">Legislation</span></div>
+        <div style="position:absolute;left:31%;top:17%;width:96px;height:96px;transform:translate(-50%,-50%);border-radius:50%;background:#1b2b48;border:1px solid rgba(183,199,235,0.22);display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;"><span style="font:600 13px/1.2 'Public Sans';color:#dbe4f6;">Regulators</span></div>
+        <div style="position:absolute;left:25%;top:36%;width:72px;height:72px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(183,199,235,0.13);border:1px solid rgba(183,199,235,0.22);display:flex;align-items:center;justify-content:center;text-align:center;padding:8px;"><span style="font:600 11px/1.15 'Public Sans';color:#cdd9f0;">Lobbying</span></div>
+        <div style="position:absolute;left:10%;top:44%;width:88px;height:88px;transform:translate(-50%,-50%);border-radius:50%;background:#22304d;border:1px solid rgba(183,199,235,0.20);display:flex;align-items:center;justify-content:center;text-align:center;padding:9px;"><span style="font:600 12px/1.15 'Public Sans';color:#dbe4f6;">Committees</span></div>
+        <div style="position:absolute;left:21%;top:50%;width:94px;height:94px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(183,199,235,0.10);border:1px solid rgba(183,199,235,0.22);display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;"><span style="font:600 12px/1.18 'Public Sans';color:#cdd9f0;">Political statements</span></div>
+        <div style="position:absolute;left:32%;top:53%;width:66px;height:66px;transform:translate(-50%,-50%);border-radius:50%;background:#1b2b48;border:1px solid rgba(183,199,235,0.20);display:flex;align-items:center;justify-content:center;text-align:center;padding:8px;"><span style="font:600 11px/1.1 'Public Sans';color:#dbe4f6;">News</span></div>
+        <div style="position:absolute;left:39%;top:46%;width:84px;height:84px;transform:translate(-50%,-50%);border-radius:50%;background:#22304d;border:1px solid rgba(183,199,235,0.20);display:flex;align-items:center;justify-content:center;text-align:center;padding:9px;"><span style="font:600 12px/1.15 'Public Sans';color:#dbe4f6;">Industry reporting</span></div>
+        <div style="position:absolute;left:17%;top:66%;width:80px;height:80px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(183,199,235,0.12);border:1px solid rgba(183,199,235,0.22);display:flex;align-items:center;justify-content:center;text-align:center;padding:9px;"><span style="font:600 11px/1.15 'Public Sans';color:#cdd9f0;">Economic data</span></div>
+        <div style="position:absolute;left:13%;top:80%;width:74px;height:74px;transform:translate(-50%,-50%);border-radius:50%;background:#1b2b48;border:1px solid rgba(183,199,235,0.20);display:flex;align-items:center;justify-content:center;text-align:center;padding:9px;"><span style="font:600 11px/1.15 'Public Sans';color:#dbe4f6;">Provincial records</span></div>
+        <div style="position:absolute;left:35%;top:76%;width:78px;height:78px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(183,199,235,0.11);border:1px solid rgba(183,199,235,0.22);display:flex;align-items:center;justify-content:center;text-align:center;padding:9px;"><span style="font:600 11px/1.15 'Public Sans';color:#cdd9f0;">Proprietary data</span></div>
+        <!-- accent (unlabeled) bubbles for density -->
+        <div style="position:absolute;left:22%;top:10%;width:34px;height:34px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(183,199,235,0.16);border:1px solid rgba(183,199,235,0.2);"></div>
+        <div style="position:absolute;left:6%;top:31%;width:44px;height:44px;transform:translate(-50%,-50%);border-radius:50%;background:#1b2b48;border:1px solid rgba(183,199,235,0.16);"></div>
+        <div style="position:absolute;left:44%;top:32%;width:26px;height:26px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(183,199,235,0.18);border:1px solid rgba(183,199,235,0.2);"></div>
+        <div style="position:absolute;left:41%;top:63%;width:30px;height:30px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(183,199,235,0.16);border:1px solid rgba(183,199,235,0.2);"></div>
+        <div style="position:absolute;left:28%;top:87%;width:52px;height:52px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(183,199,235,0.09);border:1px solid rgba(183,199,235,0.18);"></div>
+
+        <!-- glitch shards trailing into the noise -->
+        <div style="position:absolute;left:46%;top:30%;width:12px;height:3px;background:rgba(183,199,235,0.4);"></div>
+        <div style="position:absolute;left:47.5%;top:40%;width:8px;height:3px;background:rgba(183,199,235,0.3);"></div>
+        <div style="position:absolute;left:45.5%;top:55%;width:14px;height:2px;background:rgba(183,199,235,0.35);"></div>
+        <div style="position:absolute;left:48%;top:64%;width:7px;height:3px;background:rgba(183,199,235,0.28);"></div>
+        <div style="position:absolute;left:46.5%;top:48%;width:3px;height:9px;background:rgba(183,199,235,0.25);"></div>
+
+        <!-- digital-noise band (document shredding to static) -->
+        <div style="position:absolute;left:49.5%;top:13%;bottom:13%;width:10%;background:repeating-linear-gradient(90deg, rgba(183,199,235,0.22) 0 1px, transparent 1px 4px);-webkit-mask-image:linear-gradient(to right, #000, transparent 92%);mask-image:linear-gradient(to right, #000, transparent 92%);"></div>
+
+        <!-- bright tearing seam -->
+        <div style="position:absolute;left:49%;top:8%;height:84%;width:2px;background:linear-gradient(to bottom, transparent, #b7c7eb 22%, #e6ecf7 50%, #b7c7eb 78%, transparent);box-shadow:0 0 22px 3px rgba(183,199,235,0.45);"></div>
+
+        <!-- the document (right edge intact, left edge dissolving) -->
+        <div style="position:absolute;left:50.5%;top:13%;bottom:13%;width:14%;-webkit-mask-image:linear-gradient(to left, #000 50%, transparent);mask-image:linear-gradient(to left, #000 50%, transparent);">
+          <div style="height:100%;background:rgba(233,238,247,0.93);border-radius:3px;padding:14px 12px;display:flex;flex-direction:column;gap:5px;overflow:hidden;">
+            <div style="height:5px;background:rgba(20,32,56,0.45);border-radius:2px;width:64%;margin-bottom:5px;"></div>
+            <div style="height:3px;background:rgba(20,32,56,0.26);border-radius:2px;width:96%;"></div>
+            <div style="height:3px;background:rgba(20,32,56,0.26);border-radius:2px;width:88%;"></div>
+            <div style="height:3px;background:rgba(20,32,56,0.26);border-radius:2px;width:93%;"></div>
+            <div style="height:3px;background:rgba(20,32,56,0.26);border-radius:2px;width:72%;margin-bottom:6px;"></div>
+            <div style="height:3px;background:rgba(20,32,56,0.26);border-radius:2px;width:90%;"></div>
+            <div style="height:3px;background:rgba(20,32,56,0.26);border-radius:2px;width:97%;"></div>
+            <div style="height:3px;background:rgba(20,32,56,0.26);border-radius:2px;width:80%;"></div>
+            <div style="height:3px;background:rgba(20,32,56,0.26);border-radius:2px;width:94%;margin-bottom:6px;"></div>
+            <div style="height:3px;background:rgba(20,32,56,0.26);border-radius:2px;width:86%;"></div>
+            <div style="height:3px;background:rgba(20,32,56,0.26);border-radius:2px;width:98%;"></div>
+            <div style="height:3px;background:rgba(20,32,56,0.26);border-radius:2px;width:70%;"></div>
+          </div>
+        </div>
+
+        <!-- the question (resolved, right) -->
+        <div style="position:absolute;right:3%;top:50%;transform:translateY(-50%);width:31%;min-width:230px;">
+          <div style="width:38px;height:3px;background:#b7c7eb;border-radius:2px;margin-bottom:20px;"></div>
+          <p style="font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3.1vw,40px);line-height:1.13;letter-spacing:-0.015em;color:#ffffff;margin:0;text-wrap:balance;">How will the new critical minerals policy affect Canadian mining investment?</p>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
+        <div style="border-top:2px solid #041632;padding-top:16px;"><div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:22px;color:#041632;margin-bottom:6px;">Slow</div><p style="font:400 14px/21px 'Public Sans';color:#44474d;margin:0;">Days of searching and cross-referencing.</p></div>
+        <div style="border-top:2px solid #041632;padding-top:16px;"><div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:22px;color:#041632;margin-bottom:6px;">Expensive</div><p style="font:400 14px/21px 'Public Sans';color:#44474d;margin:0;">Analysts, advisers and subscriptions layered together.</p></div>
+        <div style="border-top:2px solid #041632;padding-top:16px;"><div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:22px;color:#041632;margin-bottom:6px;">Incomplete</div><p style="font:400 14px/21px 'Public Sans';color:#44474d;margin:0;">Important relationships remain hidden between sources.</p></div>
+        <div style="border-top:2px solid #041632;padding-top:16px;"><div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:22px;color:#041632;margin-bottom:6px;">Unscalable</div><p style="font:400 14px/21px 'Public Sans';color:#44474d;margin:0;">Every new question becomes another manual research project.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ HOW IT WORKS ░░ -->
+  <section id="how" data-screen-label="How It Works" style="background:#ffffff;padding:96px 32px;border-top:1px solid #e2e8f0;">
+    <div style="max-width:1120px;margin:0 auto;">
+      <div style="max-width:720px;margin-bottom:48px;">
+        <div style="font:700 11px/1 'Public Sans';letter-spacing:0.14em;text-transform:uppercase;color:#75777e;margin-bottom:16px;">How It Works</div>
+        <h2 style="font-family:'Source Serif 4',serif;font-weight:600;font-size:clamp(34px,4vw,52px);line-height:1.04;letter-spacing:-0.02em;color:#041632;margin:0 0 18px;">Five questions. One workspace.</h2>
+        <p style="font:400 19px/30px 'Public Sans';color:#44474d;margin:0;text-wrap:pretty;">Nessus is built around the only five questions that matter when government activity touches a company, sector or deal.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:46px;">
+        <div style="border:1px solid #e2e8f0;border-radius:11px;padding:20px 18px;background:#f7f9fb;" style-hover="border-color:#041632;background:#fff;">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:30px;color:#b7c7eb;line-height:1;margin-bottom:14px;">01</div>
+          <div style="font:600 16px/1.2 'Public Sans';color:#041632;margin-bottom:8px;">What changed?</div>
+          <p style="font:400 13px/19px 'Public Sans';color:#44474d;margin:0;">Material developments surface automatically across every source.</p>
+        </div>
+        <div style="border:1px solid #e2e8f0;border-radius:11px;padding:20px 18px;background:#f7f9fb;" style-hover="border-color:#041632;background:#fff;">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:30px;color:#b7c7eb;line-height:1;margin-bottom:14px;">02</div>
+          <div style="font:600 16px/1.2 'Public Sans';color:#041632;margin-bottom:8px;">Why does it matter?</div>
+          <p style="font:400 13px/19px 'Public Sans';color:#44474d;margin:0;">Plain-language analysis of the commercial implication.</p>
+        </div>
+        <div style="border:1px solid #e2e8f0;border-radius:11px;padding:20px 18px;background:#f7f9fb;" style-hover="border-color:#041632;background:#fff;">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:30px;color:#b7c7eb;line-height:1;margin-bottom:14px;">03</div>
+          <div style="font:600 16px/1.2 'Public Sans';color:#041632;margin-bottom:8px;">Who's affected?</div>
+          <p style="font:400 13px/19px 'Public Sans';color:#44474d;margin:0;">Companies, sectors and decisions in the blast radius.</p>
+        </div>
+        <div style="border:1px solid #e2e8f0;border-radius:11px;padding:20px 18px;background:#f7f9fb;" style-hover="border-color:#041632;background:#fff;">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:30px;color:#b7c7eb;line-height:1;margin-bottom:14px;">04</div>
+          <div style="font:600 16px/1.2 'Public Sans';color:#041632;margin-bottom:8px;">What's the evidence?</div>
+          <p style="font:400 13px/19px 'Public Sans';color:#44474d;margin:0;">Every claim links to the underlying record and source.</p>
+        </div>
+        <div style="border:1px solid #e2e8f0;border-radius:11px;padding:20px 18px;background:#f7f9fb;" style-hover="border-color:#041632;background:#fff;">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:30px;color:#b7c7eb;line-height:1;margin-bottom:14px;">05</div>
+          <div style="font:600 16px/1.2 'Public Sans';color:#041632;margin-bottom:8px;">What's next?</div>
+          <p style="font:400 13px/19px 'Public Sans';color:#44474d;margin:0;">Recommended questions, risks and upcoming deadlines.</p>
+        </div>
+      </div>
+      <!-- drill path -->
+      <div style="background:#041632;border-radius:12px;padding:22px 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font:700 10px/1 'Public Sans';letter-spacing:0.12em;text-transform:uppercase;color:#5f6f91;margin-right:8px;">Drill path</span>
+        <span style="font:600 14px/1 'Public Sans';color:#fff;">Dashboard</span>
+        <span style="font-family:'Material Symbols Outlined';font-size:18px;color:#5f6f91;">arrow_forward</span>
+        <span style="font:600 14px/1 'Public Sans';color:#fff;">Finding</span>
+        <span style="font-family:'Material Symbols Outlined';font-size:18px;color:#5f6f91;">arrow_forward</span>
+        <span style="font:600 14px/1 'Public Sans';color:#fff;">Connected entities</span>
+        <span style="font-family:'Material Symbols Outlined';font-size:18px;color:#5f6f91;">arrow_forward</span>
+        <span style="font:600 14px/1 'Public Sans';color:#fff;">Internal records</span>
+        <span style="font-family:'Material Symbols Outlined';font-size:18px;color:#5f6f91;">arrow_forward</span>
+        <span style="font:600 14px/1 'Public Sans';color:#b7c7eb;">Original source</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ PRODUCT ░░ -->
+  <section id="product" data-screen-label="Product" style="background:#f7f9fb;padding:96px 32px;border-top:1px solid #e2e8f0;">
+    <div style="max-width:1120px;margin:0 auto;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;">
+        <div>
+          <div style="font:700 11px/1 'Public Sans';letter-spacing:0.14em;text-transform:uppercase;color:#75777e;margin-bottom:16px;">The Product</div>
+          <h2 style="font-family:'Source Serif 4',serif;font-weight:600;font-size:clamp(32px,3.4vw,46px);line-height:1.05;letter-spacing:-0.02em;color:#041632;margin:0 0 18px;">Every finding, traceable to the source.</h2>
+          <p style="font:400 18px/29px 'Public Sans';color:#44474d;margin:0 0 28px;text-wrap:pretty;">Nessus doesn't summarize and hope. Every object — a bill, a person, a company, a lobbying record — is clickable, connected, and backed by the original evidence.</p>
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div style="display:flex;gap:13px;">
+              <span style="font-family:'Material Symbols Outlined';font-size:21px;color:#041632;margin-top:1px;">hub</span>
+              <div><div style="font:600 15px/1.3 'Public Sans';color:#041632;margin-bottom:3px;">Connected, not searched</div><p style="font:400 14px/21px 'Public Sans';color:#44474d;margin:0;">Bills, committees, people, organizations and regulators link to one another automatically.</p></div>
+            </div>
+            <div style="display:flex;gap:13px;">
+              <span style="font-family:'Material Symbols Outlined';font-size:21px;color:#041632;margin-top:1px;">forum</span>
+              <div><div style="font:600 15px/1.3 'Public Sans';color:#041632;margin-bottom:3px;">Ask in plain language</div><p style="font:400 14px/21px 'Public Sans';color:#44474d;margin:0;">Query the full Nessus dataset and get evidence-linked answers.</p></div>
+            </div>
+            <div style="display:flex;gap:13px;">
+              <span style="font-family:'Material Symbols Outlined';font-size:21px;color:#041632;margin-top:1px;">description</span>
+              <div><div style="font:600 15px/1.3 'Public Sans';color:#041632;margin-bottom:3px;">Diligence memos on demand</div><p style="font:400 14px/21px 'Public Sans';color:#44474d;margin:0;">Generate structured, evidence-backed reports and export to PDF.</p></div>
+            </div>
+          </div>
+        </div>
+        <!-- finding detail mock -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:13px;box-shadow:0 24px 50px -28px rgba(4,22,50,0.35);overflow:hidden;">
+          <div style="padding:16px 18px;border-bottom:1px solid #e2e8f0;">
+            <div style="font:700 9px/1 'Public Sans';letter-spacing:0.14em;text-transform:uppercase;color:#75777e;margin-bottom:10px;">Finding · Technology</div>
+            <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:20px;line-height:1.2;color:#041632;">Bill C-27 advances to clause-by-clause review</div>
+          </div>
+          <div style="padding:16px 18px;border-bottom:1px solid #eef1f5;background:#f7f9fb;">
+            <span style="font:700 9px/1 'Public Sans';letter-spacing:0.1em;text-transform:uppercase;color:#041632;">Why It Matters</span>
+            <p style="font:400 13px/20px 'Public Sans';color:#44474d;margin:6px 0 0;">The Consumer Privacy Protection Act and AI &amp; Data Act move toward law — data-intensive portfolio companies face new consent, governance and reporting obligations within the planning horizon.</p>
+          </div>
+          <div style="padding:16px 18px;border-bottom:1px solid #eef1f5;">
+            <span style="font:700 9px/1 'Public Sans';letter-spacing:0.1em;text-transform:uppercase;color:#75777e;">Connected Entities</span>
+            <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
+              <span style="display:inline-flex;align-items:center;gap:5px;font:500 12px/1 'Public Sans';background:#f2f4f6;border:1px solid #e2e8f0;color:#191c1e;padding:6px 9px;border-radius:6px;"><span style="font-family:'Material Symbols Outlined';font-size:14px;color:#505f76;">account_balance</span>INDU Committee</span>
+              <span style="display:inline-flex;align-items:center;gap:5px;font:500 12px/1 'Public Sans';background:#f2f4f6;border:1px solid #e2e8f0;color:#191c1e;padding:6px 9px;border-radius:6px;"><span style="font-family:'Material Symbols Outlined';font-size:14px;color:#505f76;">person</span>Min. of Innovation</span>
+              <span style="display:inline-flex;align-items:center;gap:5px;font:500 12px/1 'Public Sans';background:#f2f4f6;border:1px solid #e2e8f0;color:#191c1e;padding:6px 9px;border-radius:6px;"><span style="font-family:'Material Symbols Outlined';font-size:14px;color:#505f76;">corporate_fare</span>12 registrants</span>
+            </div>
+          </div>
+          <div style="padding:13px 18px;display:flex;align-items:center;gap:8px;">
+            <span style="display:inline-flex;align-items:center;gap:5px;font:500 11px/1 'Public Sans';background:#eceef0;border:1px solid #e2e8f0;color:#505f76;padding:6px 9px;border-radius:6px;"><span style="font-family:'Material Symbols Outlined';font-size:14px;">layers</span>9 sources</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;font:500 11px/1 'Public Sans';background:#eceef0;border:1px solid #e2e8f0;color:#505f76;padding:6px 9px;border-radius:6px;"><span style="font-family:'Material Symbols Outlined';font-size:14px;">verified</span>High confidence</span>
+            <a href="#beta" style="margin-left:auto;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font:600 12px/1 'Public Sans';background:#041632;color:#fff;padding:8px 13px;border-radius:6px;" style-hover="background:#1b2b48;">Open evidence<span style="font-family:'Material Symbols Outlined';font-size:15px;">arrow_forward</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ DILIGENCE REPORTS ░░ -->
+  <section id="reports" data-screen-label="Diligence Reports" style="background:#041632;padding:96px 32px;position:relative;overflow:hidden;border-top:1px solid rgba(183,199,235,0.12);">
+    <sc-if value="{{ gridTexture }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;inset:0;background-image:radial-gradient(rgba(183,199,235,0.12) 1px, transparent 1px);background-size:26px 26px;opacity:0.5;pointer-events:none;"></div>
+    </sc-if>
+    <div style="position:relative;max-width:1120px;margin:0 auto;">
+      <div style="max-width:760px;margin-bottom:48px;">
+        <div style="font:700 11px/1 'Public Sans';letter-spacing:0.14em;text-transform:uppercase;color:#5f6f91;margin-bottom:16px;">Diligence Reports</div>
+        <h2 style="font-family:'Source Serif 4',serif;font-weight:600;font-size:clamp(34px,4vw,52px);line-height:1.04;letter-spacing:-0.02em;color:#fff;margin:0 0 18px;">From question to report in minutes.</h2>
+        <p style="font:400 19px/30px 'Public Sans';color:#aeb9d2;margin:0;text-wrap:pretty;">Start with a company, sector, transaction or research question. Nessus assembles a structured workspace and generates a detailed, evidence-backed diligence report.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:1.05fr 0.95fr;gap:40px;align-items:start;">
+        <!-- generated memo mock -->
+        <div style="position:relative;">
+          <div style="position:absolute;top:14px;left:14px;right:-14px;bottom:-14px;background:#0c2042;border:1px solid rgba(183,199,235,0.18);border-radius:13px;"></div>
+          <div style="position:relative;background:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:13px;overflow:hidden;box-shadow:0 40px 80px -34px rgba(3,15,36,0.7);">
+            <!-- toolbar -->
+            <div style="display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid #e2e8f0;background:#f7f9fb;">
+              <span style="font-family:'Material Symbols Outlined';font-size:17px;color:#041632;">description</span>
+              <span style="font:600 13px/1 'Public Sans';color:#041632;">Diligence Memo</span>
+              <span style="font:500 11px/1 'Public Sans';color:#75777e;margin-left:4px;">Generated 2 min ago</span>
+              <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;font:600 11px/1 'Public Sans';background:#041632;color:#fff;padding:7px 11px;border-radius:6px;"><span style="font-family:'Material Symbols Outlined';font-size:14px;">picture_as_pdf</span>Export PDF</span>
+            </div>
+            <!-- paper -->
+            <div style="padding:24px 26px;">
+              <div style="font:700 9px/1 'Public Sans';letter-spacing:0.16em;text-transform:uppercase;color:#7b1e1e;margin-bottom:12px;">Confidential · Diligence Memo</div>
+              <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:24px;line-height:1.18;letter-spacing:-0.01em;color:#041632;margin-bottom:14px;">Project Maple — Regulatory &amp; Political Exposure</div>
+              <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:20px;">
+                <span style="font:500 11px/1 'Public Sans';color:#44474d;background:#f2f4f6;border:1px solid #e2e8f0;padding:6px 9px;border-radius:6px;">Target: NorthBridge Payments</span>
+                <span style="font:500 11px/1 'Public Sans';color:#44474d;background:#f2f4f6;border:1px solid #e2e8f0;padding:6px 9px;border-radius:6px;">Sector: Financial Services</span>
+                <span style="font:500 11px/1 'Public Sans';color:#44474d;background:#f2f4f6;border:1px solid #e2e8f0;padding:6px 9px;border-radius:6px;">Confidence: High</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;">
+                <span style="font-family:'Source Serif 4',serif;font-weight:600;font-size:14px;color:#041632;">Executive Summary</span>
+                <span style="font:700 9px/1 'Public Sans';letter-spacing:0.06em;text-transform:uppercase;background:rgba(245,158,11,0.12);color:#d97706;padding:4px 7px;border-radius:4px;">Elevated</span>
+              </div>
+              <p style="font:400 12.5px/19px 'Public Sans';color:#44474d;margin:0 0 6px;">NorthBridge operates in a sector under active federal reform. Bill C-27 and the Retail Payment Activities Act introduce near-term consent, governance and reporting obligations<span style="vertical-align:super;font-size:9px;color:#7b1e1e;"> [1]</span>. Lobbying activity from incumbent processors has intensified ahead of clause-by-clause review<span style="vertical-align:super;font-size:9px;color:#7b1e1e;"> [2]</span>.</p>
+              <div style="height:1px;background:#eef1f5;margin:18px 0;"></div>
+              <div style="font:700 9px/1 'Public Sans';letter-spacing:0.12em;text-transform:uppercase;color:#75777e;margin-bottom:12px;">In this memo</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px 18px;margin-bottom:18px;">
+                <div style="display:flex;align-items:baseline;gap:8px;"><span style="font-family:'Source Serif 4',serif;font-weight:600;font-size:12px;color:#b7c7eb;">01</span><span style="font:500 12px/1.3 'Public Sans';color:#191c1e;">Political exposure</span></div>
+                <div style="display:flex;align-items:baseline;gap:8px;"><span style="font-family:'Source Serif 4',serif;font-weight:600;font-size:12px;color:#b7c7eb;">02</span><span style="font:500 12px/1.3 'Public Sans';color:#191c1e;">Regulatory landscape</span></div>
+                <div style="display:flex;align-items:baseline;gap:8px;"><span style="font-family:'Source Serif 4',serif;font-weight:600;font-size:12px;color:#b7c7eb;">03</span><span style="font:500 12px/1.3 'Public Sans';color:#191c1e;">Lobbying activity</span></div>
+                <div style="display:flex;align-items:baseline;gap:8px;"><span style="font-family:'Source Serif 4',serif;font-weight:600;font-size:12px;color:#b7c7eb;">04</span><span style="font:500 12px/1.3 'Public Sans';color:#191c1e;">Government dependencies</span></div>
+                <div style="display:flex;align-items:baseline;gap:8px;"><span style="font-family:'Source Serif 4',serif;font-weight:600;font-size:12px;color:#b7c7eb;">05</span><span style="font:500 12px/1.3 'Public Sans';color:#191c1e;">Upcoming risks &amp; deadlines</span></div>
+                <div style="display:flex;align-items:baseline;gap:8px;"><span style="font-family:'Source Serif 4',serif;font-weight:600;font-size:12px;color:#b7c7eb;">06</span><span style="font:500 12px/1.3 'Public Sans';color:#191c1e;">Management questions</span></div>
+              </div>
+              <div style="border-top:1px solid #eef1f5;padding-top:12px;font:400 10px/15px 'Public Sans';color:#8a8d94;">[1] Canada Gazette, Part II · [2] Office of the Commissioner of Lobbying · [3] INDU Committee evidence — every claim links to its source.</div>
+            </div>
+          </div>
+        </div>
+        <!-- right column -->
+        <div>
+          <div style="font:700 10px/1 'Public Sans';letter-spacing:0.12em;text-transform:uppercase;color:#b7c7eb;margin-bottom:20px;">Every memo covers</div>
+          <div style="display:flex;flex-direction:column;gap:13px;margin-bottom:28px;">
+            <div style="display:flex;gap:11px;align-items:flex-start;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#42d18a;margin-top:1px;">check</span><div><div style="font:600 14px/1.3 'Public Sans';color:#fff;">Political &amp; regulatory exposure</div><p style="font:400 13px/19px 'Public Sans';color:#8393b5;margin:2px 0 0;">Where government activity touches the target.</p></div></div>
+            <div style="display:flex;gap:11px;align-items:flex-start;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#42d18a;margin-top:1px;">check</span><div><div style="font:600 14px/1.3 'Public Sans';color:#fff;">Lobbying &amp; stakeholder pressure</div><p style="font:400 13px/19px 'Public Sans';color:#8393b5;margin:2px 0 0;">Who is shaping the outcome, and how.</p></div></div>
+            <div style="display:flex;gap:11px;align-items:flex-start;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#42d18a;margin-top:1px;">check</span><div><div style="font:600 14px/1.3 'Public Sans';color:#fff;">Government dependencies</div><p style="font:400 13px/19px 'Public Sans';color:#8393b5;margin:2px 0 0;">Contracts, funding and approvals at risk.</p></div></div>
+            <div style="display:flex;gap:11px;align-items:flex-start;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#42d18a;margin-top:1px;">check</span><div><div style="font:600 14px/1.3 'Public Sans';color:#fff;">Upcoming risks &amp; recommended questions</div><p style="font:400 13px/19px 'Public Sans';color:#8393b5;margin:2px 0 0;">What to raise before the decision is made.</p></div></div>
+          </div>
+          <!-- generate bar -->
+          
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ USE CASES ░░ -->
+  <section id="use-cases" data-screen-label="Use Cases" style="background:#ffffff;padding:96px 32px;border-top:1px solid #e2e8f0;">
+    <div style="max-width:1120px;margin:0 auto;">
+      <div style="max-width:720px;margin-bottom:48px;">
+        <div style="font:700 11px/1 'Public Sans';letter-spacing:0.14em;text-transform:uppercase;color:#75777e;margin-bottom:16px;">Who It's For</div>
+        <h2 style="font-family:'Source Serif 4',serif;font-weight:600;font-size:clamp(34px,4vw,52px);line-height:1.04;letter-spacing:-0.02em;color:#041632;margin:0 0 18px;">Built for people who can't be wrong.</h2>
+        <p style="font:400 19px/30px 'Public Sans';color:#44474d;margin:0;text-wrap:pretty;">When a decision rides on what government does next, guessing isn't an option.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">
+        <div style="border:1px solid #e2e8f0;border-radius:13px;overflow:hidden;">
+          <div style="background:#041632;padding:20px;">
+            <span style="font-family:'Material Symbols Outlined';font-size:24px;color:#b7c7eb;">trending_up</span>
+            <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:21px;color:#fff;margin-top:12px;line-height:1.15;">Private Equity, VC &amp; M&amp;A</div>
+          </div>
+          <div style="padding:20px;display:flex;flex-direction:column;gap:11px;">
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Pre-transaction political &amp; regulatory diligence</span></div>
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Sector thesis development</span></div>
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Portfolio monitoring &amp; risk alerts</span></div>
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Investment committee preparation</span></div>
+          </div>
+        </div>
+        <div style="border:1px solid #e2e8f0;border-radius:13px;overflow:hidden;">
+          <div style="background:#041632;padding:20px;">
+            <span style="font-family:'Material Symbols Outlined';font-size:24px;color:#b7c7eb;">insights</span>
+            <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:21px;color:#fff;margin-top:12px;line-height:1.15;">Corporate Strategy &amp; Consulting</div>
+          </div>
+          <div style="padding:20px;display:flex;flex-direction:column;gap:11px;">
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Market &amp; sector monitoring</span></div>
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Policy exposure analysis</span></div>
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Client research &amp; scenario development</span></div>
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Strategic planning support</span></div>
+          </div>
+        </div>
+        <div style="border:1px solid #e2e8f0;border-radius:13px;overflow:hidden;">
+          <div style="background:#041632;padding:20px;">
+            <span style="font-family:'Material Symbols Outlined';font-size:24px;color:#b7c7eb;">campaign</span>
+            <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:21px;color:#fff;margin-top:12px;line-height:1.15;">Government Relations &amp; Public Affairs</div>
+          </div>
+          <div style="padding:20px;display:flex;flex-direction:column;gap:11px;">
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Legislative &amp; regulatory monitoring</span></div>
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Stakeholder &amp; lobbying intelligence</span></div>
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Issue &amp; narrative tracking</span></div>
+            <div style="display:flex;gap:9px;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#059669;">check_circle</span><span style="font:400 14px/20px 'Public Sans';color:#44474d;">Political signal monitoring</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ WHY NESSUS ░░ -->
+  <section id="why" data-screen-label="Why Nessus" style="background:#041632;padding:96px 32px;position:relative;overflow:hidden;">
+    <sc-if value="{{ gridTexture }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;inset:0;background-image:radial-gradient(rgba(183,199,235,0.12) 1px, transparent 1px);background-size:26px 26px;opacity:0.5;pointer-events:none;"></div>
+    </sc-if>
+    <div style="position:relative;max-width:1120px;margin:0 auto;">
+      <div style="max-width:760px;margin-bottom:48px;">
+        <div style="font:700 11px/1 'Public Sans';letter-spacing:0.14em;text-transform:uppercase;color:#5f6f91;margin-bottom:16px;">Why Nessus</div>
+        <h2 style="font-family:'Source Serif 4',serif;font-weight:600;font-size:clamp(34px,4vw,52px);line-height:1.04;letter-spacing:-0.02em;color:#fff;margin:0 0 18px;">Not a search box. An intelligence layer.</h2>
+        <p style="font:400 19px/30px 'Public Sans';color:#aeb9d2;margin:0;text-wrap:pretty;">A government-data browser, a news monitor and an AI summarizer all leave the hard part to you. Nessus does the connecting.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:0.85fr 1.15fr;gap:18px;align-items:stretch;">
+        <div style="border:1px solid rgba(183,199,235,0.18);border-radius:13px;padding:24px;">
+          <div style="font:700 10px/1 'Public Sans';letter-spacing:0.12em;text-transform:uppercase;color:#5f6f91;margin-bottom:18px;">What others give you</div>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div style="display:flex;gap:10px;align-items:center;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#5f6f91;">remove</span><span style="font:400 15px/1.3 'Public Sans';color:#8393b5;">Raw records you still have to read</span></div>
+            <div style="display:flex;gap:10px;align-items:center;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#5f6f91;">remove</span><span style="font:400 15px/1.3 'Public Sans';color:#8393b5;">Headlines with no business context</span></div>
+            <div style="display:flex;gap:10px;align-items:center;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#5f6f91;">remove</span><span style="font:400 15px/1.3 'Public Sans';color:#8393b5;">Summaries you can't trace or trust</span></div>
+          </div>
+        </div>
+        <div style="border:1px solid rgba(183,199,235,0.35);border-radius:13px;padding:24px;background:#0c2042;">
+          <div style="font:700 10px/1 'Public Sans';letter-spacing:0.12em;text-transform:uppercase;color:#b7c7eb;margin-bottom:18px;">What Nessus does</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div style="display:flex;gap:10px;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#42d18a;">check</span><div><div style="font:600 14px/1.3 'Public Sans';color:#fff;">Resolves entities</div><p style="font:400 12px/17px 'Public Sans';color:#8393b5;margin:3px 0 0;">One person, company or bill across every source.</p></div></div>
+            <div style="display:flex;gap:10px;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#42d18a;">check</span><div><div style="font:600 14px/1.3 'Public Sans';color:#fff;">Classifies relevance</div><p style="font:400 12px/17px 'Public Sans';color:#8393b5;margin:3px 0 0;">Signal separated from background noise.</p></div></div>
+            <div style="display:flex;gap:10px;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#42d18a;">check</span><div><div style="font:600 14px/1.3 'Public Sans';color:#fff;">Connects signals</div><p style="font:400 12px/17px 'Public Sans';color:#8393b5;margin:3px 0 0;">A relationship graph across institutions.</p></div></div>
+            <div style="display:flex;gap:10px;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#42d18a;">check</span><div><div style="font:600 14px/1.3 'Public Sans';color:#fff;">Assesses materiality</div><p style="font:400 12px/17px 'Public Sans';color:#8393b5;margin:3px 0 0;">What actually moves the needle.</p></div></div>
+            <div style="display:flex;gap:10px;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#42d18a;">check</span><div><div style="font:600 14px/1.3 'Public Sans';color:#fff;">Translates to impact</div><p style="font:400 12px/17px 'Public Sans';color:#8393b5;margin:3px 0 0;">Political activity into business implications.</p></div></div>
+            <div style="display:flex;gap:10px;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#42d18a;">check</span><div><div style="font:600 14px/1.3 'Public Sans';color:#fff;">Keeps the evidence</div><p style="font:400 12px/17px 'Public Sans';color:#8393b5;margin:3px 0 0;">Every output is citable, end to end.</p></div></div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:18px;border:1px dashed rgba(183,199,235,0.3);border-radius:11px;padding:18px 22px;display:flex;align-items:center;gap:12px;">
+        <span style="font-family:'Material Symbols Outlined';font-size:22px;color:#b7c7eb;">trending_up</span>
+        <p style="font:500 15px/1.4 'Public Sans';color:#dbe4f6;margin:0;">The moat compounds — every query enriches the historical relationship graph, sector models and proprietary classifications. <span style="color:#b7c7eb;">Nessus gets sharper the more it's used.</span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ COVERAGE ░░ -->
+  <section data-screen-label="Coverage" style="background:#f7f9fb;padding:96px 32px;border-top:1px solid #e2e8f0;">
+    <div style="max-width:1120px;margin:0 auto;">
+      <div style="max-width:720px;margin-bottom:44px;">
+        <div style="font:700 11px/1 'Public Sans';letter-spacing:0.14em;text-transform:uppercase;color:#75777e;margin-bottom:16px;">Coverage</div>
+        <h2 style="font-family:'Source Serif 4',serif;font-weight:600;font-size:clamp(34px,4vw,52px);line-height:1.04;letter-spacing:-0.02em;color:#041632;margin:0 0 18px;">Canada, end to end.</h2>
+        <p style="font:400 19px/30px 'Public Sans';color:#44474d;margin:0;text-wrap:pretty;">We started where the data is most fragmented and most underserved by global platforms and went deep.</p>
+      </div>
+      <sc-if value="{{ showProofStats }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:40px;">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:22px;"><div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:38px;line-height:1;color:#041632;">100+</div><div style="font:500 13px/18px 'Public Sans';color:#44474d;margin-top:8px;">source classes, normalized into one graph</div></div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:22px;"><div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:38px;line-height:1;color:#041632;">Millions</div><div style="font:500 13px/18px 'Public Sans';color:#44474d;margin-top:8px;">of connected political &amp; regulatory data points</div></div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:22px;"><div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:38px;line-height:1;color:#041632;">Fed + Prov</div><div style="font:500 13px/18px 'Public Sans';color:#44474d;margin-top:8px;">federal coverage today, provincial expanding</div></div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:22px;"><div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:38px;line-height:1;color:#041632;">100%</div><div style="font:500 13px/18px 'Public Sans';color:#44474d;margin-top:8px;">of findings linked to original evidence</div></div>
+        </div>
+      </sc-if>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <span style="font:500 13px/1 'Public Sans';color:#191c1e;background:#fff;border:1px solid #e2e8f0;padding:9px 13px;border-radius:999px;">Parliament &amp; Hansard</span>
+        <span style="font:500 13px/1 'Public Sans';color:#191c1e;background:#fff;border:1px solid #e2e8f0;padding:9px 13px;border-radius:999px;">Bills &amp; legislation</span>
+        <span style="font:500 13px/1 'Public Sans';color:#191c1e;background:#fff;border:1px solid #e2e8f0;padding:9px 13px;border-radius:999px;">Canada Gazette</span>
+        <span style="font:500 13px/1 'Public Sans';color:#191c1e;background:#fff;border:1px solid #e2e8f0;padding:9px 13px;border-radius:999px;">Lobbying Registry</span>
+        <span style="font:500 13px/1 'Public Sans';color:#191c1e;background:#fff;border:1px solid #e2e8f0;padding:9px 13px;border-radius:999px;">Committees &amp; hearings</span>
+        <span style="font:500 13px/1 'Public Sans';color:#191c1e;background:#fff;border:1px solid #e2e8f0;padding:9px 13px;border-radius:999px;">Regulators &amp; agencies</span>
+        <span style="font:500 13px/1 'Public Sans';color:#191c1e;background:#fff;border:1px solid #e2e8f0;padding:9px 13px;border-radius:999px;">Consultations &amp; notices</span>
+        <span style="font:500 13px/1 'Public Sans';color:#191c1e;background:#fff;border:1px solid #e2e8f0;padding:9px 13px;border-radius:999px;">Public appointments</span>
+        <span style="font:500 13px/1 'Public Sans';color:#191c1e;background:#fff;border:1px solid #e2e8f0;padding:9px 13px;border-radius:999px;">Procurement &amp; funding</span>
+        <span style="font:500 13px/1 'Public Sans';color:#191c1e;background:#fff;border:1px solid #e2e8f0;padding:9px 13px;border-radius:999px;">News &amp; industry media</span>
+        <span style="font:500 13px/1 'Public Sans';color:#191c1e;background:#fff;border:1px solid #e2e8f0;padding:9px 13px;border-radius:999px;">Source-health tracking</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ BETA CTA ░░ -->
+  <section id="beta" data-screen-label="Join the Beta" style="background:#030f24;padding:100px 32px;position:relative;overflow:hidden;">
+    <div style="position:absolute;inset:0;background:radial-gradient(60% 80% at 50% 0%, rgba(43,67,110,0.55), transparent 70%);pointer-events:none;"></div>
+    <div style="position:relative;max-width:680px;margin:0 auto;text-align:center;">
+      <div style="font:700 11px/1 'Public Sans';letter-spacing:0.14em;text-transform:uppercase;color:#5f6f91;margin-bottom:18px;">Private Beta · Canada</div>
+      <h2 style="font-family:'Source Serif 4',serif;font-weight:600;font-size:clamp(36px,4.4vw,58px);line-height:1.03;letter-spacing:-0.02em;color:#fff;margin:0 0 18px;">Join the Nessus beta.</h2>
+      <p style="font:400 18px/29px 'Public Sans';color:#aeb9d2;margin:0 auto 32px;max-width:520px;text-wrap:pretty;">We're onboarding a first cohort of Canadian investors, advisors and strategy teams. Get early access and help shape the platform.</p>
+      <form onsubmit="{{ noop }}" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;max-width:520px;margin:0 auto 16px;">
+        <input type="email" placeholder="Work email" style="flex:1;min-width:240px;background:#0c2042;border:1px solid rgba(183,199,235,0.3);border-radius:8px;padding:15px 16px;font:400 15px/1 'Public Sans';color:#fff;outline:none;">
+        <button type="submit" style="display:inline-flex;align-items:center;gap:9px;background:#fff;color:#041632;border:none;font:600 15px/1 'Public Sans';padding:15px 24px;border-radius:8px;cursor:pointer;" style-hover="background:#b7c7eb;">
+          Join the Beta
+          <span style="font-family:'Material Symbols Outlined';font-size:18px;line-height:1;">arrow_forward</span>
+        </button>
+      </form>
+      <p style="font:500 12px/1.5 'Public Sans';color:#5f6f91;margin:0;">No spam. We'll only reach out about beta access.</p>
+    </div>
+  </section>
+
+  <!-- ░░ FOOTER ░░ -->
+  <footer style="background:#041632;border-top:1px solid rgba(183,199,235,0.12);padding:40px 32px;">
+    <div style="max-width:1120px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:11px;">
+        <span style="width:30px;height:30px;border-radius:6px;background:#fff;color:#041632;display:flex;align-items:center;justify-content:center;"><span style="font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 1;font-size:18px;line-height:1;">account_balance</span></span>
+        <div style="display:flex;flex-direction:column;line-height:1;">
+          <span style="font:700 16px/1 'Public Sans';letter-spacing:0.06em;color:#fff;">NESSUS</span>
+          <span style="font:600 9px/1.4 'Public Sans';letter-spacing:0.16em;color:#5f6f91;text-transform:uppercase;margin-top:3px;">Intelligence Grade · Canada-First</span>
+        </div>
+      </div>
+      <nav style="display:flex;gap:24px;flex-wrap:wrap;">
+        <a href="#problem" style="text-decoration:none;font:500 13px/1 'Public Sans';color:#8393b5;" style-hover="color:#fff;">The Problem</a>
+        <a href="#how" style="text-decoration:none;font:500 13px/1 'Public Sans';color:#8393b5;" style-hover="color:#fff;">How It Works</a>
+        <a href="#product" style="text-decoration:none;font:500 13px/1 'Public Sans';color:#8393b5;" style-hover="color:#fff;">Product</a>
+        <a href="#use-cases" style="text-decoration:none;font:500 13px/1 'Public Sans';color:#8393b5;" style-hover="color:#fff;">Use Cases</a>
+        <a href="#beta" style="text-decoration:none;font:500 13px/1 'Public Sans';color:#8393b5;" style-hover="color:#fff;">Join the Beta</a>
+      </nav>
+    </div>
+    <div style="max-width:1120px;margin:24px auto 0;padding-top:20px;border-top:1px solid rgba(183,199,235,0.10);font:400 12px/1.5 'Public Sans';color:#5f6f91;">
+      © 2026 Nessus Intelligence. Canada-first political &amp; regulatory intelligence. Built for diligence, not for headlines.
+    </div>
+  </footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;showAnnouncementBar&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot; },
+  &quot;gridTexture&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot; },
+  &quot;showProofStats&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot; }
+}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      showAnnouncementBar: this.props.showAnnouncementBar ?? true,
+      gridTexture: this.props.gridTexture ?? true,
+      showProofStats: this.props.showProofStats ?? true,
+      noop: (e) => { e.preventDefault(); },
+    };
+  }
+}
+</script>
+</body>
+</html>
