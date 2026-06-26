@@ -59,11 +59,17 @@
   /* Hero product mock (fixed sidebar + dense dashboard) doesn't reflow cleanly below ~480px —
      badges/timestamps start overflowing their cards. Below that, scale it down as one unit
      (like a real screenshot) instead of letting its internals reflow and break.
-     transform:scale() (not `zoom`) for universal engine support; the wrapper's height is
-     pinned to the mock's fixed natural height (1226px at the 444px design width) times the
-     same scale factor, since transform doesn't shrink the space it occupies on its own. */
+     transform:scale() (not `zoom`) for universal engine support. Scaling the whole desktop
+     dashboard to phone width still leaves it ~980px tall (one long awkward strip), so we also
+     CLIP the wrapper to a framed "peek" of the top of the product and fade the bottom out —
+     the same way real product marketing shots are cropped. */
   @media (max-width: 480px) {
-    .nx-hero-mock-wrap { overflow: hidden; height: calc(1226px * ((100vw - 36px) / 444px)); }
+    .nx-hero-mock-wrap {
+      overflow: hidden;
+      height: min(440px, calc(1226px * ((100vw - 36px) / 444px)));
+      -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+      mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+    }
     .nx-hero-mock { width: 444px; transform-origin: top left; transform: scale(calc((100vw - 36px) / 444px)); }
   }
 </style>
