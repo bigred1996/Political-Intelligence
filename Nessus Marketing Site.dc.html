@@ -58,9 +58,13 @@
   }
   /* Hero product mock (fixed sidebar + dense dashboard) doesn't reflow cleanly below ~480px —
      badges/timestamps start overflowing their cards. Below that, scale it down as one unit
-     (like a real screenshot) instead of letting its internals reflow and break. */
+     (like a real screenshot) instead of letting its internals reflow and break.
+     transform:scale() (not `zoom`) for universal engine support; the wrapper's height is
+     pinned to the mock's fixed natural height (1226px at the 444px design width) times the
+     same scale factor, since transform doesn't shrink the space it occupies on its own. */
   @media (max-width: 480px) {
-    .nx-hero-mock { width: 444px; zoom: calc((100vw - 36px) / 444px); }
+    .nx-hero-mock-wrap { overflow: hidden; height: calc(1226px * ((100vw - 36px) / 444px)); }
+    .nx-hero-mock { width: 444px; transform-origin: top left; transform: scale(calc((100vw - 36px) / 444px)); }
   }
 </style>
 </helmet>
@@ -131,6 +135,7 @@
 
     <!-- PRODUCT MOCK overlapping into next section -->
     <div style="position:relative;max-width:1120px;margin:0 auto;padding:0 32px;transform:translateY(64px);">
+      <div class="nx-hero-mock-wrap">
       <div class="nx-hero-mock" style="border-radius:14px;overflow:hidden;background:#ffffff;border:1px solid rgba(255,255,255,0.10);box-shadow:0 40px 90px -30px rgba(3,15,36,0.65), 0 0 0 1px rgba(4,22,50,0.04);">
         <!-- topbar -->
         <div style="display:flex;align-items:center;gap:14px;padding:11px 16px;background:#041632;border-bottom:1px solid rgba(183,199,235,0.12);">
@@ -232,6 +237,7 @@
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
     <div style="height:104px;background:#f7f9fb;"></div>
