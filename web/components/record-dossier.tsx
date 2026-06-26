@@ -103,6 +103,17 @@ export function RecordDossier({
                 <Beat label="Why it matters" icon="priority_high" accent="#d97706">{assess.matters}</Beat>
                 <Beat label={detail.industry ? `Impact on ${detail.industry.name}` : "Impact"} icon="trending_up" accent="var(--color-primary)">{assess.impact}</Beat>
               </div>
+              {assess.what_to_watch ? (
+                <div className="px-density-comfortable pb-density-comfortable">
+                  <div className="rounded-lg border border-secondary/30 bg-secondary-container/40 p-density-comfortable flex gap-3">
+                    <span className="material-symbols-outlined text-[22px] text-secondary shrink-0" aria-hidden="true">radar</span>
+                    <div className="min-w-0">
+                      <div className="font-label-caps text-label-caps uppercase tracking-wider text-secondary mb-1">What to watch</div>
+                      <p className="font-memo-body text-memo-body text-on-surface leading-relaxed">{assess.what_to_watch}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </Card>
           ) : null}
 

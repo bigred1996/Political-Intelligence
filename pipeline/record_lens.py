@@ -217,123 +217,210 @@ def _rt_key(record_type: str) -> str:
     return "default"
 
 
+def _yr(date: Any) -> str | None:
+    """Year out of an ISO-ish or M/D/Y date string."""
+    if not date:
+        return None
+    s = str(date)
+    for i in range(len(s) - 3):
+        chunk = s[i:i + 4]
+        if chunk.isdigit() and 1990 <= int(chunk) <= 2035:
+            return chunk
+    return None
+
+
+def _count_word(n: int, singular: str) -> str:
+    return f"{n:,} {singular}{'' if n == 1 else 's'}"
+
+
+def _contract_band(amount: float | None) -> str:
+    if not amount:
+        return "a federal"
+    if amount >= 5_000_000:
+        return "a major"
+    if amount >= 1_000_000:
+        return "a large"
+    if amount >= 250_000:
+        return "a mid-sized"
+    if amount < 50_000:
+        return "a small, routine"
+    return "a standard"
+
+
+def _entity_footprint(facts: dict[str, Any]) -> list[str]:
+    """Plain-language pieces describing the entity's real federal footprint."""
+    bits: list[str] = []
+    c = facts.get("contracts")
+    if c:
+        bits.append(f"{_count_word(c['count'], 'federal contract')} worth {_money(c['total'])}")
+    g = facts.get("grants")
+    if g:
+        bits.append(f"{_count_word(g['count'], 'grant')} worth {_money(g['total'])}")
+    lob = facts.get("lobbying")
+    if lob:
+        bits.append(_count_word(lob["count"], "lobbying communication"))
+    d = facts.get("donations")
+    if d:
+        bits.append(f"{_money(d['total'])} in political donations")
+    return bits
+
+
+def _party_concentration(facts: dict[str, Any]) -> tuple[str, int, str] | None:
+    """(top_party, pct, qualifier) for a donor's giving, or None."""
+    d = facts.get("donations")
+    if not d or not d.get("parties"):
+        return None
+    parties = {k: v for k, v in d["parties"].items() if v}
+    total = sum(parties.values())
+    if not total:
+        return None
+    top = max(parties, key=parties.get)
+    share = parties[top] / total
+    pct = round(share * 100)
+    if share >= 0.85:
+        return (top, pct, "almost entirely")
+    if share >= 0.6:
+        return (top, pct, "mostly")
+    if len(parties) > 1:
+        return (top, pct, "with a plurality")
+    return (top, pct, "entirely")
+
+
 def assessment(
     *, record_type: str, entity: str | None, sector_name: str | None,
     sector_confidence: str, amount: float | None, status: str | None,
     signature: dict[str, Any], total_connections: int, distinct_sources: int,
-    signal_level: str,
+    signal_level: str, fields: dict[str, Any] | None = None, facts: dict[str, Any] | None = None,
+    date: str | None = None,
 ) -> dict[str, str]:
-    """The means / matters / impact beats + a one-line strategic read."""
+    """Record-specific means / matters / impact / what-to-watch beats + a one-line
+    strategic read. Reads the record's own field values and the entity's computed
+    aggregates (`facts`) so the prose is about *this* record, not its type."""
+    f = fields or {}
+    facts = facts or {}
     key = _rt_key(record_type)
-    # Records with no named entity need a sensible subject for the prose.
-    _subject = {
-        "bill": "this bill", "regulation": "this regulation",
-        "tribunal": "this matter", "news": "this announcement",
-    }
+    _subject = {"bill": "this bill", "regulation": "this regulation", "tribunal": "this matter", "news": "this announcement"}
     who = entity or _subject.get(key, "this organization")
     amt = _money(amount)
     sec = _sector_phrase(sector_name, sector_confidence)
     has_sector = bool(sector_name)
+    when = _yr(date)
+    dept = f.get("department")
+    footprint = _entity_footprint(facts)
 
-    # Sector-impact clause reused across beats.
-    if has_sector:
-        impact_lead = f"For {sec}, "
-    else:
-        impact_lead = "Across government, "
+    sector_impact = (
+        f"For {sec}, this is one data point in how Ottawa shapes the industry — read it against the connected records for the pattern."
+        if has_sector else
+        "It reads against government-wide activity rather than a single tracked industry."
+    )
 
-    beats: dict[str, dict[str, str]] = {
-        "contract": {
-            "means": f"A {amt or 'federal'} procurement award to {who} — the government paying for goods or services.",
-            "matters": "Procurement is concrete federal reliance on a named supplier. Award size, the contracting department, and any follow-on or amended awards measure that footprint.",
-            "impact": f"{impact_lead}awards like this signal where Ottawa places operational reliance and shape competitive dynamics among suppliers.",
-        },
-        "grant": {
-            "means": f"A {amt or 'federal'} grant or contribution to {who} — money transferred, not paid for services rendered.",
-            "matters": "Transfers reveal where Ottawa is directing money and which players it chooses to back — a leading signal of policy priorities.",
-            "impact": f"{impact_lead}funding decisions show the government's hand in which players and projects it wants to advance.",
-        },
-        "donation": {
-            "means": f"A political contribution linked to {who}. Since the 2007 corporate-donation ban these are individual donors.",
-            "matters": "Donation patterns map political relationships; concentration toward one party can foreshadow alignment on policy.",
-            "impact": f"{impact_lead}the flow of political money traces which relationships an industry's actors are cultivating.",
-        },
-        "lobby": {
-            "means": f"{who} formally engaged — or registered to engage — federal officials.",
-            "matters": "Lobbying is a leading indicator: it frequently precedes regulatory, funding, or procurement decisions. The institutions contacted, and any clustering before a policy moment, are the signal.",
-            "impact": f"{impact_lead}lobbying activity is an early read on where the policy and spending agenda is about to move.",
-        },
-        "bill": {
-            "means": f"Federal legislation (status: {status or 'in progress'}).",
-            "matters": "Bills are the sharpest form of policy volatility — the further one advances, the more concrete its compliance, cost, or market impact.",
-            "impact": f"{impact_lead}legislation sets the rules of the game; its progress is the clearest forward signal of regulatory change.",
-        },
-        "regulation": {
-            "means": "A regulatory action published in the Canada Gazette — policy turning into binding obligation.",
-            "matters": "Gazette items become enforceable rules with direct compliance and cost consequences.",
-            "impact": f"{impact_lead}this is policy crossing the line from proposal into legal obligation.",
-        },
-        "tribunal": {
-            "means": "A decision by a federal tribunal or regulator (e.g. CRTC) resolving a specific matter.",
-            "matters": "Tribunal decisions bind the parties and set precedent; outcomes signal how regulators are leaning.",
-            "impact": f"{impact_lead}regulator decisions are a direct read on enforcement posture and likely precedent.",
-        },
-        "appointment": {
-            "means": f"A Governor-in-Council appointment{(' of ' + who) if entity else ''} to a federal body.",
-            "matters": "Who sits on a sector's regulators sets the posture of the bodies overseeing it — a quiet but decisive lever.",
-            "impact": f"{impact_lead}appointments shape the orientation of the institutions that hold the industry to account.",
-        },
-        "incident": {
-            "means": f"An operational or safety incident involving {who}.",
-            "matters": "Incidents raise regulatory scrutiny and social-licence risk, and often precede tightened oversight.",
-            "impact": f"{impact_lead}incidents are frequently the trigger for new scrutiny across the whole industry.",
-        },
-        "release": {
-            "means": f"A reported environmental release by {who}.",
-            "matters": "Release data feeds environmental policy and ESG scrutiny and can become the evidence base for new regulation.",
-            "impact": f"{impact_lead}emissions and release records often become the factual basis for future rule-making.",
-        },
-        "news": {
-            "means": "A government communication or announcement.",
-            "matters": "Departmental announcements signal ministerial priorities and the likely direction of upcoming policy.",
-            "impact": f"{impact_lead}official communications telegraph where attention — and policy — is heading.",
-        },
-        "hansard": {
-            "means": f"A statement made in the House of Commons{(' by ' + who) if entity else ''}.",
-            "matters": "House interventions show which issues MPs are actively raising and how positions are forming.",
-            "impact": f"{impact_lead}parliamentary debate is where political will around an issue becomes visible.",
-        },
-        "default": {
-            "means": "A federal data point.",
-            "matters": "Read alongside the connected records to see how it fits the wider pattern of contracts, lobbying, and regulation.",
-            "impact": f"{impact_lead}its significance comes mainly from how it connects to the surrounding record.",
-        },
-    }
-    beat = beats.get(key, beats["default"])
+    means = matters = impact = watch = ""
 
-    # Strategic read — the verdict line, referencing signal + connection signature.
-    signal_phrase = {
-        "strong": "Strong signal", "moderate": "Moderate signal",
-    }.get(signal_level, "Low standalone signal")
+    if key == "contract":
+        means = f"{dept or 'A federal department'} awarded {who} {amt or 'an undisclosed sum'}" + (f" for {f['description']}" if f.get("description") else "") + (f" in {when}" if when else "") + "."
+        band = _contract_band(amount)
+        if facts.get("contracts") and facts["contracts"]["count"] > 1:
+            c = facts["contracts"]
+            matters = f"At {amt}, {band} award. {who} holds {_count_word(c['count'], 'federal contract')} worth {_money(c['total'])}" + (f", concentrated with {c['top']}" if c.get("top") else "") + "."
+        else:
+            matters = f"At {amt}, {band} award. It is {who}'s only federal contract on record — a one-off, not a pattern."
+        impact = sector_impact
+        watch = f"Watch {dept or 'the department'} for follow-on or amended awards to {who}" + (" — and whether the firm's lobbying continues to precede federal work." if facts.get("lobbying") else ".")
+
+    elif key == "grant":
+        means = f"{dept or 'A federal department'} granted {who} {amt or 'funding'}" + (f" under {f['program']}" if f.get("program") else "") + (f" in {when}" if when else "") + "."
+        if facts.get("grants") and facts["grants"]["count"] > 1:
+            g = facts["grants"]
+            matters = f"{who} has received {_count_word(g['count'], 'federal grant')} totalling {_money(g['total'])} — a recurring recipient of federal funding."
+        else:
+            matters = f"This is {who}'s only grant on record. Transfers like it show where Ottawa is directing money and which players it backs."
+        impact = sector_impact
+        watch = "Watch for renewal or follow-on funding" + (f" under {f['program']}" if f.get("program") else "") + (f"; the agreement runs to {f['end_date']}." if f.get("end_date") else ".")
+
+    elif key == "donation":
+        means = f"{who} contributed {amt or 'a donation'} to the {f.get('party') or 'a federal party'}" + (f" ({f['province']})" if f.get("province") else "") + (f" in {when}" if when else "") + "."
+        conc = _party_concentration(facts)
+        if conc:
+            party, pct, qual = conc
+            d = facts["donations"]
+            matters = f"{who}'s political giving runs {qual} to the {party} ({pct}% of {_money(d['total'])} across {_count_word(d['count'], 'contribution')}) — a clear partisan lean."
+        else:
+            matters = "Since the 2007 corporate-donation ban these are individual donors; the pattern of giving still maps political relationships."
+        money_footprint = [b for b in footprint if "contract" in b or "grant" in b]
+        impact = (f"Note: this donor also has {', '.join(money_footprint)} on record — political giving alongside federal funding is a relationship worth scrutinising." if money_footprint else sector_impact)
+        watch = f"Watch whether giving stays concentrated toward the {f.get('party') or 'same party'}" + (" — and whether it tracks with the federal funding above." if money_footprint else ".")
+
+    elif key == "lobby":
+        means = f"{who} lobbied federal officials" + (f" at {f['institutions']}" if f.get("institutions") else "") + (f" in {when}" if when else "") + (f"; registrant {f['registrant']}." if f.get("registrant") else ".")
+        lob = facts.get("lobbying")
+        intensity = f"{who} has logged {_count_word(lob['count'], 'lobbying communication')}" + (f" since {_yr(lob['earliest'])}" if _yr(lob.get("earliest")) else "") + "." if lob and lob["count"] > 1 else f"This is the only lobbying communication on record for {who}."
+        money_footprint = [b for b in footprint if "contract" in b or "grant" in b]
+        matters = intensity + (f" It also holds {', '.join(money_footprint)}." if money_footprint else "")
+        impact = (f"For {sec}, lobbying is a leading indicator — it frequently precedes regulatory, funding, or procurement decisions." if has_sector else "Lobbying is a leading indicator — it frequently precedes funding or regulatory decisions.")
+        watch = f"Watch {f['institutions']}" if f.get("institutions") else "Watch the contacted institutions"
+        watch += f" and any {sec} procurement or rule-making that follows this contact." if has_sector else " and any procurement or rule-making that follows."
+
+    elif key == "bill":
+        means = f"{f.get('bill_number') or 'A bill'}" + (f", {f['title']}," if f.get("title") else "") + (f" sponsored by {f['sponsor']}," if f.get("sponsor") else "") + f" is currently {status or 'in progress'}."
+        adv = (status or "").lower()
+        if any(k in adv for k in ("royal assent", "became law")):
+            matters = "It has received Royal Assent — now law. The compliance and cost implications are real, not prospective."
+            watch = "Watch implementation: coming-into-force dates and the regulations made under it."
+        elif any(k in adv for k in ("third reading", "report stage", "senate")):
+            matters = "It is well advanced through Parliament — close enough to law that affected operators should be preparing."
+            watch = "Watch its remaining stages; at this point passage is a live prospect."
+        else:
+            matters = "It is early in the legislative process — introduced but far from law, so the impact is still prospective."
+            watch = "Watch whether it advances past first reading; most early bills never become law."
+        impact = (f"For {sec}, bills are the sharpest form of policy volatility — the further this advances, the more concrete the compliance and cost impact." if has_sector else "Bills are the sharpest form of policy volatility for whichever industry they touch.")
+
+    elif key == "appointment":
+        pos = f.get("position")
+        org = f.get("organization")
+        # The position title often already contains the body ("Chair of the X") —
+        # don't repeat it as "… at X".
+        at_org = f" at {org}" if org and (not pos or org.lower() not in pos.lower()) else ""
+        means = f"{f.get('appointee') or who} was appointed" + (f" {pos}" if pos else "") + at_org + (f" in {when}" if when else "") + "."
+        matters = f"Who sits on {f.get('organization') or 'a federal body'} sets the posture of the institution — appointments are a quiet but decisive lever on the sector it oversees."
+        impact = sector_impact
+        watch = f"Watch this appointee's posture at {f.get('organization') or 'the body'}" + (f"; the term runs to {f['end_date']}." if f.get("end_date") else ".")
+
+    elif key == "regulation":
+        means = (f.get("title") or "A regulatory action") + " was published in the Canada Gazette."
+        matters = "Gazette items become enforceable rules with direct compliance and cost consequences — this is policy turning into binding obligation."
+        impact = sector_impact
+        watch = "Watch the comment period and the coming-into-force date, where the obligation actually bites."
+
+    elif key == "tribunal":
+        means = f"{f.get('body') or 'A federal tribunal'} issued decision {f.get('decision_number') or ''}".strip() + (f" involving {f['parties']}" if f.get("parties") else "") + "."
+        matters = "Tribunal decisions bind the parties and set precedent; the outcome signals how the regulator is leaning."
+        impact = sector_impact
+        watch = "Watch for an appeal or related proceedings that could widen the precedent."
+
+    elif key == "hansard":
+        means = f"{f.get('speaker') or who} spoke" + (f" on {f['subject']}" if f.get("subject") else "") + " in the House of Commons" + (f" in {when}" if when else "") + "."
+        matters = "House interventions show which issues MPs are actively raising and how positions are forming ahead of any bill or committee study."
+        impact = sector_impact
+        watch = "Watch whether the issue advances into a bill, a committee study, or a recorded vote."
+
+    else:  # release / incident / news / source_records / default
+        means = (f.get("title") or f"A federal record involving {who}") + (f" ({when})" if when else "") + "."
+        matters = (f"{who} is active across {', '.join(footprint)}." if footprint else "Read it against the connected records to see how it fits the wider pattern.")
+        impact = sector_impact
+        watch = "Watch the connected records for whether this is an isolated entry or part of a developing pattern."
+
+    # ── Strategic read — the one-line verdict: signal + sharpest fact + watch hook.
+    signal_phrase = {"strong": "Strong signal", "moderate": "Moderate signal"}.get(signal_level, "Low standalone signal")
     insight = signature.get("insight")
-    sector_tail = f" in {sec}" if has_sector else ""
-
     if insight:
-        strategic = f"{signal_phrase}. {insight} Read the connections{sector_tail} for the full footprint."
+        lead = insight
+    elif footprint:
+        lead = f"{who} carries {', '.join(footprint[:3])} across the federal record."
     elif total_connections > 0:
-        strategic = (
-            f"{signal_phrase}. {who} shows {total_connections:,} connected federal "
-            f"record{'s' if total_connections != 1 else ''} across {distinct_sources} "
-            f"source{'s' if distinct_sources != 1 else ''}{sector_tail}."
-        )
+        lead = f"{who} links to {_count_word(total_connections, 'federal record')} across {distinct_sources} source{'s' if distinct_sources != 1 else ''}."
     else:
-        strategic = (
-            f"{signal_phrase} — an isolated record with no other federal activity found "
-            f"for {who}{sector_tail}. Its value here is as a primary source, not a pattern."
-        )
+        lead = f"An isolated record — no other federal activity found for {who}."
+    watch_hook = watch.split(" — ")[0].rstrip(".") if watch else ""
+    strategic = f"{signal_phrase}. {lead}" + (f" {watch_hook}." if watch_hook else "")
 
-    return {
-        "means": beat["means"],
-        "matters": beat["matters"],
-        "impact": beat["impact"],
-        "strategic_read": strategic,
-    }
+    return {"means": means, "matters": matters, "impact": impact, "what_to_watch": watch, "strategic_read": strategic}

@@ -20,7 +20,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, null, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
@@ -367,6 +367,95 @@ async def _lateral_records(
     }]
 
 
+async def _entity_facts(session: AsyncSession, canonical: str) -> dict[str, Any]:
+    """Cheap per-entity aggregates (all on the indexed canonical_name) that make
+    the analysis record-specific: real money totals, date ranges, the top
+    counterparty per source, and donation party-concentration."""
+    from api.models.contract import Contract
+    from api.models.donation import Donation
+    from api.models.entity import LobbyingRecord
+    from api.models.grant import Grant
+    from api.models.ocl_registration import OCLRegistration
+
+    facts: dict[str, Any] = {}
+
+    async def _agg(model, amount_col: str | None, date_col: str | None):
+        amount_expr = func.sum(getattr(model, amount_col)) if amount_col else null()
+        dmin = func.min(getattr(model, date_col)) if date_col else null()
+        dmax = func.max(getattr(model, date_col)) if date_col else null()
+        return (await session.execute(
+            select(func.count(), amount_expr, dmin, dmax).where(model.canonical_name == canonical)
+        )).one()
+
+    async def _top(model, group_col, amount_col):
+        return (await session.execute(
+            select(getattr(model, group_col)).where(model.canonical_name == canonical)
+            .group_by(getattr(model, group_col)).order_by(func.sum(getattr(model, amount_col)).desc()).limit(1)
+        )).scalar_one_or_none()
+
+    c = await _agg(Contract, "contract_value", "contract_date")
+    if c[0]:
+        facts["contracts"] = {"count": c[0], "total": float(c[1] or 0), "earliest": c[2], "latest": c[3],
+                              "top": await _top(Contract, "owner_org_title", "contract_value")}
+    g = await _agg(Grant, "agreement_value", "agreement_start")
+    if g[0]:
+        facts["grants"] = {"count": g[0], "total": float(g[1] or 0), "earliest": g[2], "latest": g[3],
+                           "top": await _top(Grant, "program_name", "agreement_value")}
+    d = await _agg(Donation, "amount", "received_date")
+    if d[0]:
+        parties = (await session.execute(
+            select(Donation.party, func.sum(Donation.amount)).where(Donation.canonical_name == canonical)
+            .group_by(Donation.party).order_by(func.sum(Donation.amount).desc())
+        )).all()
+        facts["donations"] = {"count": d[0], "total": float(d[1] or 0), "earliest": d[2], "latest": d[3],
+                              "parties": {(p or "Unknown"): float(s or 0) for p, s in parties}}
+    lob = await _agg(LobbyingRecord, None, "communication_date")
+    if lob[0]:
+        facts["lobbying"] = {"count": lob[0], "earliest": lob[2], "latest": lob[3]}
+    ocl = await _agg(OCLRegistration, None, "effective_date")
+    if ocl[0]:
+        facts["ocl"] = {"count": ocl[0], "earliest": ocl[2], "latest": ocl[3]}
+    return facts
+
+
+def _en(value: Any) -> str | None:
+    """Federal data stores bilingual names as 'English | Français' — keep the
+    English side for clean prose."""
+    if not value:
+        return None
+    return str(value).split(" | ")[0].strip() or None
+
+
+def _field_values(row: Any) -> dict[str, Any]:
+    """The record's own field values the analysis prose reads from, normalized to
+    one flat dict so record_lens stays DB-free."""
+    inst = getattr(row, "institutions", None)
+    institutions = ", ".join(_en(x) or str(x) for x in inst[:2]) if isinstance(inst, list) and inst else None
+    return {
+        "department": _en(_g(row, "owner_org_title") or _g(row, "department") or _g(row, "organization")) or None,
+        "description": _g(row, "description") or None,
+        "program": _en(_g(row, "program_name")) or None,
+        "party": _g(row, "party") or None,
+        "province": _g(row, "contributor_province") or _g(row, "province") or None,
+        "registrant": _g(row, "registrant") or _g(row, "registrant_name") or None,
+        "institutions": institutions,
+        "bill_number": _g(row, "bill_number") or None,
+        "title": _g(row, "title_en") or _g(row, "title") or None,
+        "status": _g(row, "status") or None,
+        "sponsor": _g(row, "sponsor") or None,
+        "latest_activity": _g(row, "latest_activity") or None,
+        "appointee": _g(row, "appointee_name") or None,
+        "position": _en(_g(row, "position_title")) or None,
+        "organization": _en(_g(row, "organization")) or None,
+        "body": _en(_g(row, "body")) or None,
+        "decision_number": _g(row, "decision_number") or None,
+        "parties": _g(row, "parties") or None,
+        "speaker": _g(row, "speaker") or None,
+        "subject": _g(row, "subject") or None,
+        "end_date": _g(row, "agreement_end") or _g(row, "end_date") or None,
+    }
+
+
 @router.get("/{table}/{pk}", response_model=RecordDetailResponse)
 async def get_record(table: str, pk: int, session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     spec, key = _spec_for(table)
@@ -434,6 +523,7 @@ async def get_record(table: str, pk: int, session: AsyncSession = Depends(get_se
         "timeline": [], "explicit_links": explicit, "lateral": [],
         "cross_source_signature": {"sources": [], "distinct": 0, "insight": None},
     }
+    facts: dict[str, Any] = {}
     if canonical:
         groups, total = await _related_by_entity(session, canonical, spec.source, pk)
         relations["by_source"] = groups
@@ -448,6 +538,7 @@ async def get_record(table: str, pk: int, session: AsyncSession = Depends(get_se
             relations["sector_peers"] = [
                 {"canonical": e, "name": e.title()} for e in sec.entities if e != canonical
             ][:12]
+        facts = await _entity_facts(session, canonical)
 
     distinct_sources = len(relations["by_source"])
     total_conn = relations["total"]
@@ -459,7 +550,7 @@ async def get_record(table: str, pk: int, session: AsyncSession = Depends(get_se
     if total_conn <= 3:
         relations["lateral"] = await _lateral_records(session, model, spec, key, row, pk)
 
-    # ── The deterministic reading: signal strength + the five narrative beats.
+    # ── The deterministic reading: signal strength + record-specific narrative.
     signal = signal_strength(
         record_type=rtype, amount=record["amount"],
         total_connections=total_conn + explicit["total"],
@@ -470,7 +561,8 @@ async def get_record(table: str, pk: int, session: AsyncSession = Depends(get_se
         sector_name=sector.name if sector else None, sector_confidence=confidence,
         amount=record["amount"], status=_g(row, "status") or None,
         signature=signature, total_connections=total_conn,
-        distinct_sources=distinct_sources, signal_level=signal["level"])
+        distinct_sources=distinct_sources, signal_level=signal["level"],
+        fields=_field_values(row), facts=facts, date=record["date"])
 
     people = await _genuine_people(session, key, row, explicit, _g(row, "sponsor") or None)
 

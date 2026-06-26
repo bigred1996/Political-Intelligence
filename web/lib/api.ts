@@ -434,6 +434,7 @@ export interface RecordAssessment {
   means: string;
   matters: string;
   impact: string;
+  what_to_watch?: string;
   strategic_read: string;
 }
 export interface CrossSourceSignature {
