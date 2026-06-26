@@ -30,7 +30,7 @@ export function PlannedPoliticalProfile({
     id: finding.title,
     title: finding.title,
     type: "Finding",
-    href: findingHref(finding.title),
+    href: findingHref(finding),
     description: finding.summary,
     meta: finding.confidence,
     relationship: `${profile.relationshipSubject} connected to finding`,

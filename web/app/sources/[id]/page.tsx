@@ -118,7 +118,7 @@ function findingItemsFor(findings: GraphFinding[]): RelatedItem[] {
     id: `finding:${finding.title}:${index}`,
     title: finding.title,
     type: "Finding",
-    href: findingHref(finding.title),
+    href: findingHref(finding),
     description: finding.summary,
     relationship: "finding supported by source",
     strength: "supported",

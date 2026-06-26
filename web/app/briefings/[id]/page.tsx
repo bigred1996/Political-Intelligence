@@ -210,7 +210,7 @@ function reportFindingItems(findings: GraphFinding[], context: BriefingContextVa
     id: `report-finding:${finding.title}:${index}`,
     title: finding.title,
     type: "Finding",
-    href: withContext(findingHref(finding.title), context),
+    href: withContext(findingHref(finding), context),
     description: finding.summary,
     meta: finding.references?.length ? `${finding.references.length} evidence record${finding.references.length === 1 ? "" : "s"}` : finding.confidence,
     relationship: "report includes finding",

@@ -7,7 +7,7 @@ import { Card, Crumb, DetailHeader } from "@/components/nessus";
 import { AvatarLogo, RelatedItems, type RelatedItem } from "@/components/intelligence";
 import { useApi } from "@/lib/use-api";
 import type { EvidenceRef, FindingsResponse, GraphFinding, ReportsResponse } from "@/lib/api";
-import { committeeHref, entityHref, evidenceHref, personHref, reportHref, sectorHref, slugifyFindingTitle, typeLabel } from "@/lib/navigation";
+import { committeeHref, entityHref, evidenceHref, findingSlug, legacyFindingSlug, personHref, reportHref, sectorHref, typeLabel } from "@/lib/navigation";
 
 export default function SignalDetail({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -16,25 +16,25 @@ export default function SignalDetail({ params }: { params: Promise<{ slug: strin
   const decoded = decodeURIComponent(slug);
   const context = findingContext(searchParams);
   const { data: reports } = useApi<ReportsResponse>(`/api/reports/by-finding/${encodeURIComponent(decoded)}`);
-  const finding = data?.findings.find((f) => slugifyFindingTitle(f.title) === decoded) ?? data?.findings[0] ?? null;
+  const finding = data?.findings.find((f) => findingSlug(f) === decoded || legacyFindingSlug(f) === decoded) ?? data?.findings[0] ?? null;
 
   if (loading) return <SignalSkeleton />;
   if (error) return <Message tone="error">{error}</Message>;
   if (!finding) return <Message>No finding is available for this workspace yet.</Message>;
 
-  const findingSlug = slugifyFindingTitle(finding.title);
-  const evidenceItems = evidenceRelatedItems(finding, findingSlug);
-  const sectorItems = sectorRelatedItems(finding, findingSlug);
-  const actorItems = actorRelatedItems(finding, findingSlug);
-  const committeeItems = committeeRelatedItems(finding, findingSlug);
-  const companyItems = companyRelatedItems(finding, findingSlug);
-  const billItems = recordRelatedItems(finding, findingSlug, ["bills"]);
-  const fileItems = recordRelatedItems(finding, findingSlug, ["lobbying", "ocl_registrations", "gazette", "tribunal", "source_records"]);
+  const stableFindingSlug = findingSlug(finding) ?? legacyFindingSlug(finding) ?? decoded;
+  const evidenceItems = evidenceRelatedItems(finding, stableFindingSlug);
+  const sectorItems = sectorRelatedItems(finding, stableFindingSlug);
+  const actorItems = actorRelatedItems(finding, stableFindingSlug);
+  const committeeItems = committeeRelatedItems(finding, stableFindingSlug);
+  const companyItems = companyRelatedItems(finding, stableFindingSlug);
+  const billItems = recordRelatedItems(finding, stableFindingSlug, ["bills"]);
+  const fileItems = recordRelatedItems(finding, stableFindingSlug, ["lobbying", "ocl_registrations", "gazette", "tribunal", "source_records"]);
   const reportItems: RelatedItem[] = (reports?.reports ?? []).map((report) => ({
     id: report.id,
     title: report.company_name,
     type: "Report",
-    href: withFindingContext(reportHref(report.id), findingSlug),
+    href: withFindingContext(reportHref(report.id), stableFindingSlug),
     description: `${report.report_type} - ${report.status}`,
     relationship: "report includes finding",
     strength: "direct",

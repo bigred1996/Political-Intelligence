@@ -4,7 +4,7 @@ import Link from "next/link";
 import { AvatarLogo, RelatedItems, type RelatedItem } from "@/components/intelligence";
 import { useApi } from "@/lib/use-api";
 import type { FindingsResponse, GraphFinding } from "@/lib/api";
-import { evidenceHref, findingHref, personHref, sectorHref, typeLabel } from "@/lib/navigation";
+import { evidenceHref, findingHref, findingSlug, personHref, sectorHref, typeLabel } from "@/lib/navigation";
 
 export default function EvidenceExplorer() {
   const { data, loading, error } = useApi<FindingsResponse>("/api/graph/findings");
@@ -43,7 +43,7 @@ export default function EvidenceExplorer() {
               {selected?.summary || "Ingest source data to populate connected graph findings."}
             </p>
             {selected ? (
-              <Link href={findingHref(selected.title) ?? "/signals"} className="mt-3 inline-flex text-body-md text-primary hover:underline focus-ring rounded">
+              <Link href={findingHref(selected) ?? "/signals"} className="mt-3 inline-flex text-body-md text-primary hover:underline focus-ring rounded">
                 Open finding detail
               </Link>
             ) : null}
@@ -67,9 +67,9 @@ export default function EvidenceExplorer() {
               <span className="w-2 h-2 rounded-full bg-error" />
             </div>
             <ul className="divide-y divide-outline-variant">
-              {findings.slice(0, 5).map((finding) => (
-                <li key={finding.title} className="p-3">
-                  <Link href={findingHref(finding.title) ?? "/signals"} className="block focus-ring rounded">
+              {findings.slice(0, 5).map((finding, index) => (
+                <li key={findingSlug(finding) ?? `${finding.title}-${index}`} className="p-3">
+                  <Link href={findingHref(finding) ?? "/signals"} className="block focus-ring rounded">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="material-symbols-outlined text-primary text-[16px]">hub</span>
                       <span className="text-body-md font-bold text-primary line-clamp-1">{finding.title}</span>
@@ -89,7 +89,7 @@ export default function EvidenceExplorer() {
         <div className="relative bg-surface-container-low overflow-hidden">
           <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(#c5c6ce 1px, transparent 1px)", backgroundSize: "24px 24px", opacity: 0.4 }} />
           <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">
-            {nodes.slice(1, 18).map((node, index) => (
+            {nodes.slice(1, 18).map((node) => (
               <line key={`${node.id}-edge`} x1="50%" y1="50%" x2={`${node.x}%`} y2={`${node.y}%`} stroke={node.type === "record" ? "#75777e" : "#ba1a1a"} strokeDasharray={node.type === "record" ? "4 4" : undefined} strokeWidth="1.5" />
             ))}
           </svg>
@@ -129,7 +129,7 @@ function buildExplorerNodes(findings: GraphFinding[]): ExplorerNode[] {
   const nodes: ExplorerNode[] = [];
   const selected = findings[0];
   if (selected) {
-    nodes.push({ id: `finding-${selected.title}`, label: selected.title, type: "finding", href: findingHref(selected.title), x: 50, y: 50 });
+    nodes.push({ id: `finding-${findingSlug(selected) ?? selected.title}`, label: selected.title, type: "finding", href: findingHref(selected), x: 50, y: 50 });
   }
   const seen = new Set(nodes.map((node) => node.id));
   const radial = [...findings.flatMap((finding) => [

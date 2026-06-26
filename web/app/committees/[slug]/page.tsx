@@ -9,7 +9,7 @@ import { AvatarLogo, RelatedItems, type RelatedItem } from "@/components/intelli
 import { EvidenceRows } from "@/components/ui";
 import { num, type CommitteeProfile, type EvidenceRef, type GraphFinding } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
-import { evidenceHref, findingHref, personHref, sectorHref, typeLabel } from "@/lib/navigation";
+import { evidenceHref, findingHref, findingSlug, personHref, sectorHref, typeLabel } from "@/lib/navigation";
 
 export default function CommitteeDetail({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -183,11 +183,11 @@ function peopleRelatedItems(people: Record<string, unknown>[], context: Committe
 }
 
 function findingRelatedItems(findings: GraphFinding[], context: CommitteeContextValue): RelatedItem[] {
-  return findings.slice(0, 6).map((finding) => ({
-    id: finding.title,
+  return findings.slice(0, 6).map((finding, index) => ({
+    id: findingSlug(finding) ?? `${finding.title}-${index}`,
     title: finding.title,
     type: "Finding",
-    href: withContext(findingHref(finding.title), context),
+    href: withContext(findingHref(finding), context),
     description: finding.summary,
     meta: finding.confidence,
     relationship: "committee connected to finding",

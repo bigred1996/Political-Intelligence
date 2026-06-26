@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { OriginalSourceLink, SourceTag } from "@/components/ui";
+import { SourceTag } from "@/components/ui";
 
 export type RelationshipStrength = "direct" | "supported" | "inferred";
 
@@ -226,73 +226,3 @@ export function JurisdictionBadge({ code, label, compact = false }: { code?: str
   );
 }
 
-export function DocumentThumbnail({
-  title,
-  type,
-  source,
-  date,
-  url,
-  className = "",
-}: {
-  title: string;
-  type: string;
-  source?: string | null;
-  date?: string | null;
-  url?: string | null;
-  className?: string;
-}) {
-  const icon = documentIcon(type);
-  const note = "Generated document thumbnail fallback; source document image is not stored.";
-  return (
-    <div className={`space-y-3 ${className}`}>
-      <div
-        className="aspect-[4/5] rounded-lg border border-outline-variant bg-surface-container-lowest p-4 shadow-sm flex flex-col"
-        title={note}
-        aria-label={`${type} document thumbnail fallback`}
-      >
-        <div className="flex items-center justify-between gap-2 mb-5">
-          <SourceTag>{type}</SourceTag>
-          <span className="material-symbols-outlined text-primary text-[22px]" aria-hidden="true">
-            {icon}
-          </span>
-        </div>
-        <div className="space-y-2 flex-1" aria-hidden="true">
-          <div className="h-3 rounded bg-surface-container-high w-11/12" />
-          <div className="h-3 rounded bg-surface-container-high w-8/12" />
-          <div className="h-px bg-outline-variant my-4" />
-          <div className="h-2 rounded bg-surface-container w-full" />
-          <div className="h-2 rounded bg-surface-container w-10/12" />
-          <div className="h-2 rounded bg-surface-container w-9/12" />
-          <div className="h-2 rounded bg-surface-container w-11/12" />
-        </div>
-        <div className="mt-5 border-t border-outline-variant pt-3">
-          <div className="font-label-caps text-label-caps text-on-surface-variant uppercase">Internal evidence</div>
-          <div className="font-body-md text-body-md text-on-surface line-clamp-2 mt-1">{title}</div>
-        </div>
-      </div>
-      <div className="rounded border border-outline-variant bg-surface-container-low px-3 py-2">
-        <div className="font-data-tabular text-data-tabular text-on-surface-variant">
-          {[source, date].filter(Boolean).join(" - ") || "Source metadata not available"}
-        </div>
-        <div className="font-data-tabular text-[11px] text-on-surface-variant mt-1">{note}</div>
-        {url ? (
-          <OriginalSourceLink href={url} className="mt-2" />
-        ) : (
-          <div className="mt-2 text-[12px] text-on-surface-variant">No original source URL is available.</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function documentIcon(type: string): string {
-  const lower = type.toLowerCase();
-  if (lower.includes("bill") || lower.includes("legislation")) return "gavel";
-  if (lower.includes("lobby")) return "record_voice_over";
-  if (lower.includes("contract") || lower.includes("grant")) return "request_quote";
-  if (lower.includes("statement") || lower.includes("news")) return "campaign";
-  if (lower.includes("hansard") || lower.includes("intervention")) return "forum";
-  if (lower.includes("regulation") || lower.includes("gazette")) return "rule";
-  if (lower.includes("appointment")) return "badge";
-  return "description";
-}

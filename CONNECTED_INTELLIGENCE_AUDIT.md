@@ -170,26 +170,27 @@ Current URL rules:
 
 `/api/records/{table}/{pk}` resolves supported source tables through the SQL search specs and aliases. It returns:
 
-- normalized title/source/type/date/amount/url
-- full normalized fields
-- raw source data where available
+- normalized title/source/type/date/amount/url; full normalized fields (internal-only columns `id`/`ingested_at`/`canonical_name` hidden); full untruncated `body` text for text-bearing sources; raw source data where available
 - resolved entity/canonical name
-- sector/industry impact
-- relevant political players
-- cross-source records sharing the same canonical entity
-- sector peers
-- timeline of related entity activity
+- **confidence-tiered industry**: entity-roster match → `confirmed`; keyword match (≥2 corroborating hits) → `likely`; otherwise no sector is asserted (cross-government). This kills the prior false positives (a PSPC road contract no longer reads "Aerospace & Defence" off a single "procurement" keyword or the generic buyer name).
+- **`signal`**: a calibrated Strong/Moderate/Low signal (replaces the old miscalibrated per-type severity), blended from cross-source footprint, connection volume, dollar materiality, record-type weight, and sector confidence — returned with the drivers that produced it so the score is legible.
+- **`assessment`**: the deterministic five-beat reading (`means` / `matters` / `impact` / `strategic_read`) from `pipeline/record_lens.py` — no API calls, instant, identical every load.
+- **`people`** — genuinely-linked people only: bill sponsor, Hansard speaker (`spoken_by`), recorded vote participants (`mp_voted`), and the GIC appointee. The old keyword-Hansard sweep (any MP who once said a sector keyword, including procedural names like "The Speaker") was removed as noise.
+- **`governing_regulators`** — the sector's federal regulators, surfaced as institutional context separate from "people on this record".
+- **cross-source connections** sharing the same canonical entity, plus a `cross_source_signature` distilling the "so what" pattern (lobbied AND won contracts AND donated…), plus per-type `lateral` "records like this" (indexed lookups: same department / body / sponsor) for one-off records with no entity graph.
+- sector peers and a chronological timeline of related entity activity.
 
-`/api/graph/record/{table}/{pk}` overlays graph findings on that record and labels the finding relationship:
+`/api/graph/record/{table}/{pk}` overlays graph findings and labels the relationship `supported` (direct evidence) or `inferred` (sector-contextual).
 
-- `supported`: the current record appears as direct evidence for the finding
-- `inferred`: the finding is sector-contextual rather than directly caused by the record
+**Record detail UI — the adaptive two-column dossier (`web/components/record-dossier.tsx`, shared by the record and meeting pages).** It is built on one editorial spine — *What does it mean? Why does it matter? How does it connect? What is the impact? Strategic assessment* — and adapts to data richness. The left column is the narrative ("tell me"): a verdict-first **Strategic Read** (with the signal's drivers), then an **Analysis** card carrying the *What this means / Why it matters / Impact on {sector}* beats, then any directly-supported findings, then **Full Text** (real `record.body`, never a placeholder), then **Record Details**. The right rail is the evidence ("show me"): **How It Connects** (the cross-source signature + grouped connections on rich records; honest "no cross-source activity" + lateral "records sharing context" on one-offs), **People On This Record** (genuine links only — hidden when there are none), **Who Governs This** (regulators), and an **Activity Timeline**. `OriginalSourceLink` stays the one secondary, explicit, new-tab action.
 
-The record detail UI now also surfaces source-group relationships for connected bills, lobbying, regulations, tribunals, appointments, and breadth/source records. These groups use relationship labels such as `bill affects sector`, `organization registered lobbying activity`, `regulator opened consultation`, `finding supported by source`, or `shared entity evidence`, and they open the first linked internal evidence record instead of sending the user to an external site.
+## Record Browse Logic
+
+`/records` source cards' "Open records" action opens `/records/{source_id}`, a paginated browse of that source's individual rows — staying inside the platform instead of bouncing into `/search`. It's backed by `GET /api/sources/{source_id}/records` (cursor-paginated on `id < cursor`, newest-ingested first, so even the million-row tables like contracts/donations stay an indexed primary-key lookup regardless of page depth). Each row links to `/records/{table}/{pk}?from=records&source={source_id}`, and the record detail page recognizes `from=records` as a return-context the same way it does `from=search`/`from=sector`/`from=finding`.
 
 ## Meeting Detail Logic
 
-`/meetings/[id]` is a semantic internal view over `/records/lobbying/{id}` and `/api/graph/record/lobbying/{id}`. The central `recordHref` registry delegates `meetings`, `communications`, and `contacts` aliases to this richer page instead of the generic record shell. It shows title/type, important normalized data, AI interpretation, participants, related findings, affected sectors, connected source groups, an evidence timeline, a primary internal evidence-record link, and `View original source` only as a secondary action. It preserves `from=search`, `from=sector`, and `from=finding` context into the underlying evidence record, related findings, affected sectors, participants, and connected source links.
+`/meetings/[id]` is a semantic internal view over `/records/lobbying/{id}` and `/api/graph/record/lobbying/{id}`. The central `recordHref` registry delegates `meetings`, `communications`, and `contacts` aliases to this page instead of the generic record shell. It is now a thin wrapper over the shared `RecordDossier` (`web/components/record-dossier.tsx`): a meeting-specific "Registered Communication" lead card (stating the record marks contact, not proven influence) sits above the same verdict-first dossier the record page uses, so a lobbying communication reads consistently whether reached as a record or a meeting. It preserves `from=search`/`from=sector`/`from=finding` context through every connected link.
 
 ## Search Linking Logic
 
@@ -261,10 +262,12 @@ Report detail preserves incoming search, sector, or finding context into connect
 
 | Component | File | Purpose |
 |---|---|---|
+| `RecordDossier` | `web/components/record-dossier.tsx` | The adaptive two-column record dossier (verdict-first narrative + adaptive evidence rail) shared by the record and meeting pages. |
+| `SignalBadge` | `web/components/nessus.tsx` | Calibrated Strong/Moderate/Low signal-strength chip (replaces the old miscalibrated severity badge). |
+| `Beat` | `web/components/nessus.tsx` | One labelled narrative beat (What this means / Why it matters / Impact). |
 | `AvatarLogo` | `web/components/intelligence.tsx` | Official image when present, otherwise initials or neutral type fallback; accepts image source/attribution metadata. |
 | `PartyBadge` | `web/components/intelligence.tsx` | Generated party visual identity fallback for political pages; explicitly notes that official party logos are not stored. |
 | `JurisdictionBadge` | `web/components/intelligence.tsx` | Generated jurisdiction symbol fallback for province/territory recognition; explicitly notes that official flags/symbols are not stored. |
-| `DocumentThumbnail` | `web/components/intelligence.tsx` | Generated evidence-document thumbnail fallback for record detail pages; keeps original-source links secondary and states that source document images are not stored. |
 | `RelationshipBadge` | `web/components/intelligence.tsx` | Displays `Direct`, `Supported`, or `Inferred`. |
 | `RelatedItems` | `web/components/intelligence.tsx` | Reusable typed relationship list. |
 | `EvidenceRows` | `web/components/ui.tsx` | Compact internal evidence-link list. |
@@ -312,14 +315,13 @@ Relationship strength labels are explicit: `direct`, `supported`, or `inferred`.
 | Department/regulator marks | Organization pages use `AvatarLogo` department/regulator fallback and explicitly state official marks are not stored. | Need image URL/source/attribution metadata if used. |
 | Party logos | Political pages use `PartyBadge` generated party symbols/color fallbacks with explicit non-official-source notes. | Official party logo assets/source metadata still require an asset/source decision. |
 | Jurisdiction flags/symbols | Political pages use `JurisdictionBadge` generated province/territory symbols for recognition with explicit non-official-source notes. | Official jurisdiction flags/symbol source metadata still require an asset/source decision. |
-| Document thumbnails | Record detail pages use `DocumentThumbnail` generated evidence-document fallbacks with source/date metadata and secondary original-source action. | Real source-document preview images and attribution metadata are not stored yet. |
 
 ## Remaining Gaps
 
 - Enrich first-class regulator/department pages with canonical directories, aliases, official marks, remit metadata, and stronger source coverage.
 - Enrich committee pages with canonical member/witness data, stronger aliases, Senate committee coverage, and official marks only where they improve recognition.
 - Add report inclusion counts on entity pages and report filters by company/sector.
-- Extend media attribution/source metadata beyond MP portraits and generated party/jurisdiction/document fallbacks to logos, department/regulator marks, official party logos, official jurisdiction symbols, and real document thumbnails when those assets are introduced.
+- Extend media attribution/source metadata beyond MP portraits and generated party/jurisdiction fallbacks to logos, department/regulator marks, official party logos, and official jurisdiction symbols when those assets are introduced.
 - Keep non-core investigation context on more internal links beyond search, sector, dashboard, briefing, and finding-to-record paths.
 - Expand graph relationships beyond deterministic sector/entity links where evidence exists.
 - Replace senator/minister graceful search-backed pages with first-class source-backed profiles when those ingestion feeds are added.

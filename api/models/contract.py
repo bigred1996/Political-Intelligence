@@ -28,6 +28,6 @@ class Contract(Base):
     contract_value: Mapped[float | None] = mapped_column(Float, nullable=True)
     contract_date: Mapped[str | None] = mapped_column(String(32), nullable=True)
     owner_org: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    owner_org_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    owner_org_title: Mapped[str | None] = mapped_column(String(512), nullable=True, index=True)
     source: Mapped[str] = mapped_column(String(128), default="Proactive Publication — Contracts")
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

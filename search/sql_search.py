@@ -118,6 +118,15 @@ SPECS: list[TableSpec] = [
         snippet_fn=lambda r: _g(r, "organization"), record_type="appointment",
     ),
     TableSpec(
+        "api.models.politician:Politician", "politicians",
+        ["name", "party", "riding", "role"],
+        title_fn=lambda r: _g(r, "name"),
+        entity_col="name", date_col="since_date",
+        url_fn=lambda r: _g(r, "commons_url") or _g(r, "url") or None,
+        snippet_fn=lambda r: " · ".join(x for x in [_g(r, "party"), _g(r, "riding"), _g(r, "role")] if x),
+        record_type="politician",
+    ),
+    TableSpec(
         "api.models.politician:HansardMention", "hansard_mentions",
         ["keyword", "speaker", "excerpt"],
         title_fn=lambda r: f"{_g(r,'speaker') or 'House intervention'} — {_g(r,'keyword')}",

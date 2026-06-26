@@ -4,7 +4,7 @@ import Link from "next/link";
 import { RelatedItems, type RelatedItem } from "@/components/intelligence";
 import { useApi } from "@/lib/use-api";
 import type { FindingsResponse, GraphFinding } from "@/lib/api";
-import { evidenceHref, findingHref, sectorHref, typeLabel } from "@/lib/navigation";
+import { evidenceHref, findingHref, findingSlug, sectorHref, typeLabel } from "@/lib/navigation";
 
 export default function LiveFeed() {
   const { data, loading, error } = useApi<FindingsResponse>("/api/graph/findings");
@@ -35,7 +35,7 @@ export default function LiveFeed() {
           {!loading && !error && !findings.length ? (
             <div className="card-level-1 rounded-lg p-density-comfortable text-on-surface-variant">No live findings yet. Ingest source data, then refresh this feed.</div>
           ) : null}
-          {findings.map((finding) => <FindingFeedCard key={finding.title} finding={finding} />)}
+          {findings.map((finding, index) => <FindingFeedCard key={findingSlug(finding) ?? `${finding.title}-${index}`} finding={finding} />)}
         </div>
 
         <aside className="col-span-12 lg:col-span-4 space-y-gutter">
@@ -62,7 +62,7 @@ export default function LiveFeed() {
 }
 
 function FindingFeedCard({ finding }: { finding: GraphFinding }) {
-  const href = findingHref(finding.title) ?? "/signals";
+  const href = findingHref(finding) ?? "/signals";
   const evidenceItems = finding.references.slice(0, 4).map((ref): RelatedItem => ({
     id: `${ref.table}-${ref.pk ?? ref.id}`,
     title: ref.title,
@@ -92,8 +92,8 @@ function FindingFeedCard({ finding }: { finding: GraphFinding }) {
       </div>
       <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-outline-variant">
         <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">Affected sectors:</span>
-        {[finding.sector, ...finding.related_sectors].filter(Boolean).slice(0, 4).map((sector) => (
-          <Link key={(sector as { slug: string }).slug} href={sectorHref((sector as { slug: string }).slug) ?? "/sectors"} className="text-xs bg-surface-container px-2 py-1 rounded text-secondary border border-outline-variant hover:border-primary focus-ring">
+        {dedupeSectors([finding.sector, ...finding.related_sectors]).slice(0, 4).map((sector) => (
+          <Link key={sector.slug} href={sectorHref(sector.slug) ?? "/sectors"} className="text-xs bg-surface-container px-2 py-1 rounded text-secondary border border-outline-variant hover:border-primary focus-ring">
             {(sector as { name: string }).name}
           </Link>
         ))}
@@ -130,6 +130,14 @@ function FilterCard({ title, items }: { title: string; items: { label: string; o
 
 function LoadingFeed() {
   return <div className="space-y-density-comfortable">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-44" />)}</div>;
+}
+
+function dedupeSectors(sectors: ({ slug: string; name: string } | null | undefined)[]): { slug: string; name: string }[] {
+  const unique = new Map<string, { slug: string; name: string }>();
+  for (const sector of sectors) {
+    if (sector?.slug && !unique.has(sector.slug)) unique.set(sector.slug, sector);
+  }
+  return [...unique.values()];
 }
 
 function severityClass(severity: string) {

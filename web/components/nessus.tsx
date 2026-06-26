@@ -48,6 +48,39 @@ export function Card({ icon, title, right, children, className = "" }: { icon?: 
   );
 }
 
+/* Calibrated signal-strength badge (Strong/Moderate/Low) — replaces the old
+   miscalibrated severity chip. Brass = strong (brand accent), amber = moderate,
+   dim = low. Colour denotes how much the record lights up the graph, not good/bad. */
+export function SignalBadge({ level, score }: { level: "strong" | "moderate" | "low"; score?: number }) {
+  const cfg = {
+    strong: { label: "Strong signal", dots: 3, cls: "text-primary border-primary/40 bg-primary/10" },
+    moderate: { label: "Moderate signal", dots: 2, cls: "text-warn border-warn/40 bg-warn/10" },
+    low: { label: "Low signal", dots: 1, cls: "text-on-surface-variant border-outline-variant bg-surface-container-low" },
+  }[level];
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ${cfg.cls}`}>
+      <span className="flex items-center gap-0.5" aria-hidden="true">
+        {[0, 1, 2].map((i) => (
+          <span key={i} className={`w-1.5 h-1.5 rounded-full bg-current ${i < cfg.dots ? "" : "opacity-25"}`} />
+        ))}
+      </span>
+      <span className="font-label-caps text-label-caps uppercase tracking-wide">{cfg.label}</span>
+      {typeof score === "number" ? <span className="font-data-tabular text-[11px] opacity-70">{score}</span> : null}
+    </span>
+  );
+}
+
+/* One labeled narrative beat — the building block of the "What does it mean? Why
+   does it matter? What is the impact?" reading. */
+export function Beat({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-1.5">{label}</div>
+      <p className="font-memo-body text-memo-body text-on-surface leading-relaxed">{children}</p>
+    </div>
+  );
+}
+
 export function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>

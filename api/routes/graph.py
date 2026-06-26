@@ -87,6 +87,17 @@ async def record_graph(table: str, pk: int, session: AsyncSession = Depends(get_
                 seen.add(node_id)
             edges.append({"from": node_id, "to": nodes[0]["id"], "type": "shared_entity"})
 
+    for related in (detail.get("relations") or {}).get("explicit_links", {}).get("records", [])[:16]:
+        node_type = "actor" if related.get("table") == "politicians" else "record"
+        node_id = f"{node_type}:{related['table']}:{related['pk']}"
+        if node_id not in seen:
+            nodes.append({"id": node_id, "type": node_type, "label": related["title"], "meta": related})
+            seen.add(node_id)
+        if related.get("direction") == "in":
+            edges.append({"from": node_id, "to": nodes[0]["id"], "type": related.get("relationship")})
+        else:
+            edges.append({"from": nodes[0]["id"], "to": node_id, "type": related.get("relationship")})
+
     findings: list[dict[str, Any]] = []
     if industry:
         sector_graph_data = await build_sector_graph(session, industry["slug"])

@@ -1,7 +1,7 @@
 # Game Plan — Fix the old stuff, then go provincial
 
 **Started:** 2026-06-25. **Owner instruction:** fix everything broken in the federal estate
-documented in [`DATA.md`](DATA.md) §5 (known bugs) and §3.4 (built-not-wired), then start
+documented in [`DATA.md`](DATA.md) §5 (known bugs) and §3.5 (built-not-wired), then start
 real provincial ingestion (ON, QC, BC, AB) — autonomously, no check-ins mid-execution.
 
 This doc is the execution tracker. `DATA.md` stays the state-of-the-world doc (what exists,
@@ -221,5 +221,41 @@ first-party, full-text replacement source sitting alongside it (kept separate, n
   `hansard_transcripts` entry) with verification notes.
 
 ---
+
+
+## Phase 3 — Materialize record links (user-directed continuation, 2026-06-26)
+
+User instruction: "records should link together, Hansard linked to MPs, bills, etc; everything
+interconnected." This phase adds a real cross-record link table rather than relying only on
+shared `canonical_name` inference.
+
+- [x] Added `record_links` (`api/models/record_link.py`) with a uniqueness constraint on
+  `(source_table, source_pk, target_table, target_pk, relationship)` plus source/target lookup
+  indexes. Registered it in `api/database.py`.
+- [x] Built `pipeline/record_linker.py` + `scripts/link_records.py`, idempotent via
+  `INSERT OR IGNORE`, for three first-pass edge types:
+  `hansard_speeches -> politicians` (`spoken_by`), `hansard_speeches -> bills`
+  (`mentions_bill`), and `source_records/house_votes -> politicians` (`mp_voted`).
+- [x] Fixed a subtle identifier issue during verification: Hansard XML `Affiliation DbId` is
+  not the same as the ourcommons member profile `PersonId`, so the speaker linker now uses
+  that ID only when it happens to match and otherwise falls back to exact normalized MP names
+  parsed from the Hansard speaker label. Generic roles like `The Speaker` stay unlinked unless
+  the XML label contains an actual person name in parentheses.
+- [x] Ran the linker for real against `polaris.db` on 2026-06-26. Result: **589,836**
+  materialized links — **210,519** `spoken_by`, **6,445** `mentions_bill`, **372,872**
+  `mp_voted`. Spot checks: C-5 has 1,018 Hansard links; vote participant links resolve to
+  current MPs via archived XML `PersonId`; recent Hansard rows resolve to MP profiles by exact
+  parsed name with confidence `0.92`.
+- [x] Wired explicit links into `api/routes/records.py` (`relations.explicit_links`) and
+  `/api/graph/record/{table}/{pk}` so record pages and graph views show these edges alongside
+  the older inferred shared-entity relations. Added `politicians` to `search/sql_search.py`
+  SPECS so linked MP records can be resolved generically.
+- [x] Tests: `tests/test_record_linker.py` covers member-ID extraction, bill mention
+  normalization, Hansard speaker parsing, and vote XML participant parsing. Verification run:
+  `.venv/bin/python -m pytest tests/test_api_smoke.py::test_record_detail_resolves_linkable_record tests/test_record_linker.py -q` → 5 passed;
+  `.venv/bin/python -m pytest tests/test_product_contracts.py::test_politician_detail_uses_live_api_and_internal_hansard_links tests/test_product_contracts.py::test_search_result_context_is_preserved_on_record_detail_links -q` → 2 passed.
+- [ ] Remaining cleaning gap: import a historical MP/parliamentarian roster, not just current
+  MPs, then rerun `scripts/link_records.py` to connect older Hansard speakers and historical
+  vote participants that are currently unlinked because no `politicians` row exists for them.
 
 ## Working notes (append as you go — don't lose findings mid-session)

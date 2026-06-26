@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useApi } from "@/lib/use-api";
 import type { IntelligenceFinding, OverviewResponse } from "@/lib/api";
-import { money, num } from "@/lib/api";
-import { evidenceHref, findingHref, recordHref, sectorHref, sourceHref } from "@/lib/navigation";
+import { num } from "@/lib/api";
+import { evidenceHref, findingHref, findingSlug, recordHref, sectorHref, sourceHref } from "@/lib/navigation";
 
 export default function Dashboard() {
   const { data, loading, error } = useApi<OverviewResponse>("/api/overview");
@@ -45,7 +45,7 @@ export default function Dashboard() {
               {loading ? <LoadingRows /> : null}
               {error ? <div className="p-density-comfortable text-error">{error}</div> : null}
               {!loading && !error && findings.length === 0 ? <div className="p-density-comfortable text-on-surface-variant">No material developments available yet.</div> : null}
-              {findings.slice(0, 6).map((finding) => <Development key={finding.title} finding={finding} />)}
+              {findings.slice(0, 6).map((finding, index) => <Development key={findingSlug(finding) ?? `${finding.title}-${index}`} finding={finding} />)}
             </div>
           </section>
         </div>
@@ -133,7 +133,7 @@ function StatCard({ label, value, delta, tone, icon, href }: { label: string; va
 }
 
 function Development({ finding }: { finding: IntelligenceFinding }) {
-  const baseHref = findingHref(finding.title) ?? "/signals";
+  const baseHref = findingHref(finding) ?? "/signals";
   const href = `${baseHref}${baseHref.includes("?") ? "&" : "?"}from=dashboard`;
   const evidence = finding.related_records?.[0];
   const evidenceUrl = evidence ? evidenceHref(evidence) : finding.evidence_references?.[0]?.internal_url;

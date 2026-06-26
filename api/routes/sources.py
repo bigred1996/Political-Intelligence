@@ -15,7 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..cache import invalidate_workspace_caches
 from ..database import get_session
 from ..models.donation import Bill, Donation
-from ..schemas import EvidenceReference, IngestCompletedResponse, SourceDetailResponse, SourceStatusResponse
+from ..schemas import (
+    EvidenceReference,
+    IngestCompletedResponse,
+    SourceDetailResponse,
+    SourceRecordsPageResponse,
+    SourceStatusResponse,
+)
 from pipeline.evidence_graph import build_global_findings, sectors_for_text
 from pipeline.ingest import fetch_bill_rows, fetch_donation_rows
 
@@ -62,6 +68,40 @@ _RECORD_TABLE_ALIASES = {
     "gazette_entries": "gazette",
     "tribunal_decisions": "tribunal",
 }
+
+
+def _table_models() -> dict[str, tuple[Any, str | None]]:
+    """Physical table name -> (model, default date column), shared by every
+    source-coverage query so every table (incl. hansard_speeches) is queryable
+    from one place rather than three drifting copies of this dict."""
+    from ..models.appointment import Appointment
+    from ..models.contract import Contract
+    from ..models.entity import LobbyingRecord
+    from ..models.grant import Grant
+    from ..models.hansard_speech import HansardSpeech
+    from ..models.ocl_registration import OCLRegistration
+    from ..models.politician import HansardMention, Politician
+    from ..models.regulation import GazetteEntry, TribunalDecision
+    from ..models.source_record import SourceRecord
+
+    return {
+        "appointments": (Appointment, "appointment_date"),
+        "bills": (Bill, "introduced_date"),
+        "contracts": (Contract, "contract_date"),
+        "donations": (Donation, "received_date"),
+        "gazette_entries": (GazetteEntry, "published_date"),
+        "grants": (Grant, "agreement_start"),
+        "hansard_mentions": (HansardMention, "speech_date"),
+        "hansard_speeches": (HansardSpeech, "sitting_date"),
+        "lobbying_records": (LobbyingRecord, "communication_date"),
+        "ocl_registrations": (OCLRegistration, "effective_date"),
+        "politicians": (Politician, "since_date"),
+        "source_records": (SourceRecord, "event_date"),
+        "tribunal_decisions": (TribunalDecision, "decision_date"),
+    }
+
+
+_AMOUNT_ATTRS = ("contract_value", "agreement_value", "amount")
 
 
 def _record_table(table: str | None) -> str | None:
@@ -113,6 +153,13 @@ def _ref_from_row(row: Any, table: str, label: str) -> dict[str, Any]:
             url = getattr(row, attr)
             if url:
                 break
+    amount = None
+    for attr in _AMOUNT_ATTRS:
+        if hasattr(row, attr):
+            value = getattr(row, attr)
+            if value:
+                amount = float(value)
+                break
     record_table = _record_table(table) or table
     return EvidenceReference.model_validate({
         "table": record_table,
@@ -122,6 +169,7 @@ def _ref_from_row(row: Any, table: str, label: str) -> dict[str, Any]:
         "title": _record_title(row, table),
         "date": date,
         "url": url,
+        "amount": amount,
         "record_type": getattr(row, "record_type", None) or record_table,
     }).model_dump()
 
@@ -435,32 +483,10 @@ async def get_sources_status(session: AsyncSession, *, refresh: bool = False) ->
         payload["cache"] = {"status": "hit", "ttl_seconds": _SOURCE_STATUS_CACHE_TTL_SECONDS}
         return payload
 
-    from ..models.appointment import Appointment
-    from ..models.contract import Contract
-    from ..models.entity import LobbyingRecord
-    from ..models.grant import Grant
-    from ..models.hansard_speech import HansardSpeech
-    from ..models.ocl_registration import OCLRegistration
-    from ..models.politician import HansardMention, Politician
-    from ..models.regulation import GazetteEntry, TribunalDecision
     from ..models.scheduler_log import SchedulerLog
     from ..models.source_record import SourceRecord
 
-    models: dict[str, tuple[Any, str | None]] = {
-        "appointments": (Appointment, "appointment_date"),
-        "bills": (Bill, "introduced_date"),
-        "contracts": (Contract, "contract_date"),
-        "donations": (Donation, "received_date"),
-        "gazette_entries": (GazetteEntry, "published_date"),
-        "grants": (Grant, "agreement_start"),
-        "hansard_mentions": (HansardMention, "speech_date"),
-        "hansard_speeches": (HansardSpeech, "sitting_date"),
-        "lobbying_records": (LobbyingRecord, "communication_date"),
-        "ocl_registrations": (OCLRegistration, "effective_date"),
-        "politicians": (Politician, "since_date"),
-        "source_records": (SourceRecord, "event_date"),
-        "tribunal_decisions": (TribunalDecision, "decision_date"),
-    }
+    models = _table_models()
 
     # Per-source coverage is independent across sources, so compute each on its
     # own connection concurrently. The lobbying count(*) stays exact (product
@@ -580,43 +606,46 @@ async def _source_records_for_detail(session: AsyncSession, source: dict[str, An
     table = source.get("table")
     if not table:
         return []
-    from ..models.appointment import Appointment
-    from ..models.contract import Contract
-    from ..models.entity import LobbyingRecord
-    from ..models.grant import Grant
-    from ..models.ocl_registration import OCLRegistration
-    from ..models.politician import HansardMention, Politician
-    from ..models.regulation import GazetteEntry, TribunalDecision
-    from ..models.source_record import SourceRecord
-
-    models: dict[str, tuple[Any, str | None]] = {
-        "appointments": (Appointment, "appointment_date"),
-        "bills": (Bill, "introduced_date"),
-        "contracts": (Contract, "contract_date"),
-        "donations": (Donation, "received_date"),
-        "gazette_entries": (GazetteEntry, "published_date"),
-        "grants": (Grant, "agreement_start"),
-        "hansard_mentions": (HansardMention, "speech_date"),
-        "lobbying_records": (LobbyingRecord, "communication_date"),
-        "ocl_registrations": (OCLRegistration, "effective_date"),
-        "politicians": (Politician, "since_date"),
-        "source_records": (SourceRecord, "event_date"),
-        "tribunal_decisions": (TribunalDecision, "decision_date"),
-    }
-    model_cfg = models.get(table)
+    model_cfg = _table_models().get(table)
     if not model_cfg:
         return []
     model, date_col = model_cfg
     stmt = select(model)
     source_values = _source_values_for(source)
     if table == "source_records" and source_values:
-        stmt = stmt.where(SourceRecord.source.in_(source_values))
+        stmt = stmt.where(model.source.in_(source_values))
     if date_col and hasattr(model, date_col):
         stmt = stmt.order_by(getattr(model, date_col).desc())
     else:
         stmt = stmt.order_by(model.id.desc())
     rows = (await session.execute(stmt.limit(limit))).scalars().all()
     return [_ref_from_row(row, table, source["label"]) for row in rows]
+
+
+async def _source_records_page(
+    session: AsyncSession, source: dict[str, Any], cursor: int | None, limit: int,
+) -> tuple[list[dict[str, Any]], int | None]:
+    """Cursor-paginated rows for one source, ordered newest-ingested first.
+
+    Pages by `id < cursor` rather than OFFSET so a deep page on a million-row
+    table (contracts, donations) stays an indexed primary-key lookup instead of
+    a scan-and-skip — see CLAUDE.md's big-table performance rule.
+    """
+    table = source.get("table")
+    model_cfg = _table_models().get(table) if table else None
+    if not model_cfg:
+        return [], None
+    model, _date_col = model_cfg
+    stmt = select(model)
+    source_values = _source_values_for(source)
+    if table == "source_records" and source_values:
+        stmt = stmt.where(model.source.in_(source_values))
+    if cursor is not None:
+        stmt = stmt.where(model.id < cursor)
+    stmt = stmt.order_by(model.id.desc()).limit(limit)
+    rows = (await session.execute(stmt)).scalars().all()
+    next_cursor = rows[-1].id if len(rows) == limit else None
+    return [_ref_from_row(row, table, source["label"]) for row in rows], next_cursor
 
 
 @router.get("/sources/{source_id}", response_model=SourceDetailResponse)
@@ -675,4 +704,32 @@ async def source_detail(source_id: str, session: AsyncSession = Depends(get_sess
         "timeline": records[:10],
         "known_gaps": source.get("known_gaps", []),
         "original_source_url": None,
+    }
+
+
+@router.get("/sources/{source_id}/records", response_model=SourceRecordsPageResponse)
+async def source_records_page(
+    source_id: str,
+    cursor: int | None = Query(default=None, ge=1, description="Return rows with id < cursor"),
+    limit: int = Query(default=25, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Browse every individual row of one source, paginated — the destination
+    for the Records page's "Open records" action, kept fully inside the
+    platform instead of bouncing into free-text search."""
+    status_payload = await get_sources_status(session)
+    source = next((item for item in status_payload.get("sources", []) if item.get("id") == source_id), None)
+    if not source:
+        raise HTTPException(status_code=404, detail="Unsupported source")
+
+    records, next_cursor = await _source_records_page(session, source, cursor, limit)
+    return {
+        "id": source["id"],
+        "label": source["label"],
+        "table": _record_table(source.get("table")) or source.get("table") or source["id"],
+        "total_rows": int(source.get("rows") or 0),
+        "approximate": bool(source.get("approximate")),
+        "records": records,
+        "next_cursor": next_cursor,
+        "has_more": next_cursor is not None,
     }

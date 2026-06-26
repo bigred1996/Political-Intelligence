@@ -107,6 +107,17 @@ export interface EvidenceRef {
   url?: string | null;
   record_type?: string | null;
   entity?: string | null;
+  amount?: number | null;
+}
+export interface SourceRecordsPage {
+  id: string;
+  label: string;
+  table: string;
+  total_rows: number;
+  approximate: boolean;
+  records: EvidenceRef[];
+  next_cursor: number | null;
+  has_more: boolean;
 }
 export interface MovementWindow {
   window_days: 7 | 30 | 90;
@@ -408,11 +419,45 @@ export interface RelationGroup {
   records: RecordRef[]; partial: boolean;
 }
 export interface PlayerRef {
-  type: "politician" | "regulator";
+  type: "politician" | "regulator" | "appointee";
   name: string; slug: string | null; party: string | null;
   role: string | null; photo_url: string | null; why: string;
   photo_source?: string | null; photo_attribution?: string | null; photo_source_url?: string | null;
 }
+export type SignalLevel = "strong" | "moderate" | "low";
+export interface RecordSignal {
+  level: SignalLevel;
+  score: number;
+  drivers: { label: string; detail: string }[];
+}
+export interface RecordAssessment {
+  means: string;
+  matters: string;
+  impact: string;
+  strategic_read: string;
+}
+export interface CrossSourceSignature {
+  sources: string[];
+  distinct: number;
+  insight: string | null;
+}
+export interface LateralGroup {
+  label: string;
+  basis: string;
+  records: RecordRef[];
+}
+export interface ExplicitRecordLink extends RecordRef {
+  relationship: string;
+  confidence: number;
+  direction: "in" | "out";
+  evidence?: Record<string, unknown> | null;
+}
+export interface ExplicitLinkGroup {
+  relationship: string;
+  count: number;
+  records: ExplicitRecordLink[];
+}
+
 export interface RecordDetail {
   table: string;
   pk: number;
@@ -421,13 +466,18 @@ export interface RecordDetail {
     entity: string | null; canonical: string | null;
     date: string | null; amount: number | null; url: string | null;
     fields: { key: string; label: string; value: string }[];
+    body?: string | null;
     raw: Record<string, unknown> | null;
   };
   entity: { canonical: string | null; name: string | null };
-  industry: { name: string; slug: string; blurb: string; matched_by: string } | null;
+  industry: { name: string; slug: string; blurb: string; matched_by: string; confidence: "confirmed" | "likely" | "" } | null;
+  signal: RecordSignal | null;
+  assessment: RecordAssessment | null;
+  governing_regulators: string[];
+  people: PlayerRef[];
+  // Back-compat (page reads signal/assessment/people instead).
   impact: {
-    industry: string | null; industry_slug: string | null; how: string;
-    severity: "high" | "elevated" | "watch"; meaning: string; regulators: string[];
+    industry: string | null; severity: string; meaning: string; regulators: string[];
   };
   players: PlayerRef[];
   relations: {
@@ -436,6 +486,13 @@ export interface RecordDetail {
     sector: { slug: string; name: string; blurb: string } | null;
     sector_peers: { canonical: string; name: string }[];
     timeline: RecordRef[];
+    lateral?: LateralGroup[];
+    cross_source_signature?: CrossSourceSignature;
+    explicit_links?: {
+      total: number;
+      groups: ExplicitLinkGroup[];
+      records: ExplicitRecordLink[];
+    };
   };
 }
 

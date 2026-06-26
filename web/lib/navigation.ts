@@ -129,9 +129,26 @@ export function slugifyFindingTitle(title: string): string {
     .slice(0, 96) || "finding";
 }
 
-export function findingHref(finding: Pick<IntelligenceFinding, "title"> | string | null | undefined): string | null {
+type FindingLike = Pick<IntelligenceFinding, "title"> & {
+  sector?: { slug?: string | null } | null;
+  primary_sector?: { slug?: string | null } | null;
+};
+
+export function findingSlug(finding: FindingLike | string | null | undefined): string | null {
   const title = typeof finding === "string" ? finding : finding?.title;
-  return title ? `/signals/${encodeURIComponent(slugifyFindingTitle(title))}` : null;
+  if (!title) return null;
+  const sector = typeof finding === "object" && finding ? finding.sector?.slug ?? finding.primary_sector?.slug ?? null : null;
+  return slugifyFindingTitle(sector ? `${title} ${sector}` : title);
+}
+
+export function legacyFindingSlug(finding: Pick<IntelligenceFinding, "title"> | string | null | undefined): string | null {
+  const title = typeof finding === "string" ? finding : finding?.title;
+  return title ? slugifyFindingTitle(title) : null;
+}
+
+export function findingHref(finding: FindingLike | string | null | undefined): string | null {
+  const slug = findingSlug(finding);
+  return slug ? `/signals/${encodeURIComponent(slug)}` : null;
 }
 
 export function sourceLabel(table?: string | null, fallback?: string | null): string {

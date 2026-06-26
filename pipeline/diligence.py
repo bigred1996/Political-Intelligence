@@ -257,7 +257,7 @@ async def _finding_meta(session: AsyncSession, table: str, pk: Any, confidence: 
     regulators_text = " ".join(filter(None, [
         _g(row, "department"), _g(row, "organization"), _g(row, "owner_org_title"), entity or ""]))
 
-    sector, how = resolve_sector(canonical or None, title, summary_text, regulators_text=regulators_text)
+    sector, how, _confidence = resolve_sector(canonical or None, title, summary_text, regulators_text=regulators_text)
     impact = industry_impact(rtype, sector, entity=entity or None,
                              amount=getattr(row, spec.amount_col, None) if spec.amount_col else None,
                              status=_g(row, "status") or None, how=how)

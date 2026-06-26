@@ -20,9 +20,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from pipeline.sector_mapper import SECTORS, Sector, sector_for_entity
 
 
@@ -38,14 +35,34 @@ def _money(n: float | None) -> str:
     return f"${n:,.0f}"
 
 
+# A single keyword hit is too weak to assert an industry — "procurement" alone
+# matched every PSPC contract to Aerospace & Defence. Require corroboration.
+_KEYWORD_MIN_HITS = 2
+
+# Confidence the (sector, how) pairing earns. Drives whether the UI states the
+# industry as fact ("Telecommunications") or as a hedge ("Likely: Transportation").
+_CONFIDENCE_BY_HOW = {"entity": "confirmed", "keyword": "likely", "regulator": "likely", "": ""}
+
+
+def sector_confidence(how: str) -> str:
+    """Confidence label for a `how` match strategy. Only a roster (entity) match
+    is treated as confirmed; keyword/regulator matches are tentative."""
+    return _CONFIDENCE_BY_HOW.get(how, "")
+
+
 def resolve_sector(
     canonical: str | None, title: str, summary: str, *, regulators_text: str = "",
-) -> tuple[Sector | None, str]:
-    """Return (sector, how) where how ∈ {'entity','keyword','regulator',''}."""
+) -> tuple[Sector | None, str, str]:
+    """Return (sector, how, confidence).
+
+    how ∈ {'entity','keyword','regulator',''}; confidence ∈ {'confirmed','likely',''}.
+    Entity-roster matches are confirmed; keyword matches need ≥2 corroborating hits
+    before they're asserted (single-hit guesses are dropped, not surfaced wrong).
+    """
     if canonical:
         s = sector_for_entity(canonical)
         if s:
-            return s, "entity"
+            return s, "entity", "confirmed"
     blob = f"{title} {summary}".lower()
     best: Sector | None = None
     best_hits = 0
@@ -53,15 +70,15 @@ def resolve_sector(
         hits = sum(1 for kw in s.keywords if kw in blob)
         if hits > best_hits:
             best, best_hits = s, hits
-    if best:
-        return best, "keyword"
+    if best and best_hits >= _KEYWORD_MIN_HITS:
+        return best, "keyword", "likely"
     # Regulator-name fallback (e.g. a Gazette item from "Canada Energy Regulator").
     rt = regulators_text.lower()
     if rt:
         for s in SECTORS.values():
             if any(reg.lower() in rt for reg in s.regulators):
-                return s, "regulator"
-    return None, ""
+                return s, "regulator", "likely"
+    return None, "", ""
 
 
 # Per-record-type reading of what the data point means for its industry.
@@ -167,65 +184,7 @@ def industry_impact(
     }
 
 
-async def relevant_players(
-    session: AsyncSession, *, sector: Sector | None, canonical: str | None,
-    sponsor: str | None = None,
-) -> list[dict[str, Any]]:
-    """The political players in play for this record.
-
-    Combines: the bill's sponsor (if any), MPs who raised this entity or the
-    sector's keywords in the House, and the regulators that govern the industry.
-    MPs are linked to their profile by slug where we can resolve them.
-    """
-    from api.models.politician import HansardMention, Politician
-
-    players: list[dict[str, Any]] = []
-    seen: set[str] = set()
-
-    async def _add_mp(name: str | None, why: str) -> None:
-        if not name:
-            return
-        key = name.lower().strip()
-        if key in seen:
-            return
-        pol = (await session.execute(
-            select(Politician).where(Politician.name.ilike(f"%{name.strip()}%")).limit(1)
-        )).scalar_one_or_none()
-        seen.add(key)
-        players.append({
-            "type": "politician",
-            "name": pol.name if pol else name,
-            "slug": pol.slug if pol else None,
-            "party": pol.party if pol else None,
-            "role": (pol.role if pol else None),
-            "photo_url": getattr(pol, "photo_url", None) if pol else None,
-            "why": why,
-        })
-
-    # 1. Bill sponsor.
-    if sponsor:
-        await _add_mp(sponsor, "Sponsored this legislation")
-
-    # 2. MPs who raised this entity / sector in Hansard.
-    conds = []
-    if canonical:
-        conds.append(HansardMention.canonical_name == canonical)
-    if sector:
-        for kw in sector.keywords[:6]:
-            conds.append(HansardMention.keyword.ilike(f"%{kw}%"))
-    if conds:
-        rows = (await session.execute(
-            select(HansardMention.speaker).where(or_(*conds)).limit(40)
-        )).scalars().all()
-        for speaker in rows:
-            if speaker and len(seen) < 8:
-                await _add_mp(speaker, f"Raised {sector.name if sector else 'the topic'} in the House")
-
-    # 3. Industry regulators (institutional players, no profile).
-    if sector:
-        for reg in sector.regulators[:4]:
-            players.append({"type": "regulator", "name": reg, "slug": None,
-                            "party": None, "role": "Federal regulator/department",
-                            "photo_url": None, "why": f"Oversees {sector.name}"})
-
-    return players[:14]
+# NOTE: the old `relevant_players()` keyword-Hansard sweep was removed — it surfaced
+# any MP who once said a sector keyword in the House as a "player on this record",
+# which was noise (often procedural names like "The Speaker"). Genuinely-linked
+# people are now derived from materialized record_links in api/routes/records.py.

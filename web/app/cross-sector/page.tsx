@@ -22,7 +22,7 @@ export default function CrossSector() {
   const { data: findingData, loading: findingsLoading, error: findingsError } = useApi<FindingsResponse>("/api/graph/findings");
 
   const sectors = useMemo(() => (sectorData?.sectors ?? []).slice().sort((a, b) => (b.entity_count ?? 0) - (a.entity_count ?? 0)), [sectorData]);
-  const findings = findingData?.findings ?? [];
+  const findings = useMemo(() => findingData?.findings ?? [], [findingData]);
   const pairs = useMemo(() => buildConvergencePairs(findings), [findings]);
   const topPairs = pairs.slice(0, 8);
   const matrixSectors = sectors.slice(0, 6);
@@ -80,7 +80,7 @@ export default function CrossSector() {
                 {summaryText(pairs, findings.length)}
               </p>
               {topPairs.slice(0, 2).map((pair) => (
-                <Link key={pair.key} href={findingHref(pair.findings[0]?.title) ?? sectorHref(pair.a.slug) ?? "/signals"} className="block bg-surface-container-low border-l-2 border-primary rounded-r px-4 py-3 hover:bg-surface-container transition-colors focus-ring">
+                <Link key={pair.key} href={findingHref(pair.findings[0]) ?? sectorHref(pair.a.slug) ?? "/signals"} className="block bg-surface-container-low border-l-2 border-primary rounded-r px-4 py-3 hover:bg-surface-container transition-colors focus-ring">
                   <span className="font-label-caps text-label-caps text-primary uppercase">Key driver - {pair.a.name} + {pair.b.name}</span>
                   <p className="font-body-md text-body-md text-on-surface mt-1 line-clamp-3">{pair.findings[0]?.summary || "Shared sector signal supported by internal evidence records."}</p>
                 </Link>
@@ -150,7 +150,7 @@ function ConvergenceMatrix({ sectors, pairs }: { sectors: SectorSummary[]; pairs
             {sectors.map((col) => {
               const pair = row.slug === col.slug ? null : byKey.get(pairKey(row, col));
               const intensity = row.slug === col.slug ? 0.08 : Math.min(0.9, 0.12 + (pair?.findings.length ?? 0) * 0.18 + (pair?.severity ?? 0) * 0.08);
-              const href = pair ? findingHref(pair.findings[0]?.title) : sectorHref(col.slug);
+              const href = pair ? findingHref(pair.findings[0]) : sectorHref(col.slug);
               return (
                 <Link
                   key={`${row.slug}-${col.slug}`}
@@ -177,7 +177,7 @@ function ConvergenceRow({ pair }: { pair: ConvergencePair }) {
   return (
     <tr className="border-b border-outline-variant zebra-row hover:bg-surface-container-low transition-colors">
       <td className="py-4 px-density-comfortable">
-        <Link href={findingHref(finding?.title) ?? "/signals"} className="font-medium text-primary hover:underline focus-ring rounded">
+        <Link href={findingHref(finding) ?? "/signals"} className="font-medium text-primary hover:underline focus-ring rounded">
           {finding?.title ?? `${pair.a.name} / ${pair.b.name}`}
         </Link>
         <p className="text-[12px] text-on-surface-variant mt-1 line-clamp-2">{finding?.summary ?? "Shared signal derived from connected sector records."}</p>

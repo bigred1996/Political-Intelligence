@@ -61,8 +61,7 @@ export default function RecordsIndex() {
 
 function SourceRecordCard({ source }: { source: SourceCoverageItem }) {
   const profileHref = sourceHref(source.id) ?? "/sources";
-  const searchTerm = source.table ? typeLabel(source.table, true) : source.label;
-  const searchHref = `/search?q=${encodeURIComponent(searchTerm)}`;
+  const browseHref = `/records/${encodeURIComponent(source.id)}`;
   const tableLabel = source.table ? typeLabel(source.table, true) : "Planned source";
   const rowText = source.status === "planned" ? "Planned" : `${num(source.rows)} rows${source.approximate ? " approx." : ""}`;
   const latest = source.latest_record_date ? `Latest ${source.latest_record_date}` : freshnessLabel(source.freshness);
@@ -90,7 +89,7 @@ function SourceRecordCard({ source }: { source: SourceCoverageItem }) {
           <Link href={profileHref} className="px-3 py-1.5 rounded bg-primary text-on-primary text-body-md font-medium hover:bg-primary-container transition-colors focus-ring">
             Source profile
           </Link>
-          <Link href={searchHref} className="px-3 py-1.5 rounded border border-outline-variant text-body-md font-medium text-on-surface hover:bg-surface-container-low transition-colors focus-ring">
+          <Link href={browseHref} className="px-3 py-1.5 rounded border border-outline-variant text-body-md font-medium text-on-surface hover:bg-surface-container-low transition-colors focus-ring">
             Open records
           </Link>
         </div>

@@ -11,11 +11,11 @@ import type {
   OverviewResponse,
   SourceStatusResponse,
 } from "@/lib/api";
-import { money, num } from "@/lib/api";
+import { num } from "@/lib/api";
 import {
   evidenceHref,
   findingHref,
-  personHref,
+  findingSlug,
   recordHref,
   sectorHref,
 } from "@/lib/navigation";
@@ -219,7 +219,7 @@ export default function IntelligenceDashboard() {
               <div className="space-y-3">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-28 rounded-lg" />)}</div>
             ) : findings.length ? (
               <div className="space-y-3">
-                {findings.slice(0, 5).map((f) => <ChangedRow key={f.title} finding={f} />)}
+                {findings.slice(0, 5).map((f, index) => <ChangedRow key={findingSlug(f) ?? `${f.title}-${index}`} finding={f} />)}
               </div>
             ) : (
               <EmptyState>
@@ -560,11 +560,11 @@ function RiskOppColumn({ kind, findings, loading }: { kind: "risk" | "opportunit
         {loading ? (
           <><div className="skeleton h-20 rounded" /><div className="skeleton h-20 rounded" /></>
         ) : findings.length ? (
-          findings.slice(0, 3).map((f) => {
+          findings.slice(0, 3).map((f, index) => {
             const ev = (f.related_records ?? [])[0];
             const evHref = ev ? evidenceHref(ev) : f.evidence_references?.[0]?.internal_url;
             return (
-              <div key={f.title} className="rounded border border-outline-variant bg-surface-container-lowest p-3">
+              <div key={findingSlug(f) ?? `${f.title}-${index}`} className="rounded border border-outline-variant bg-surface-container-lowest p-3">
                 <Link href={`${findingHref(f) ?? "/signals"}?from=briefing`} className="font-body-md text-body-md font-bold text-primary leading-snug hover:underline focus-ring rounded block">{f.title}</Link>
                 <p className="font-body-md text-[13px] text-on-surface-variant mt-1 leading-snug line-clamp-2">{f.concise_summary || f.why_it_matters}</p>
                 {f.suggested_questions?.[0] && (

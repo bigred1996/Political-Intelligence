@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { RelatedItems, type RelatedItem } from "@/components/intelligence";
 import { useApi } from "@/lib/use-api";
 import type { EvidenceRef, FindingsResponse, GraphFinding, SectorsResponse } from "@/lib/api";
-import { evidenceHref, findingHref, sectorHref, typeLabel } from "@/lib/navigation";
+import { evidenceHref, findingHref, findingSlug, sectorHref, typeLabel } from "@/lib/navigation";
 
 type Watchlist = {
   id: string;
@@ -21,8 +21,8 @@ export default function WatchlistsPage() {
   const [selected, setSelected] = useState(0);
   const { data: sectorData, loading: sectorsLoading, error: sectorsError } = useApi<SectorsResponse>("/api/sectors");
   const { data: findingData, loading: findingsLoading, error: findingsError } = useApi<FindingsResponse>("/api/graph/findings");
-  const findings = findingData?.findings ?? [];
-  const sectors = sectorData?.sectors ?? [];
+  const findings = useMemo(() => findingData?.findings ?? [], [findingData]);
+  const sectors = useMemo(() => sectorData?.sectors ?? [], [sectorData]);
   const watchlists = useMemo(() => buildWatchlists(sectors, findings), [sectors, findings]);
   const selectedIndex = Math.min(selected, Math.max(0, watchlists.length - 1));
   const wl = watchlists[selectedIndex];
@@ -141,11 +141,11 @@ function buildWatchlists(sectors: SectorsResponse["sectors"], findings: GraphFin
       relationship: "company belongs to sector",
       strength: "inferred",
     }));
-  const findingTargets = highFindings.slice(0, 8).map((finding): RelatedItem => ({
-    id: `finding-${finding.title}`,
+  const findingTargets = highFindings.slice(0, 8).map((finding, index): RelatedItem => ({
+    id: `finding-${findingSlug(finding) ?? `${finding.title}-${index}`}`,
     title: finding.title,
     type: "Finding",
-    href: findingHref(finding.title),
+    href: findingHref(finding),
     description: finding.summary,
     meta: `${finding.severity} severity`,
     relationship: "finding spans sectors",

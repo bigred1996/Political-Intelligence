@@ -25,6 +25,7 @@ class EvidenceReference(APIModel):
     record_type: str = "record"
     sector: str | None = None
     confidence: str = "linked"
+    amount: float | None = None
 
 
 class IntelligenceEvidence(APIModel):
@@ -184,6 +185,17 @@ class SourceDetailResponse(APIModel):
     timeline: list[EvidenceReference] = Field(default_factory=list)
     known_gaps: list[str] = Field(default_factory=list)
     original_source_url: str | None = None
+
+
+class SourceRecordsPageResponse(APIModel):
+    id: str
+    label: str
+    table: str
+    total_rows: int = 0
+    approximate: bool = False
+    records: list[EvidenceReference] = Field(default_factory=list)
+    next_cursor: int | None = None
+    has_more: bool = False
 
 
 class SchedulerRun(APIModel):
@@ -593,6 +605,10 @@ class RecordDetailResponse(APIModel):
     record: dict[str, Any]
     entity: dict[str, Any] = Field(default_factory=dict)
     industry: dict[str, Any] | None = None
+    signal: dict[str, Any] | None = None
+    assessment: dict[str, Any] | None = None
+    governing_regulators: list[str] = Field(default_factory=list)
+    people: list[dict[str, Any]] = Field(default_factory=list)
     impact: dict[str, Any] | None = None
     players: list[dict[str, Any]] = Field(default_factory=list)
     relations: dict[str, Any] = Field(default_factory=dict)

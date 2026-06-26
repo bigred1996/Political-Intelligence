@@ -7,7 +7,7 @@ import { EvidenceRows } from "@/components/ui";
 import { useApi } from "@/lib/use-api";
 import type { EvidenceGraphResponse, EvidenceRef, IntelligenceFinding, SectorOverview } from "@/lib/api";
 import { money, num } from "@/lib/api";
-import { committeeHref, entityHref, evidenceHref, findingHref, organizationHref, personHref, recordHref, sourceHref, typeLabel } from "@/lib/navigation";
+import { committeeHref, entityHref, evidenceHref, findingHref, findingSlug, organizationHref, personHref, sourceHref, typeLabel } from "@/lib/navigation";
 
 export default function SectorDetail({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -83,7 +83,7 @@ export default function SectorDetail({ params }: { params: Promise<{ slug: strin
               <Link href="/signals" className="font-label-caps text-label-caps text-primary hover:underline focus-ring rounded">View live feed</Link>
             </div>
             <div className="flex flex-col">
-              {findings.slice(0, 5).map((finding, index) => <FindingRow key={finding.title} finding={finding} sectorSlug={sector.slug} last={index === Math.min(findings.length, 5) - 1} />)}
+              {findings.slice(0, 5).map((finding, index) => <FindingRow key={findingSlug(finding) ?? `${finding.title}-${index}`} finding={finding} sectorSlug={sector.slug} last={index === Math.min(findings.length, 5) - 1} />)}
               {!findings.length && <div className="p-density-comfortable text-on-surface-variant">No findings are available for this sector yet.</div>}
             </div>
           </section>
@@ -148,7 +148,7 @@ export default function SectorDetail({ params }: { params: Promise<{ slug: strin
 }
 
 function FindingRow({ finding, sectorSlug, last }: { finding: IntelligenceFinding; sectorSlug: string; last: boolean }) {
-  const href = findingHref(finding.title) ?? "/signals";
+  const href = findingHref(finding) ?? "/signals";
   const firstEvidence = finding.related_records?.[0] ? evidenceHref(finding.related_records[0]) : finding.evidence_references?.[0]?.internal_url;
   return (
     <div className={`px-density-comfortable py-density-comfortable zebra-row flex gap-gutter items-start ${last ? "" : "border-b border-outline-variant"}`}>

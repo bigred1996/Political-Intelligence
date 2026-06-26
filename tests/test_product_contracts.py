@@ -448,6 +448,7 @@ def test_evidence_graph_reference_shape_is_canonical():
         "record_type": "record",
         "sector": None,
         "confidence": "linked",
+        "amount": None,
     }
     assert ref("gazette", 7, "Canada Gazette", "Regulation")["pk"] == 7
 
@@ -481,30 +482,37 @@ def test_search_hits_include_canonical_reference_shape():
 def test_search_result_context_is_preserved_on_record_detail_links():
     search_page = Path("web/app/search/page.tsx").read_text()
     record_page = Path("web/app/records/[table]/[pk]/page.tsx").read_text()
-    shared = Path("web/components/intelligence.tsx").read_text()
+    # The adaptive record dossier (shared by the record + meeting pages) holds the
+    # rendering; the route file is a thin fetch-and-delegate shell.
+    dossier = Path("web/components/record-dossier.tsx").read_text()
     ui = Path("web/components/ui.tsx").read_text()
     audit = Path("CONNECTED_INTELLIGENCE_AUDIT.md").read_text()
     assert "?from=search&q=" in search_page
     assert "export function OriginalSourceLink" in ui
     assert 'label = "View original source"' in ui
     assert "OriginalSourceLink" in search_page
-    assert "OriginalSourceLink" in record_page
+    assert "OriginalSourceLink" in dossier
     assert "sourceLabel(hit.table ?? hit.source, hit.source)" in search_page
-    assert "useSearchParams" in record_page
-    assert "Investigation context" in record_page
-    assert "from=search" in record_page
-    assert "Connected Bills, Lobbying, Regulations & Sources" in record_page
-    assert "DocumentThumbnail" in record_page
-    assert "Generated document thumbnail fallback; source document image is not stored." in shared
-    assert "OriginalSourceLink" in shared
-    assert "`DocumentThumbnail`" in audit
+    assert "searchParams" in record_page
+    assert "investigationContext" in record_page
+    assert "Investigation context" in dossier
+    assert "from=search" in dossier
+    # The five-beat editorial spine: a strategic read up top, then the analysis beats.
+    assert "Strategic Read" in dossier
+    assert "What this means" in dossier
+    assert "Why it matters" in dossier
+    assert "How It Connects" in dossier
+    # No generated document-thumbnail placeholder: real full text inline where the
+    # source has one (record.body), real structured fields otherwise.
+    assert "DocumentThumbnail" not in record_page
+    assert "DocumentThumbnail" not in dossier
+    assert "record.body" in dossier
+    assert "Full Text" in dossier
+    assert "Record Details" in dossier
     assert "`OriginalSourceLink`" in audit
-    assert "generated evidence-document fallbacks" in audit
-    assert "buildFindingItems(graph?.findings ?? [], context)" in record_page
-    assert "href: withContext(findingHref(finding.title), context)" in record_page
-    assert "withContext(sectorHref(detail.industry.slug), context)" in record_page
+    assert "withContext(sectorHref(slug), context)" in dossier
     assert "recordTypeLabel(detail.record.record_type, detail.record.source, detail.table)" in record_page
-    assert "return \"Public statement\"" in record_page
+    assert "return \"Public statement\"" in dossier
 
 
 def test_live_feed_uses_graph_findings_not_placeholder_records():
@@ -717,25 +725,23 @@ def test_entity_index_uses_graph_findings_and_internal_links():
 def test_meeting_pages_reuse_lobbying_records_as_internal_detail_views():
     registry = Path("web/lib/navigation.ts").read_text()
     page = Path("web/app/meetings/[id]/page.tsx").read_text()
+    dossier = Path("web/components/record-dossier.tsx").read_text()
     audit = Path("CONNECTED_INTELLIGENCE_AUDIT.md").read_text()
     assert 'key: "meetings"' in registry
     assert "meetingHref" in registry
+    # The meeting view is now a thin wrapper over the shared record dossier, with a
+    # meeting-specific lead card; the dossier supplies the connected intelligence.
     assert "/api/records/lobbying/" in page
     assert "/api/graph/record/lobbying/" in page
     assert "useSearchParams" in page
-    assert "meetingContext(searchParams)" in page
-    assert "Investigation context" in page
-    assert "RelatedItems" in page
-    assert "EvidenceRows" in page
-    assert "findingItems(graph?.findings ?? [], context)" in page
-    assert "sectorItemsFor(data, graph, context)" in page
-    assert "href: withContext(findingHref(finding), context)" in page
-    assert "href: withContext(sectorHref(sector.slug), context)" in page
-    assert "participantItemsFor(data, context)" in page
-    assert "sourceGroupsFor(data, context)" in page
-    assert "meeting supported by record" in page
-    assert "organization registered lobbying activity" in page
-    assert "OriginalSourceLink" in page
+    assert "investigationContext" in page
+    assert "RecordDossier" in page
+    assert "Registered Communication" in page
+    assert 'label: "Meetings"' in page
+    # Shared dossier carries the workflow context + connected intelligence.
+    assert "Investigation context" in dossier
+    assert "How It Connects" in dossier
+    assert "OriginalSourceLink" in dossier
     assert "`/meetings/{id}`" in audit
     assert "`/meetings/[id]` is a semantic internal view over `/records/lobbying/{id}`" in audit
 
@@ -832,7 +838,7 @@ def test_source_detail_pages_are_registered_and_linkable():
     assert "EvidenceRows" in page
     assert '"id": "social_statements", "label": "Public statements", "table": "source_records"' in route
     assert '"source_values": ["social_statements", "public_statements"]' in route
-    assert "SourceRecord.source.in_(source_values)" in route
+    assert "model.source.in_(source_values)" in route
     assert '"social_statements": "source_records"' in record_route
     assert "recordTypeLabel(record.record_type, record.source, record.table)" in page
     assert "sourceHref(s.id)" in ui
@@ -942,8 +948,9 @@ def test_finding_detail_preserves_context_into_evidence_records():
     assert "withFindingContext(reportHref(report.id), findingSlug)" in page
     assert "from=finding&finding=" in page
     assert 'relationship: "finding supported by record"' in page
-    assert "from=finding" in record_page
-    assert "withContext(player.type === \"politician\" ? personHref(player.slug)" in record_page
+    dossier = Path("web/components/record-dossier.tsx").read_text()
+    assert "from=finding" in dossier
+    assert "personHref(p.slug)" in dossier
     assert "entityContext(searchParams)" in entity_page
     assert "hrefFor={(ref) => withContext(evidenceHref(ref), context)}" in entity_page
     assert "Investigation context" in entity_page
@@ -954,14 +961,14 @@ def test_finding_detail_preserves_context_into_evidence_records():
 
 
 def test_search_context_preserves_through_connected_entities_people_and_organizations():
-    record_page = Path("web/app/records/[table]/[pk]/page.tsx").read_text()
+    dossier = Path("web/components/record-dossier.tsx").read_text()
     entity_page = Path("web/app/entities/[canonical]/page.tsx").read_text()
     politician_page = Path("web/app/politicians/[slug]/page.tsx").read_text()
     organization_page = Path("web/app/organizations/[kind]/[name]/page.tsx").read_text()
     audit = Path("CONNECTED_INTELLIGENCE_AUDIT.md").read_text()
 
-    assert 'if (context.from === "search")' in record_page
-    assert 'return `${href}${glue}from=search${q ? `&q=${encodeURIComponent(q)}` : ""}`' in record_page
+    assert 'if (context.from === "search")' in dossier
+    assert 'return `${href}${glue}from=search${q ? `&q=${encodeURIComponent(q)}` : ""}`' in dossier
     for page in (entity_page, politician_page, organization_page):
         assert 'if (from === "search")' in page
         assert 'if (from === "sector")' in page

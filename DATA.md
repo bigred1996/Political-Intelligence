@@ -137,6 +137,12 @@ full execution log.)*
   (`hansard_search`, 217 mentions, still kept separately — see §3.1). Full historical backfill
   complete: all 13 sessions, 2004-10-04 to 2026-06-18 (38th Parliament onward; pre-2004 is
   PDF-only Hansard, confirmed out of scope), 0 gaps, 0 errors.
+- **Record graph materialized 2026-06-26** (`record_links`, new) — **589,836 explicit
+  cross-record links** built from already-imported data: 210,519 Hansard speech→MP
+  `spoken_by` links, 6,445 Hansard speech→Bill `mentions_bill` links, and 372,872
+  House vote→MP `mp_voted` links from archived vote XML. Current limitation: MP links
+  are bounded by the seeded `politicians` roster (343 current MPs), so historical speakers
+  without a current profile remain unlinked until a historical MP roster is imported.
 - **Still open:** the refresh-loop problem (Postgres migration, proving the scheduled
   paths) — see Phase 1 in §8.
 
@@ -161,7 +167,7 @@ configured cron.
 | Canada Gazette RSS (`gazette_weekly`) | 638 | recent window | 🟢 Loaded | ❌ last run 2026-06-15 | RSS live 200 ✅ |
 | MPs / parliamentarians (`parliament_seed`) | 343 | current | 🟢 Loaded | ❌ ad-hoc seed, never on a real cron | openparliament live 200 ✅ |
 | Hansard keyword mentions (`hansard_search`) | 217 | current Parliament | 🟡 Partial — third-party keyword sweep, kept separate from transcripts below | ❌ last run 2026-06-19 | count(*) |
-| **Hansard full transcripts (`hansard_transcripts`, new `hansard_speeches` table)** | **639,695** (real count) | **2004-10-04 to 2026-06-18** (38th Parliament onward), all 13 real sessions: (38,1),(39,1),(39,2),(40,1),(40,2),(40,3),(41,1),(41,2),(42,1),(43,1),(43,2),(44,1),(45,1); pre-2004 Hansard is PDF-only, confirmed out of scope | 🟢 Loaded — full historical backfill complete | ✅ new `pipeline/connector_hansard_transcripts.py` — first-party ourcommons.ca per-sitting XML, every Intervention's full text; SQL-only (not embedded), same class as contracts/donations/NPRI | full backfill run 2026-06-26 (1,234s, 2,266 sittings, 0 gaps, 0 errors, `stopped_reason="exhausted"` on every session) via `scripts/run_ingest.py hansard_transcripts`; count(*) verified |
+| **Hansard full transcripts (`hansard_transcripts`, new `hansard_speeches` table)** | **639,695** (real count) | **2004-10-04 to 2026-06-18** (38th Parliament onward), all 13 real sessions: (38,1),(39,1),(39,2),(40,1),(40,2),(40,3),(41,1),(41,2),(42,1),(43,1),(43,2),(44,1),(45,1); pre-2004 Hansard is PDF-only, confirmed out of scope | 🟢 Loaded — full historical backfill complete | ✅ new `pipeline/connector_hansard_transcripts.py` — first-party ourcommons.ca per-sitting XML, every Intervention's full text; SQL-only (not embedded), same class as contracts/donations/NPRI | full backfill run 2026-06-26 (1,234s, 2,266 sittings, 0 gaps, 0 errors, `stopped_reason="exhausted"` on every session) via `scripts/run_ingest.py hansard_transcripts`; count(*) verified; `record_links` now connects 210,519 speech rows to MPs and 6,445 speech rows to bills where the seeded MP/bill rows exist |
 | GIC Appointments (`appointments_weekly`) | **9,825** (fixed 2026-06-26) | 1990s–present, derived from `orders_in_council` précis text | 🟢 Loaded | ✅ re-derives from already-ingested data, no network call | real run 2026-06-26, ISO dates verified |
 | CRTC tribunal decisions (`tribunal_decisions`) | **13,827** (fixed 2026-06-26) | 1995–2026 | 🟢 Loaded | ✅ new `pipeline/connector_crtc_decisions.py` reads CRTC's per-year decision index (RSS feeds confirmed still dead) | real run 2026-06-26: 14,619 parsed, outcome recovered for years where the source embeds it inline |
 
@@ -185,14 +191,32 @@ configured cron.
 | House of Commons recorded votes (`house_votes`) | **2,182** (new 2026-06-26) | 🟢 Loaded | ✅ daily | sessions (42,1)–(45,1); per-division yea/nay/paired tallies, not free text — `embed=False` by design, same SQL-only class as contracts/donations/NPRI; backfill initially returned 0 rows due to stale checkpoints from a pre-wiring standalone test, fixed by deleting them and re-walking live |
 | StatCan cube observations (`statcan_observations`, new typed table) | **521,367** (15 cubes, new 2026-06-26) | 🟢 Loaded | n/a (one-time backfill, `scripts/ingest_statcan_cubes.py`) | `statcan_36100608` (61.4M rows/14G) deliberately deferred — see §7 |
 
-### 3.3 Archive-only (📦 fetched, no queryable rows yet)
+
+### 3.3 Cross-record link graph (`record_links`, new 2026-06-26)
+
+`record_links` materializes high-confidence edges that cannot be expressed by the
+older shared-`canonical_name` relation alone. It is rebuilt idempotently with
+`scripts/link_records.py` after large imports. Verified 2026-06-26 against
+`polaris.db`: **589,836 links** total — **210,519** `hansard_speeches` →
+`politicians` (`spoken_by`), **6,445** `hansard_speeches` → `bills`
+(`mentions_bill`), and **372,872** `source_records`/`house_votes` →
+`politicians` (`mp_voted`) from archived vote-participant XML. API record detail
+and `/api/graph/record/{table}/{pk}` now expose these links under
+`relations.explicit_links`.
+
+Caveat: `politicians` currently contains the current 343-MP roster, not every
+historical MP since 2004. Historical Hansard and vote records therefore link to
+MPs only when the person is in that seeded roster. A historical MP roster import
+is the next cleaning step to close that gap.
+
+### 3.4 Archive-only (📦 fetched, no queryable rows yet)
 
 | Source | Status | What's needed |
 |---|---|---|
 | `canadabuys_tenders` | 📦 crawler runs every 4h (live), raw JSON only | map tender-notice JSON → `source_records` |
 | `bank_of_canada` | 📦 ~15,642 Valet series walked, raw only | map series → rows; fix the "no per-series since-param" staleness (CLAUDE.md) |
 
-### 3.4 Built, never wired in (⬜ cheapest real wins)
+### 3.5 Built, never wired in (⬜ cheapest real wins)
 
 | Source | What exists |
 |---|---|
