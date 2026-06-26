@@ -19,6 +19,7 @@ import csv
 import io
 import re
 import xml.etree.ElementTree as ET
+from datetime import datetime
 from email.utils import parsedate
 from typing import Any, AsyncIterator
 
@@ -251,6 +252,21 @@ async def fetch_iaac_records(max_rows: int = 0) -> list[dict[str, Any]]:
 CER_INCIDENTS_CSV = "https://www.cer-rec.gc.ca/open/incident/pipeline-incidents-data.csv"
 
 
+def _cer_date(v: str | None) -> str | None:
+    """CER's CSV ships dates as "1/2/2008 12:00:00 AM" (M/D/YYYY, 12-hour
+    clock) — a naive [:10] slice on that string is not a date, it's the first
+    10 characters of garbage. Parse properly to ISO YYYY-MM-DD."""
+    v = (v or "").strip()
+    if not v:
+        return None
+    for fmt in ("%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(v, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return None
+
+
 async def fetch_cer_records(max_rows: int = 0) -> list[dict[str, Any]]:
     """CER-regulated pipeline incidents — company, substance, location, what happened."""
     out: list[dict[str, Any]] = []
@@ -271,7 +287,7 @@ async def fetch_cer_records(max_rows: int = 0) -> list[dict[str, Any]]:
             "summary": (row.get("Brief Description") or
                         f"{inc_type}. Substance: {substance}. Status: {row.get('Status','')}")[:4000] or None,
             "full_text": " ".join(str(v) for v in row.values())[:6000],
-            "event_date": (row.get("Reported Date") or row.get("Occurrence Date") or "").strip()[:10] or None,
+            "event_date": _cer_date(row.get("Reported Date") or row.get("Occurrence Date")),
             "amount": _to_float(row.get("Approximate Volume Released (m3)")),
             "province": (row.get("Province") or "").strip() or None,
             "url": "https://www.cer-rec.gc.ca/en/safety-environment/industry-performance/interactive-pipeline/",

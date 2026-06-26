@@ -24,10 +24,10 @@ export function AppTopBar() {
         <div className="flex items-center gap-4 min-w-0">
           <Link
             href="/"
-            className="md:hidden w-8 h-8 rounded bg-primary flex items-center justify-center text-on-primary shrink-0"
+            className="md:hidden w-8 h-8 rounded bg-primary flex items-center justify-center shrink-0"
             aria-label="Nessus home"
           >
-            <span className="material-symbols-outlined text-[20px]">account_balance</span>
+            <img src="/brand/nessus-monogram-white.svg" alt="" className="w-5 h-5" />
           </Link>
           <span className="hidden md:block font-headline-sm text-headline-sm font-bold text-primary shrink-0">
             Nessus Intelligence

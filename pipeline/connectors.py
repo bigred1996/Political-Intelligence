@@ -36,8 +36,9 @@ import structlog
 from apscheduler.triggers.cron import CronTrigger
 
 from pipeline import breadth, feeds, news_feeds
-from pipeline import connector_cer_applications, connector_ckan_catalogue, connector_gazette_notices
-from pipeline import connector_iaac, connector_orders_in_council
+from pipeline import connector_bc_lobbyist_registry, connector_cer_applications, connector_ckan_catalogue
+from pipeline import connector_gazette_notices
+from pipeline import connector_house_votes, connector_iaac, connector_orders_in_council
 
 log = structlog.get_logger()
 
@@ -118,6 +119,18 @@ CONNECTORS: list[SourceConnector] = [
                      "boundary cursor gets re-probed once historical years are complete.",
     ),
     SourceConnector(
+        id="house_votes", name="House of Commons Recorded Votes", category="Parliament",
+        fetch=connector_house_votes.fetch_house_vote_records,
+        trigger=CronTrigger(hour=4, minute=15, timezone="America/Toronto"),
+        cadence="daily", upsert="upsert", embed=False, typical_rows=50,
+        description="Per-division yea/nay/paired counts and outcome for every recorded House "
+                     "vote, sessions (42,1) through (45,1) (Goal 7; built and tested, never "
+                     "wired into the scheduler until this fix pass). Each session has its own "
+                     "independent checkpoint, so daily re-runs cheaply re-probe only the "
+                     "current session's boundary cursor once history is caught up — same "
+                     "pattern as orders_in_council.",
+    ),
+    SourceConnector(
         id="npri", name="National Pollutant Release Inventory (NPRI)", category="Environment",
         fetch=breadth.fetch_npri_records,
         trigger=CronTrigger(day=10, hour=3, minute=0, timezone="America/Toronto"),
@@ -139,6 +152,16 @@ CONNECTORS: list[SourceConnector] = [
         trigger=CronTrigger(day_of_week="fri", hour=4, minute=0, timezone="America/Toronto"),
         cadence="weekly", upsert="replace", embed=True, typical_rows=300,
         description="Federal geospatial data catalogue (NRCan / GeoGratis / CGDI).",
+    ),
+    SourceConnector(
+        id="bc_lobbyist_registry", name="BC Registrar of Lobbyists", category="Provincial",
+        fetch=connector_bc_lobbyist_registry.fetch_bc_lobbyist_records,
+        trigger=CronTrigger(day_of_week="wed", hour=4, minute=0, timezone="America/Toronto"),
+        cadence="weekly", upsert="upsert", embed=True, typical_rows=26000,
+        description="BC provincial lobbyist registrations — client org, filer, topics, dates "
+                     "(first provincial source; ON/QC/AB have no bulk export today, see "
+                     "GAMEPLAN.md). Source publishes monthly; checked weekly is cheap since "
+                     "upsert-by-external_id only inserts genuinely new registrations.",
     ),
     SourceConnector(
         id="ckan_catalogue", name="Open Government Catalogue (full crawl)", category="Government Publications",

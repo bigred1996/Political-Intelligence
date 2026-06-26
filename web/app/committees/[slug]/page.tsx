@@ -226,7 +226,7 @@ function recordsRelatedItems(records: EvidenceRef[], context: CommitteeContextVa
 
 function sourceRelationship(table: string): string {
   if (table === "bills") return "committee studied bill";
-  if (table === "hansard_mentions") return "committee evidence record";
+  if (table === "hansard_mentions" || table === "hansard_speeches") return "committee evidence record";
   if (table === "lobbying") return "organization registered lobbying activity";
   if (table === "source_records") return "finding supported by source";
   return "committee evidence record";

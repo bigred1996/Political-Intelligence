@@ -89,6 +89,8 @@ def _record_title(row: Any, table: str) -> str:
         return getattr(row, 'name', '') or 'Political figure'
     if table == "hansard_mentions":
         return f"{getattr(row, 'speaker', '') or 'House intervention'} — {getattr(row, 'keyword', '') or 'Hansard'}"
+    if table == "hansard_speeches":
+        return f"{getattr(row, 'speaker', '') or 'House intervention'} — {(getattr(row, 'subject', '') or 'Hansard')[:70]}"
     if table == "appointments":
         return f"{getattr(row, 'appointee_name', '') or 'Appointee'} — {(getattr(row, 'position_title', '') or '')[:90]}"
     if table == "tribunal_decisions":
@@ -100,7 +102,7 @@ def _record_title(row: Any, table: str) -> str:
 
 def _ref_from_row(row: Any, table: str, label: str) -> dict[str, Any]:
     date = None
-    for attr in ("contract_date", "received_date", "agreement_start", "communication_date", "effective_date", "introduced_date", "published_date", "since_date", "speech_date", "appointment_date", "decision_date", "event_date"):
+    for attr in ("contract_date", "received_date", "agreement_start", "communication_date", "effective_date", "introduced_date", "published_date", "since_date", "speech_date", "sitting_date", "appointment_date", "decision_date", "event_date"):
         if hasattr(row, attr):
             date = getattr(row, attr)
             if date:
@@ -164,8 +166,20 @@ SOURCE_DEFS: list[dict[str, Any]] = [
     {
         "id": "hansard_mentions", "label": "Hansard mentions", "table": "hansard_mentions",
         "job_id": "hansard_search", "status_when_rows": "partial",
-        "description": "Keyword-driven House speech mentions.",
+        "description": "Keyword-driven House speech mentions (third-party openparliament.ca sweep).",
         "fresh_days": 30,
+    },
+    {
+        "id": "hansard_transcripts", "label": "Hansard transcripts (full text)", "table": "hansard_speeches",
+        "job_id": "hansard_transcripts", "status_when_rows": "live",
+        "description": "Full first-party House of Commons Hansard transcripts (every Intervention, "
+                        "direct from ourcommons.ca per-sitting XML) — distinct from the keyword-sweep "
+                        "above. Historical backfill complete (38th Parliament, 2004, onward, 0 gaps).",
+        # Parliament recesses for weeks at a time (summer ~July-Sept), so a tight freshness
+        # window would misreport "stale" during a normal sitting break — match contracts'
+        # recess-tolerant threshold rather than the 30-day window used for the daily-job sources.
+        "fresh_days": 120,
+        "approx": True, "date_strategy": "skip",
     },
     {
         "id": "operations", "label": "Operations breadth", "table": "source_records",
@@ -425,6 +439,7 @@ async def get_sources_status(session: AsyncSession, *, refresh: bool = False) ->
     from ..models.contract import Contract
     from ..models.entity import LobbyingRecord
     from ..models.grant import Grant
+    from ..models.hansard_speech import HansardSpeech
     from ..models.ocl_registration import OCLRegistration
     from ..models.politician import HansardMention, Politician
     from ..models.regulation import GazetteEntry, TribunalDecision
@@ -439,6 +454,7 @@ async def get_sources_status(session: AsyncSession, *, refresh: bool = False) ->
         "gazette_entries": (GazetteEntry, "published_date"),
         "grants": (Grant, "agreement_start"),
         "hansard_mentions": (HansardMention, "speech_date"),
+        "hansard_speeches": (HansardSpeech, "sitting_date"),
         "lobbying_records": (LobbyingRecord, "communication_date"),
         "ocl_registrations": (OCLRegistration, "effective_date"),
         "politicians": (Politician, "since_date"),

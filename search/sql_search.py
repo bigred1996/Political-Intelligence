@@ -128,6 +128,15 @@ SPECS: list[TableSpec] = [
         record_type="hansard_mention",
     ),
     TableSpec(
+        "api.models.hansard_speech:HansardSpeech", "hansard_speeches",
+        ["speaker", "subject", "content"],
+        title_fn=lambda r: f"{_g(r,'speaker') or 'House intervention'} — {_g(r,'subject')[:70]}",
+        entity_col="speaker", date_col="sitting_date",
+        url_fn=lambda r: _g(r, "url") or None,
+        snippet_fn=lambda r: _g(r, "content")[:160],
+        record_type="hansard_speech",
+    ),
+    TableSpec(
         "api.models.source_record:SourceRecord", "source_records",
         ["title", "summary", "entity_name"],
         title_fn=lambda r: _g(r, "title")[:120],

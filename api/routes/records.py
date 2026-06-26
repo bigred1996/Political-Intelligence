@@ -53,7 +53,7 @@ _LABELS = {
     "ocl_registrations": "Lobbying registrations", "bills": "Bills & legislation",
     "gazette": "Canada Gazette", "tribunal": "Tribunal decisions",
     "appointments": "GIC appointments", "source_records": "Breadth sources",
-    "hansard_mentions": "Hansard mentions",
+    "hansard_mentions": "Hansard mentions", "hansard_speeches": "Hansard transcripts",
 }
 
 _SOURCE_RECORD_LABELS = {

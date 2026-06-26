@@ -39,7 +39,9 @@ EMBED_SOURCES = ["statcan", "iaac", "cer", "transport", "geospatial", "gc_news",
                  "transport_news", "health_news", "competition_news", "crtc_news", "cer_news",
                  # Canadian News — commercial news publishers, separate connector category,
                  # each individually licence-reviewed (pipeline/news_feeds.py, Goal 10).
-                 "conversation_ca_politics"]
+                 "conversation_ca_politics",
+                 # Provincial sources (Goal: provincial ingestion).
+                 "bc_lobbyist_registry"]
 
 _cache: dict[str, Any] = {"vectors": None, "meta": None, "mtime": None}
 

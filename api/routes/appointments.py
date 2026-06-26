@@ -9,26 +9,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.cache import invalidate_workspace_caches
 from api.database import get_session
 from api.models.appointment import Appointment
+from api.models.source_record import SourceRecord
 from api.schemas import IngestStartedResponse, SourceSearchResponse, StatsResponse
 from pipeline.entity_resolver import normalize
-from pipeline.ingest import fetch_appointment_rows
+from pipeline.ingest import parse_appointments_from_precis
 
 router = APIRouter(prefix="/api/appointments", tags=["appointments"])
 
 
 class IngestRequest(BaseModel):
-    max_rows: int = 10000
+    max_rows: int = 10000  # vestigial — kept for API/UI compatibility; this
+    # source now derives from already-ingested orders_in_council rows rather
+    # than paginating a network resource, so there's nothing to cap.
 
 
 async def _run_appointment_ingest(max_rows: int) -> None:
+    from sqlalchemy import delete
     from api.database import AsyncSessionLocal
-    rows = await fetch_appointment_rows(max_rows=max_rows)
-    batch_size = 1000
     async with AsyncSessionLocal() as session:
-        for i in range(0, len(rows), batch_size):
-            for r in rows[i : i + batch_size]:
-                session.add(Appointment(**r))
-            await session.commit()
+        raw_rows = (await session.execute(
+            select(SourceRecord.raw).where(SourceRecord.source == "orders_in_council")
+        )).scalars().all()
+    rows = parse_appointments_from_precis(list(raw_rows))
+    async with AsyncSessionLocal() as session:
+        await session.execute(delete(Appointment))
+        session.add_all([Appointment(**r) for r in rows])
+        await session.commit()
     invalidate_workspace_caches("manual_appointments_ingest")
 
 

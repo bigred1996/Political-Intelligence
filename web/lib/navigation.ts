@@ -33,6 +33,7 @@ export const TYPE_REGISTRY: TypeRegistryEntry[] = [
   { key: "tribunal", label: "Tribunal decision", plural: "Tribunal decisions", type: "record", aliases: ["tribunal_decisions"], sourceLabel: "Administrative tribunals" },
   { key: "appointments", label: "GIC appointment", plural: "GIC appointments", type: "record", sourceLabel: "Governor in Council appointments" },
   { key: "hansard_mentions", label: "House intervention", plural: "House interventions", type: "record", sourceLabel: "Hansard" },
+  { key: "hansard_speeches", label: "Hansard transcript", plural: "Hansard transcripts", type: "record", sourceLabel: "Hansard (full text)" },
   { key: "source_records", label: "Source record", plural: "Source records", type: "record" },
   { key: "social_statements", label: "Public statement", plural: "Public statements", type: "record", aliases: ["public_statements", "social_posts"], sourceLabel: "Public statements" },
   { key: "reports", label: "Report", plural: "Reports", type: "report", aliases: ["briefings"] },

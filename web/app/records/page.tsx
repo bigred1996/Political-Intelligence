@@ -13,6 +13,7 @@ const ICON_BY_SOURCE: Record<string, string> = {
   contracts: "receipt_long",
   donations: "volunteer_activism",
   hansard_mentions: "record_voice_over",
+  hansard_transcripts: "record_voice_over",
   gazette_entries: "menu_book",
   appointments: "badge",
   tribunal_decisions: "balance",

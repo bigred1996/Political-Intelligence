@@ -10,9 +10,10 @@ now runs pipeline.conditional_fetch's skip-if-unchanged gate before doing
 any real download, so most scheduled fires are a single cheap HEAD/
 package_show check, not a full re-pull):
   daily       — Bills (LEGISinfo, Parliament sits daily), Canada Gazette RSS,
-                Hansard sector mentions, OCL Lobbying Communications & OCL
-                Registrations ("Lobby Canada" daily), Tribunal Decisions
-                ("Court decisions" daily)
+                Hansard sector mentions, Hansard full transcripts (budget-
+                capped per call — see hansard_transcripts), OCL Lobbying
+                Communications & OCL Registrations ("Lobby Canada" daily),
+                Tribunal Decisions ("Court decisions" daily)
   weekly      — GIC Appointments, MP roster, Federal Contracts ("Proactive
                 Disclosure" weekly), Grants & Contributions, Elections
                 Canada Donations ("outside election periods" weekly)
@@ -145,6 +146,20 @@ SOURCE_CONFIGS: list[dict[str, Any]] = [
         "description": "Regulatory tribunal decisions; MVP connector currently loads CRTC "
                         "decisions. Daily per Goal 11's \"Court decisions\" policy.",
         "typical_rows": 1000,
+    },
+    {
+        "id": "hansard_transcripts",
+        "name": "Hansard Transcripts (Full Text)",
+        "cadence": "daily",
+        "trigger": CronTrigger(hour=9, minute=30, timezone="America/Toronto"),
+        "description": "Full first-party House of Commons Hansard transcripts direct from "
+                        "ourcommons.ca's per-sitting XML — every Intervention's full text, not "
+                        "the third-party openparliament.ca keyword-sweep excerpts in "
+                        "hansard_search. Parliament sits most weekdays, so a daily check is the "
+                        "natural cadence; the scheduled run is budget-capped (200 sittings/call) "
+                        "since the multi-decade historical backlog is loaded via "
+                        "`scripts/run_ingest.py hansard_transcripts` (unbounded), not the cron job.",
+        "typical_rows": 200,
     },
     {
         "id": "canadabuys_tenders",
@@ -419,21 +434,26 @@ async def _run_hansard_search(triggered_by: str = "scheduler") -> None:
 
 
 async def _run_appointments(triggered_by: str = "scheduler") -> None:
-    from sqlalchemy import delete
+    """GIC Appointments — open.canada.ca's standalone CKAN dataset for this is
+    dead (404), so this derives appointments from the précis text of Orders
+    in Council we already ingest (source_records, source="orders_in_council")
+    instead of hitting that dataset (see pipeline/ingest.py:
+    parse_appointments_from_precis). No network call: reads our own table, so
+    there's no conditional-fetch fingerprint to check — it's cheap enough
+    (~11k OIC rows) to just re-derive in full every run."""
+    from sqlalchemy import delete, select
     from api.database import AsyncSessionLocal
     from api.models.appointment import Appointment
-    from pipeline import conditional_fetch as cf
-    from pipeline.ingest import GIC_DATASET, fetch_appointment_rows
+    from api.models.source_record import SourceRecord
+    from pipeline.ingest import parse_appointments_from_precis
     log_id = await _log_start("appointments_weekly", "GIC Appointments", triggered_by)
     t0 = time.monotonic()
     try:
-        fp = await cf.fingerprint_ckan_resource(GIC_DATASET, fmt="CSV")
-        if cf.unchanged("appointments_weekly", fp):
-            await _log_finish(log_id, "skipped", 0, 0, time.monotonic() - t0)
-            log.info("scheduler_appointments_skipped_unchanged")
-            return
-
-        rows = await fetch_appointment_rows(max_rows=10000)
+        async with AsyncSessionLocal() as session:
+            raw_rows = (await session.execute(
+                select(SourceRecord.raw).where(SourceRecord.source == "orders_in_council")
+            )).scalars().all()
+        rows = parse_appointments_from_precis(list(raw_rows))
         async with AsyncSessionLocal() as session:
             # Full replace, like bills/contracts/donations — GIC appointments has no
             # stable natural key (a person can hold multiple appointments; one OIC
@@ -444,9 +464,8 @@ async def _run_appointments(triggered_by: str = "scheduler") -> None:
             await session.commit()
         added = len(rows)
         await _log_finish(log_id, "ok", added, len(rows), time.monotonic() - t0)
-        cf.record("appointments_weekly", fp, rows=added)
         invalidate_workspace_caches("appointments_weekly")
-        log.info("scheduler_appointments_done", count=added)
+        log.info("scheduler_appointments_done", count=added, oic_scanned=len(raw_rows))
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
         log.error("scheduler_appointments_failed", error=str(exc))
@@ -613,7 +632,7 @@ async def _run_tribunal_decisions(triggered_by: str = "scheduler") -> None:
     from sqlalchemy import select
     from api.database import AsyncSessionLocal
     from api.models.regulation import TribunalDecision
-    from pipeline.ingest import fetch_crtc_decisions
+    from pipeline.connector_crtc_decisions import fetch_crtc_decisions
     log_id = await _log_start("tribunal_decisions", "Tribunal Decisions", triggered_by)
     t0 = time.monotonic()
     try:
@@ -639,6 +658,36 @@ async def _run_tribunal_decisions(triggered_by: str = "scheduler") -> None:
     except Exception as exc:
         await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
         log.error("scheduler_tribunal_decisions_failed", error=str(exc))
+
+
+async def _run_hansard_transcripts(triggered_by: str = "scheduler") -> None:
+    """Full first-party Hansard transcripts — every Intervention's full text,
+    from ourcommons.ca's own per-sitting XML. Distinct from _run_hansard_search
+    above (a third-party openparliament.ca keyword-sweep landing in the
+    separate HansardMention table). connector_hansard_transcripts.backfill_
+    hansard() commits each sitting's rows to the DB itself as it walks (see
+    that module's docstring for why), so this job is just bookkeeping.
+
+    `triggered_by == "manual"` (scripts/run_ingest.py, per CLAUDE.md's "big
+    ingests must not run through the web server") runs the walk unbounded —
+    the only way to make real progress through the 13-session, 2004-to-now
+    backlog. A scheduler cron tick stays bounded: steady state needs at most
+    a handful of new sittings a day, and an unbounded scheduled call would
+    block the event loop for hours during the initial catch-up.
+    """
+    from pipeline.connector_hansard_transcripts import backfill_hansard
+
+    log_id = await _log_start("hansard_transcripts", "Hansard Transcripts (Full Text)", triggered_by)
+    t0 = time.monotonic()
+    try:
+        max_pages = None if triggered_by == "manual" else 200
+        result = await backfill_hansard(max_pages=max_pages)
+        await _log_finish(log_id, "ok", result["rows_inserted"], result["rows_inserted"], time.monotonic() - t0)
+        invalidate_workspace_caches("hansard_transcripts")
+        log.info("scheduler_hansard_transcripts_done", **result)
+    except Exception as exc:
+        await _log_finish(log_id, "error", 0, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}")
+        log.error("scheduler_hansard_transcripts_failed", error=str(exc))
 
 
 async def _run_donations(triggered_by: str = "scheduler") -> None:
@@ -734,6 +783,7 @@ JOB_RUNNERS = {
     "grants_quarterly": _run_grants,
     "donations_quarterly": _run_donations,
     "tribunal_decisions": _run_tribunal_decisions,
+    "hansard_transcripts": _run_hansard_transcripts,
     "canadabuys_tenders": _run_canadabuys,
     "bank_of_canada": _run_boc_series,
 }

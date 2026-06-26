@@ -627,7 +627,7 @@ function tableKind(table?: string): ChainNode["kind"] {
   switch (table) {
     case "bills": case "gazette": case "tribunal": case "tribunal_decisions": return "regulatory";
     case "lobbying": case "lobbying_records": return "lobbying";
-    case "hansard_mentions": return "actor";
+    case "hansard_mentions": case "hansard_speeches": return "actor";
     default: return "record";
   }
 }

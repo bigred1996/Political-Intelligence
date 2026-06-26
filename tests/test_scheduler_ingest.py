@@ -109,10 +109,10 @@ async def _appointments_idempotent(tmp_path, monkeypatch):
     session_maker = await _make_temp_session(tmp_path, "appointments.db")
     monkeypatch.setattr(db, "AsyncSessionLocal", session_maker)
 
-    async def fake_fetch(max_rows: int = 10000):
+    def fake_parse(records):
         return list(FAKE_APPOINTMENTS)
 
-    monkeypatch.setattr("pipeline.ingest.fetch_appointment_rows", fake_fetch)
+    monkeypatch.setattr("pipeline.ingest.parse_appointments_from_precis", fake_parse)
 
     from api.scheduler import _run_appointments
 

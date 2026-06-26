@@ -169,3 +169,32 @@ async def backfill_votes(*, sessions: list[tuple[int, int]] | None = None,
               skipped=result.pages_skipped_already_done, gaps=len(result.gaps),
               stopped=result.stopped_reason)
     return result
+
+
+async def fetch_house_vote_records(max_rows: int = 0) -> list[dict[str, Any]]:
+    """SourceConnector adapter — wraps backfill_votes() into source_records
+    shape so this connector (built and tested, never wired) joins the
+    standard Tier-2 registry instead of needing a bespoke scheduler job."""
+    summary = await backfill_votes(max_pages=max_rows or None)
+    out: list[dict[str, Any]] = []
+    for row in summary.rows:
+        parliament, session, vote_number = row["parliament"], row["session"], row["vote_number"]
+        result = row.get("result") or "Unknown"
+        out.append({
+            "source": "house_votes",
+            "record_type": "division_vote",
+            "external_id": f"p{parliament}s{session}v{vote_number}",
+            "entity_name": None,
+            "canonical_name": None,
+            "title": f"Vote #{vote_number} — Parliament {parliament}, Session {session} — {result}"[:1024],
+            "summary": (f"Result: {result}. Yea: {row.get('yea', 0)}, Nay: {row.get('nay', 0)}, "
+                        f"Paired: {row.get('paired', 0)}, Total: {row.get('total', 0)}."),
+            "full_text": None,
+            "event_date": row.get("date") or None,
+            "amount": None,
+            "province": None,
+            "url": f"https://www.ourcommons.ca/Members/en/votes/{parliament}/{session}/{vote_number}",
+            "raw": row,
+        })
+    log.info("house_votes_fetch_records_done", count=len(out))
+    return out

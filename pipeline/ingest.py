@@ -16,6 +16,7 @@ import io
 import re
 import xml.etree.ElementTree as ET
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any, AsyncIterator
 
@@ -62,7 +63,7 @@ async def resolve_resource_url(dataset_id: str, resource_name: str) -> str:
 async def stream_csv_rows(url: str, max_rows: int) -> AsyncIterator[dict[str, str]]:
     """Stream a (large) remote CSV and yield parsed dict rows.
 
-    Memory stays flat: we only hold one partial line + the current row.
+    Memory stays flat: we only hold one partial record + the current row.
     max_rows <= 0 means no cap (full corpus).
     """
     header: list[str] | None = None
@@ -73,8 +74,20 @@ async def stream_csv_rows(url: str, max_rows: int) -> AsyncIterator[dict[str, st
             resp.raise_for_status()
             async for chunk in resp.aiter_text():
                 buf += chunk
-                while "\n" in buf:
-                    line, buf = buf.split("\n", 1)
+                search_from = 0
+                while True:
+                    nl = buf.find("\n", search_from)
+                    if nl == -1:
+                        break
+                    # A `\n` inside an open quote (e.g. an embedded newline in a
+                    # bilingual description field) isn't a record boundary — an
+                    # odd quote count up to here means we're still inside one,
+                    # so keep scanning forward instead of splitting here.
+                    if buf.count('"', 0, nl) % 2 != 0:
+                        search_from = nl + 1
+                        continue
+                    line, buf = buf[:nl], buf[nl + 1:]
+                    search_from = 0
                     if not line.strip():
                         continue
                     vals = next(csv.reader([line]))
@@ -96,6 +109,19 @@ def _to_float(v: str | None) -> float | None:
         return float(v.replace(",", "").replace("$", "").strip())
     except ValueError:
         return None
+
+
+def _sane_year_date(v: str | None) -> str | None:
+    """Reject dirty source dates with an obviously-wrong year (same bound as
+    the documented Hansard year-4043 workaround) rather than storing them."""
+    v = (v or "").strip()
+    if not v:
+        return None
+    try:
+        year = int(v[:4])
+    except ValueError:
+        return None
+    return v if 1990 <= year <= 2035 else None
 
 
 async def iter_contract_rows(max_rows: int = 0) -> AsyncIterator[dict[str, Any]]:
@@ -162,7 +188,11 @@ async def iter_donation_rows(max_rows: int = 0) -> AsyncIterator[dict[str, Any]]
     with zipfile.ZipFile(zip_path) as z:
         member = z.namelist()[0]
         with z.open(member) as f:
-            text = io.TextIOWrapper(f, encoding="latin-1", newline="")
+            # The source file is UTF-8 with a BOM (confirmed: accented names
+            # decode cleanly as UTF-8) — decoding as latin-1 silently mojibakes
+            # every accented name instead of erroring, which is why this went
+            # unnoticed. utf-8-sig strips the BOM if present.
+            text = io.TextIOWrapper(f, encoding="utf-8-sig", newline="")
             reader = csv.reader(text)
             next(reader, None)  # header
             for vals in reader:
@@ -178,7 +208,7 @@ async def iter_donation_rows(max_rows: int = 0) -> AsyncIterator[dict[str, Any]]
                     "party": (vals[_EC["party"]] or "").strip() or None,
                     "contributor_city": (vals[_EC["city"]] or "").strip() or None,
                     "contributor_province": (vals[_EC["province"]] or "").strip() or None,
-                    "received_date": (vals[_EC["received_date"]] or "").strip() or None,
+                    "received_date": _sane_year_date(vals[_EC["received_date"]]),
                     "amount": _to_float(vals[_EC["monetary"]]),
                 }
                 yielded += 1
@@ -438,56 +468,104 @@ async def fetch_grant_rows(max_rows: int = 30000) -> list[dict[str, Any]]:
 
 
 # ── GIC Appointments ──────────────────────────────────────────────────────────
-GIC_DATASET = "58b10b98-acab-458a-9e7a-fc1a1c2b1a58"
+# open.canada.ca's standalone GIC Appointments CKAN dataset (id below) is dead —
+# package_show returns 404 and the package_search fallback finds nothing either
+# (confirmed live). Real fix: derive appointments from the `précis` free text of
+# Orders in Council we already ingest (pipeline/connector_orders_in_council.py
+# → source_records, source="orders_in_council") — every PC-number appointment
+# OIC carries a highly templated sentence ("Appointment of NAME of CITY,
+# Province, to be POSITION...") that's reliably regex-extractable. No network
+# call needed; this parses data already in the DB.
+GIC_DATASET = "58b10b98-acab-458a-9e7a-fc1a1c2b1a58"  # dead; kept for the yaml/audit trail, not called
 
-async def fetch_appointment_rows(max_rows: int = 10000) -> list[dict[str, Any]]:
-    """Pull Governor in Council appointments from open.canada.ca."""
-    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as c:
-        r = await c.get(f"{CKAN_API}/package_show", params={"id": GIC_DATASET})
-        if r.status_code != 200:
-            r2 = await c.get(f"{CKAN_API}/package_search", params={
-                "q": "governor council appointments GIC"
-            })
-            r2.raise_for_status()
-            results = r2.json()["result"]["results"]
-            if not results:
-                raise ValueError("GIC appointments dataset not found")
-            resources = results[0]["resources"]
-        else:
-            resources = r.json()["result"]["resources"]
+_PROVINCES = {
+    "alberta", "british columbia", "manitoba", "new brunswick",
+    "newfoundland and labrador", "northwest territories", "nova scotia",
+    "nunavut", "ontario", "prince edward island", "quebec", "saskatchewan", "yukon",
+}
+_APPT_LEAD_RE = re.compile(r"^(re-?appointment|appointment|designation)\s+of\s+", re.IGNORECASE)
+_APPT_CONNECTOR_RE = re.compile(r"\s+(?:to be|as)\s+", re.IGNORECASE)
+_APPT_PERSON_RE = re.compile(
+    r"([A-ZÀ-Ý][^,]*?)\s+of\s+([^,]+?),\s+([A-Za-zÀ-ÿ ]+?)(?=,\s+(?:and\s+)?[A-Z]|$)"
+)
+_APPT_EFFECTIVE_RE = re.compile(r"effective\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})", re.IGNORECASE)
+_APPT_POSITION_STOP_RE = re.compile(
+    r"\s+to\s+hold\s+office.*$|\s+for\s+a\s+term.*$|\s+effective\b.*$|\.$"
+)
+_APPT_ORG_RE = re.compile(r"\bof\s+(?:the\s+)?([A-ZÀ-Ý][\w&,'.\-() ]+?)(?:,|\.|$)")
 
-    url = None
-    for res in resources:
-        if (res.get("format") or "").upper() == "CSV":
-            url = res["url"]
-            break
-    if not url:
-        raise ValueError("No CSV resource found in GIC appointments dataset")
 
-    log.info("appointments_ingest_start", url=url)
+def parse_appointments_from_precis(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Extract one Appointment row per appointee named in an Order in Council's
+    précis (raw OIC dict per pipeline/connector_orders_in_council.py's shape:
+    pc_number/date_made/department/precis/...). Best-effort: OICs that don't
+    match the templated "Appointment/Re-appointment/Designation of NAME ... to
+    be/as POSITION" pattern (amendments, repeals, regulatory orders — most OICs
+    aren't appointments at all) are skipped, not fabricated."""
     out: list[dict[str, Any]] = []
-    async for row in stream_csv_rows(url, max_rows):
-        # Column names vary by government data format — try common variants.
-        name = (
-            row.get("appointee_name") or row.get("name_en") or
-            row.get("first_name", "") + " " + row.get("last_name", "") or
-            row.get("full_name") or ""
-        ).strip()
-        if not name or name == " ":
+    for row in records:
+        precis = (row.get("precis") or "").strip()
+        lead = _APPT_LEAD_RE.match(precis)
+        if not lead:
             continue
-        out.append({
-            "appointee_name": name,
-            "canonical_name": normalize(name),
-            "position_title": (row.get("position_en") or row.get("position") or row.get("title_en") or "").strip() or None,
-            "organization": (row.get("organization_en") or row.get("organization") or row.get("org_en") or "").strip() or None,
-            "appointment_date": (row.get("appointment_date") or row.get("start_date") or "").strip() or None,
-            "end_date": (row.get("end_date") or row.get("term_end") or "").strip() or None,
-            "order_in_council": (row.get("order_in_council") or row.get("oic_number") or "").strip() or None,
-            "appointment_type": (row.get("appointment_type") or row.get("type_en") or "").strip() or None,
-            "remuneration": (row.get("remuneration_en") or row.get("remuneration") or "").strip() or None,
-            "province": (row.get("province_en") or row.get("province") or "").strip() or None,
-        })
-    log.info("appointments_ingest_parsed", count=len(out))
+        appointment_type = lead.group(1)
+        rest = precis[lead.end():]
+        conn = _APPT_CONNECTOR_RE.search(rest)
+        # rest[:conn.start()] includes the comma immediately before " to be"/
+        # " as" (e.g. "...Quebec, to be ...") — strip it so the trailing
+        # province doesn't fail to match the person regex's lookahead.
+        people_clause = (rest[:conn.start()] if conn else rest).rstrip(", ")
+        position_clause = rest[conn.end():] if conn else ""
+
+        people = list(_APPT_PERSON_RE.finditer(people_clause))
+        if not people:
+            # No "of CITY, Province" found (e.g. a foreign posting or a firm
+            # named as auditor) — still record the appointee with no
+            # city/province rather than dropping the row entirely.
+            name = re.split(r",| and ", people_clause)[0].strip()
+            if not name:
+                continue
+            people_data = [(name, None, None)]
+        else:
+            people_data = []
+            for m in people:
+                name = m.group(1).strip().rstrip(",")
+                city = m.group(2).strip()
+                province = m.group(3).strip()
+                if province.lower() not in _PROVINCES:
+                    province = None
+                people_data.append((name, city, province))
+
+        position_title = _APPT_POSITION_STOP_RE.sub("", position_clause).strip(", ") or None
+        # Search the already-truncated title, not the raw clause — otherwise
+        # the lazy org match runs past "of the Board" into the un-stripped
+        # "to hold office..." tail with nothing to stop it.
+        org_match = _APPT_ORG_RE.search(position_title or "")
+        organization = org_match.group(1).strip(", ") if org_match else row.get("department")
+        eff_match = _APPT_EFFECTIVE_RE.search(position_clause)
+        appointment_date = row.get("date_made")
+        if eff_match:
+            try:
+                appointment_date = datetime.strptime(eff_match.group(1), "%B %d, %Y").strftime("%Y-%m-%d")
+            except ValueError:
+                pass
+
+        for name, city, province in people_data:
+            if not name:
+                continue
+            out.append({
+                "appointee_name": name,
+                "canonical_name": normalize(name),
+                "position_title": position_title,
+                "organization": organization,
+                "appointment_date": appointment_date,
+                "end_date": None,
+                "order_in_council": row.get("pc_number"),
+                "appointment_type": appointment_type,
+                "remuneration": None,
+                "province": province,
+            })
+    log.info("appointments_parsed_from_oic", count=len(out), source_records=len(records))
     return out
 
 
@@ -571,72 +649,10 @@ async def fetch_gazette_entries() -> list[dict[str, Any]]:
 
 
 # ── CRTC Decisions ────────────────────────────────────────────────────────────
-CRTC_DECISIONS_URL = "https://crtc.gc.ca/eng/publications/reports/BroadcastDecisions/rss.xml"
-CRTC_TELECOM_URL = "https://crtc.gc.ca/eng/publications/reports/TelecomDecisions/rss.xml"
-COMPETITION_RSS = "https://www.canada.ca/en/competition-bureau/news/decisions-enforcement-publications.rss"
-
-_DEC_RE = re.compile(r"\d{4}-\d+")
-
-
-async def fetch_crtc_decisions(max_entries: int = 200) -> list[dict[str, Any]]:
-    """Fetch CRTC broadcast and telecom decisions via RSS."""
-    out: list[dict[str, Any]] = []
-    feeds = [
-        ("CRTC", CRTC_DECISIONS_URL),
-        ("CRTC", CRTC_TELECOM_URL),
-    ]
-    headers = {"User-Agent": _GAZETTE_UA}
-
-    for body, url in feeds:
-        try:
-            async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers=headers) as c:
-                r = await c.get(url)
-                r.raise_for_status()
-                # Check content-type — CRTC returns HTML 404 pages with 200 status.
-                ct = r.headers.get("content-type", "")
-                if "html" in ct and "xml" not in ct:
-                    log.warning("crtc_rss_returned_html", url=url)
-                    continue
-                # Clean non-standard XML characters before parse.
-                text = re.sub(r'&(?!(?:amp|lt|gt|apos|quot|#\d+|#x[0-9a-fA-F]+);)', '&amp;', r.text)
-                root = ET.fromstring(text)
-        except Exception as exc:
-            log.warning("crtc_rss_failed", url=url, error=str(exc))
-            continue
-
-        channel = root.find("channel") or root
-        for item in channel.findall("item"):
-            def _t(tag: str) -> str:
-                el = item.find(tag)
-                return (el.text or "").strip() if el is not None else ""
-
-            title = _t("title")
-            if not title:
-                continue
-            pub_raw = _t("pubDate")
-            pub_date = pub_raw[:10] if pub_raw else None
-            link = _t("link")
-            desc_raw = _t("description")
-            desc = re.sub(r"<[^>]+>", " ", desc_raw).strip()
-
-            m = _DEC_RE.search(title)
-            dec_num = m.group(0) if m else None
-
-            out.append({
-                "body": body,
-                "decision_number": dec_num,
-                "title": title,
-                "decision_date": pub_date,
-                "outcome": None,
-                "parties": None,
-                "summary": desc[:1000] if desc else None,
-                "url": link,
-            })
-            if len(out) >= max_entries:
-                break
-
-    log.info("crtc_ingest_parsed", count=len(out))
-    return out
+# Moved to pipeline/connector_crtc_decisions.py:fetch_crtc_decisions — the
+# BroadcastDecisions/TelecomDecisions RSS URLs this used to hit return an
+# HTML 404 page with HTTP 200 (confirmed dead; see that module's docstring
+# for the working replacement source and why).
 
 
 # ── OCL Registrations ─────────────────────────────────────────────────────────

@@ -107,17 +107,20 @@ sources:
     attribution_required: null
     enabled: true
     connector: "pipeline/ingest.py:iter_donation_rows"
-    implementation_status: working_incomplete
-    backfill_strategy: "manual trigger (triggered_by=manual), full ZIP download + stream parse — 6,230,381 rows loaded"
+    implementation_status: working
+    backfill_strategy: "manual trigger (triggered_by=manual), full ZIP download + stream parse — 6,230,597 rows loaded (re-ingested 2026-06-26 after the encoding fix below)"
     incremental_strategy: "FIXED 2026-06-22 (Goal 11): _ensure_donations_cache() used to reuse the cached ZIP forever once downloaded once — the quarterly cron had never actually refreshed donations past the first download in any real environment. pipeline/conditional_fetch.py now HEAD-fingerprints the ZIP (Last-Modified/size) before every run; the cache is only busted and re-downloaded when that fingerprint changes (scheduler_log status='skipped' otherwise). Still full delete-then-reinsert on an actual change; daily+ during an election period per spec is still not implemented."
     check_frequency: "weekly (Thu 3:30am ET) — Goal 11 retuned from quarterly per the 'Elections Canada outside election periods' weekly policy, safe now that the conditional-fetch gate exists"
-    last_checked: "2026-06-15T17:45:29Z"
-    last_successful_import: "2026-06-15T18:06:23Z (manual trigger; the scheduled cron path is unverified)"
+    last_checked: "2026-06-26T13:45:00Z"
+    last_successful_import: "2026-06-26T13:50:00Z (manual re-ingest after the encoding fix below; the scheduled cron path is still unverified)"
     last_source_change: null
     checkpoint_state: none
     rate_limit: "none enforced"
     raw_data_path: "./data/cache/donations_ec.zip (cache, not an immutable per-run archive)"
     known_limitations:
+      - "FIXED 2026-06-26: iter_donation_rows force-decoded the file as latin-1 when it's actually UTF-8 with a BOM, mangling every accented name. Now decodes utf-8-sig. Full re-ingest landed 6,230,597 clean rows."
+      - "FIXED 2026-06-26: ~43 rows had garbage received_date years (0025-4002, dirty source data). A sane-year guard now nulls out-of-range dates instead of storing them."
+      - "Residual, accepted, not fixed: 70 rows (0.001%) carry a genuine upstream double-encoded name baked into the government's own CSV (confirmed via raw byte inspection — multiple different byte-level encodings of the same name across rows in their file). Not worth per-row repair on a 6.2M-row hot path."
       - "no Elections Canada terms-of-use review on file — commercial_reuse_reviewed is honestly false despite 6.2M rows live"
       - "corporate donations banned federally since 2007 — historical pre-ban corporate records need flagging, not yet done"
       - "one prior attempt failed with 'database or disk is full' — disk headroom must be checked before every run"
@@ -325,13 +328,46 @@ sources:
     responsible_parser: "pipeline/ingest.py / scripts/deepen_hansard.py"
     health_status: healthy
 
+  - id: hansard_transcripts
+    name: Hansard — Full Transcripts, First-Party (ourcommons.ca)
+    jurisdiction: federal
+    publisher: "House of Commons (ourcommons.ca)"
+    category: parliament
+    base_url: "https://www.ourcommons.ca/Content/House/{parliament}{session}/Debates/{NNN}/HAN{NNN}-E.XML"
+    access_method: scrape
+    license: unreviewed
+    terms_url: null
+    robots_url: "https://www.ourcommons.ca/robots.txt"
+    commercial_reuse_reviewed: false
+    full_text_storage_allowed: true
+    attribution_required: true
+    enabled: true
+    connector: "pipeline/connector_hansard_transcripts.py:backfill_hansard / api/scheduler.py:_run_hansard_transcripts"
+    implementation_status: working
+    backfill_strategy: "per-sitting XML walk (pipeline/api_paginator.py:walk_cursor_pages), one independent checkpoint per (parliament, session) — 13 sessions, 38th Parliament (2004) onward; pre-2004 Hansard is PDF-only, out of scope. Full historical backfill completed 2026-06-26: 639,695 rows, 2,266 sittings, 0 gaps, 0 errors, every session reached its true empty/302 terminus (stopped_reason=exhausted)."
+    incremental_strategy: "checkpoint resumes from the last fetched sitting per session; an empty/302 sitting number is the stop signal, re-probed on each call per the Goal-11 'complete' boundary-reopen pattern"
+    check_frequency: "daily (registered job, budget-capped at 200 sittings/call); unbounded full backfill run via scripts/run_ingest.py per CLAUDE.md's 'big ingests must not run through the web server'"
+    last_checked: "2026-06-26T15:23:57Z"
+    last_successful_import: "2026-06-26T15:23:57Z"
+    last_source_change: null
+    checkpoint_state: "per-session, see data/checkpoints/hansard_transcripts_p{P}s{S}.json"
+    rate_limit: "0.2s between sitting fetches (self-imposed, not source-mandated — none documented)"
+    raw_data_path: "data/raw/parliament/hansard_transcripts_p{P}s{S}/"
+    known_limitations:
+      - "structured XML Hansard only exists from the 38th Parliament (2004) onward — parliaments 35-37 published PDF-only Hansard, confirmed live (sitting 1 of (37,1) returns HTTP 302; (38,1) returns HTTP 200); not in scope for this connector"
+      - "Affiliation's Type attribute (party/role code) is stored raw on each row (speaker_role) — its numeric-code meaning isn't publicly documented anywhere found, so no human label is derived from it (the speaker display string itself already carries name + riding + party)"
+      - "SQL-only by design, same as contracts/donations/NPRI — not in the semantic embedding pipeline (search/index.py EMBED_SOURCES), since the full corpus could reach 500k+ rows and a CPU re-embed at that scale was already measured as 40+ minutes for a much smaller corpus elsewhere in this repo"
+    priority: P1
+    responsible_parser: "pipeline/connector_hansard_transcripts.py:parse_sitting_xml"
+    health_status: healthy
+
   - id: appointments_weekly
     name: GIC Appointments
     jurisdiction: federal
     publisher: Privy Council Office (via open.canada.ca)
     category: government_structure
-    base_url: "https://open.canada.ca/data/en/dataset/58b10b98-acab-458a-9e7a-fc1a1c2b1a58"
-    access_method: ckan
+    base_url: "n/a — derived from already-ingested orders_in_council source_records, no network call"
+    access_method: derived
     license: "Open Government Licence – Canada"
     terms_url: "https://open.canada.ca/en/open-government-licence-canada"
     robots_url: "https://open.canada.ca/robots.txt"
@@ -339,24 +375,25 @@ sources:
     full_text_storage_allowed: true
     attribution_required: true
     enabled: true
-    connector: "pipeline/ingest.py:fetch_appointment_rows"
-    implementation_status: blocked_technical
-    backfill_strategy: "not run — see known_limitations, the source itself is unreachable as currently coded"
-    incremental_strategy: "FIXED 2026-06-21: _run_appointments now deletes-before-insert (same pattern as bills/contracts/donations); verified with a passing idempotency test. GOAL 11 (2026-06-22): a pipeline/conditional_fetch.py CKAN-fingerprint check now also gates this job (skip when the GIC_DATASET resource is unchanged) — added for cadence consistency with the other CKAN sources even though the connector itself still can't fetch real data (see known_limitations)."
-    check_frequency: "weekly, Mon 7am ET — not explicitly named in Goal 11's policy table; left as-is"
-    last_checked: "2026-06-21T22:12:56Z"
-    last_successful_import: null
+    connector: "pipeline/ingest.py:parse_appointments_from_precis"
+    implementation_status: working
+    backfill_strategy: "FIXED 2026-06-26: the dead CKAN dataset call is gone. _run_appointments now reads SourceRecord.raw for source='orders_in_council' (already ingested) and regex-parses the templated 'Appointment of NAME ... to be POSITION' précis text. Real run 2026-06-26: 9,825 appointments derived from 20,304 OIC records."
+    incremental_strategy: "No network call, so no conditional-fetch fingerprint needed — cheap enough (~20k OIC rows) to fully re-derive every run (full delete-then-reinsert, same pattern as bills/contracts/donations; appointments has no stable natural key since one OIC can name multiple appointees)."
+    check_frequency: "weekly, Mon 7am ET"
+    last_checked: "2026-06-26T13:57:24Z"
+    last_successful_import: "2026-06-26T13:57:24Z"
     last_source_change: null
     checkpoint_state: none
-    rate_limit: "none enforced"
-    raw_data_path: "not retained"
+    rate_limit: "none enforced (no network call)"
+    raw_data_path: "not retained (derived from orders_in_council's own raw storage)"
     known_limitations:
-      - "TRIGGERED FOR REAL 2026-06-21, FAILED CLEANLY: ValueError: No CSV resource found in GIC appointments dataset. The hardcoded CKAN dataset id (58b10b98-...) 404s, and a CKAN package_search under the Privy Council Office's own org (pco-bcp) returns zero appointments-related datasets — GIC Appointments most likely isn't published via the open.canada.ca CKAN catalogue at all."
-      - "real source is probably orders-in-council.canada.ca (confirmed reachable, HTML search portal) — a fundamentally different access pattern than the rest of this module's CKAN-bulk-CSV connectors; needs a proper connector-design pass (find export/pagination capability, or accept HTML scraping), not a one-line URL fix"
-      - "appointee name field has several column-name variants across the source CSV; some rows may have blank names — unverified against real data since nothing has ever been fetched"
+      - "best-effort regex extraction: OICs that don't match the templated appointment/re-appointment/designation pattern (amendments, repeals, regulatory orders — most OICs aren't appointments at all) are skipped, not fabricated"
+      - "organization field falls back to the OIC's department when no 'of the X' phrase is found in the position clause — may be coarser than the true appointing body for some rows (634 of 9,825 have a short/generic organization string)"
+      - "FIXED 2026-06-26: the 'effective DATE' regex captured the précis's raw textual date format instead of normalizing it, while the date_made fallback was already ISO — 36.7% of derived appointments had inconsistent date formats. Now parsed through datetime.strptime and stored ISO; re-run verified 0 malformed dates."
+      - "province/city extraction is best-effort from an 'of CITY, Province' pattern; foreign postings and firms named as auditor have null city/province by design, not a bug"
     priority: P3
     responsible_parser: "pipeline/ingest.py"
-    health_status: error
+    health_status: healthy
 
   - id: grants_quarterly
     name: Grants & Contributions
@@ -395,8 +432,8 @@ sources:
     jurisdiction: federal
     publisher: "CRTC"
     category: regulation
-    base_url: "https://crtc.gc.ca/eng/publications/reports/BroadcastDecisions/rss.xml"
-    access_method: rss
+    base_url: "https://crtc.gc.ca/eng/8045/d{year}.htm"
+    access_method: html_scrape
     license: unreviewed
     terms_url: null
     robots_url: "https://crtc.gc.ca/robots.txt"
@@ -404,24 +441,25 @@ sources:
     full_text_storage_allowed: false
     attribution_required: true
     enabled: true
-    connector: "pipeline/ingest.py:fetch_crtc_decisions"
-    implementation_status: blocked_technical
-    backfill_strategy: "designed: RSS pull, 200-entry cap, dedup-by-(decision_number, body) — TRIGGERED FOR REAL 2026-06-21, returned 0 rows (see known_limitations)"
-    incremental_strategy: "existence-check upsert by (decision_number, body) — good pattern, untestable until the feed URLs work again"
-    check_frequency: "daily, 9am ET — Goal 11 retuned from Sat-only weekly per the 'Court decisions' daily policy (cadence now tuned; still blocked on the CRTC feed URLs themselves, see known_limitations)"
-    last_checked: "2026-06-21T22:46:22Z"
-    last_successful_import: "2026-06-21T22:46:23Z (status=ok, rows_added=0 — feed returned HTML, not RSS; run twice today, both times in seconds total — see known_limitations re: the reindex fix)"
+    connector: "pipeline/connector_crtc_decisions.py:fetch_crtc_decisions"
+    implementation_status: working
+    backfill_strategy: "one GET per year, 1995-present, dedup-by-(decision_number, body) — FIXED + TRIGGERED FOR REAL 2026-06-26: 14,619 decisions parsed, 13,827 net new rows landed (rest deduped against same-run reissues)"
+    incremental_strategy: "existence-check upsert by (decision_number, body); full year-by-year re-walk every run (~32 small pages) is cheap enough not to need a checkpoint"
+    check_frequency: "daily, 9am ET"
+    last_checked: "2026-06-26T09:36:31Z"
+    last_successful_import: "2026-06-26T09:36:31Z (status=ok, rows_added=13827, total=14619)"
     last_source_change: null
     checkpoint_state: none
-    rate_limit: "none enforced"
+    rate_limit: "0.3s between requests (no robots.txt Crawl-delay set for CRTC, self-imposed)"
     raw_data_path: "not retained"
     known_limitations:
-      - "TRIGGERED FOR REAL 2026-06-21: both the BroadcastDecisions and TelecomDecisions RSS URLs currently return HTML, not RSS (crtc_rss_returned_html logged for both, exactly the documented gotcha) — the connector handled this correctly (no crash, no garbage data), but it means CRTC has likely restructured their site and the feed URLs need rediscovery. Not attempted (open-ended hunt, out of scope for this pass)."
-      - "this job's success path calls _rebuild_search_index() — on the FIRST trigger today that took 40+ minutes before being killed by hand; after fixing it (see search_reindex_performance in this registry), re-running this exact job end-to-end took 3.4 seconds total. The CRTC-feed problem above is real and still open; the reindex problem that made it look like THIS connector hung is fixed."
+      - "FIXED 2026-06-26: the old BroadcastDecisions/TelecomDecisions RSS URLs (pipeline/ingest.py:fetch_crtc_decisions, now deleted) were confirmed dead again (HTML 404 with HTTP 200) before being replaced. New connector walks crtc.gc.ca's per-year decision index (/eng/8045/d{year}.htm) instead — confirmed live 1995-2026."
+      - "decision_date is NULL for all rows — the index page has no per-decision date, only each decision's own page (/eng/archive/{year}/{id}.htm) via <time property=\"dateModified\">; fetching ~14,600 individual pages just for that field was judged out of scope for this pass (same MVP tradeoff as IAAC/StatCan/Transport catalogue-level sources)."
+      - "outcome is recovered from inline title keywords (APPROVED/DENIED/RENEWED) where the source embeds them — real signal for some years (e.g. 2015: 173 approved/33 denied/7 renewed), absent for others (2025-2026 titles don't include a result marker) — 5,332 of 13,827 rows have outcome=NULL for this reason, not a parser bug."
+      - "parties is best-effort (first '. '/' - ' split of the title) — multi-party titles only yield the first party; policy-style titles with no leading party yield NULL."
       - "Competition Bureau, CER hearings/decisions, and IRB are NOT covered — CRTC only"
-      - "outcome/parties fields are NULL — not parsed from the feed"
     priority: P1
-    responsible_parser: "pipeline/ingest.py"
+    responsible_parser: "pipeline/connector_crtc_decisions.py"
     health_status: unknown
 
   # ── Tier 2 — breadth sources (declarative registry → source_records) ────────
@@ -556,13 +594,14 @@ sources:
     backfill_strategy: "full CSV stream — 2,008 incident rows"
     incremental_strategy: "none — full replace weekly; dataset is largely static between reporting cycles"
     check_frequency: "weekly, Tue 4am ET — not explicitly named in Goal 11's policy table (incidents are history, not 'active proceedings' — see cer_applications below); left as-is"
-    last_checked: "2026-06-16T08:10:01Z"
-    last_successful_import: "2026-06-16T08:10:18Z"
+    last_checked: "2026-06-26T13:53:54Z"
+    last_successful_import: "2026-06-26T13:53:57Z"
     last_source_change: null
     checkpoint_state: none
     rate_limit: "none enforced"
     raw_data_path: "not retained"
     known_limitations:
+      - "FIXED 2026-06-26: event_date was naively [:10]-sliced assuming YYYY-MM-DD, but the source ships M/D/YYYY (e.g. '1/2/2008 12:00:00 AM'), silently breaking year-gap detection. _cer_date() now parses with strptime and stores ISO; re-run verified 0 malformed dates."
       - "incidents only — applications, hearings, decisions, conditions, energy production/demand/price datasets not ingested"
       - "regulatory-DOCUMENT systems (hearing files) intentionally not scraped per spec policy — would need confirmed permission first"
     priority: P1
@@ -1849,7 +1888,7 @@ sources:
   # Python objects in pipeline/news_feeds.py — there is no connector to wire
   # until one is actually licensed, exactly like the canlii/scc_official rows.
 
-  - id: the_conversation_ca
+  - id: conversation_ca_politics
     name: "The Conversation Canada — Politics"
     jurisdiction: national
     publisher: "The Conversation Canada"

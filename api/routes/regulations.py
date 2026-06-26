@@ -9,7 +9,8 @@ from api.cache import invalidate_workspace_caches
 from api.database import get_session
 from api.models.regulation import GazetteEntry, TribunalDecision
 from api.schemas import IngestStartedResponse, SourceSearchResponse, StatsResponse
-from pipeline.ingest import fetch_crtc_decisions, fetch_gazette_entries
+from pipeline.connector_crtc_decisions import fetch_crtc_decisions
+from pipeline.ingest import fetch_gazette_entries
 
 router = APIRouter(prefix="/api/regulations", tags=["regulations"])
 

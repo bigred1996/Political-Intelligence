@@ -58,8 +58,8 @@ export function AppSidebar() {
     <nav className="hidden md:flex h-screen w-64 shrink-0 border-r border-outline-variant bg-surface z-50 flex-col py-margin-mobile">
       {/* Brand */}
       <div className="px-6 mb-6 flex items-center gap-3">
-        <Link href="/" className="w-8 h-8 rounded bg-primary flex items-center justify-center text-on-primary focus-ring">
-          <span className="material-symbols-outlined text-[20px]">account_balance</span>
+        <Link href="/" className="w-8 h-8 rounded bg-primary flex items-center justify-center focus-ring">
+          <img src="/brand/nessus-monogram-white.svg" alt="Nessus Intelligence" className="w-5 h-5" />
         </Link>
         <div>
           <h1 className="font-headline-sm text-headline-sm font-bold text-primary tracking-tight leading-none">NESSUS</h1>
