@@ -208,6 +208,53 @@ export function RadialNetwork({
   );
 }
 
+// ── Entity connection graph ───────────────────────────────────────────
+// A radial "how it connects" diagram: the entity at the centre, one coloured
+// spoke per source category, node size scaled by connection count. Colours are
+// supplied by the caller (from lib/source-visual) so the graph, the legend, and
+// the grouped lists below it all read in the same palette.
+export function EntityConnectionGraph({
+  center,
+  nodes,
+  height = 280,
+}: {
+  center: string;
+  nodes: { label: string; value: number; color: string }[];
+  height?: number;
+}) {
+  if (!nodes.length) return <NoData h={height} />;
+  const W = 460, H = height, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 56;
+  const n = nodes.length;
+  const max = Math.max(...nodes.map((d) => d.value)) || 1;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height }} role="img" aria-label={`Connection graph for ${center}`}>
+      {nodes.map((nd, i) => {
+        const a = (i / n) * 2 * Math.PI - Math.PI / 2;
+        const x = cx + R * Math.cos(a), y = cy + R * Math.sin(a);
+        const r = 5 + Math.round((nd.value / max) * 11); // 5–16px by volume
+        const right = x >= cx - 4;
+        return (
+          <g key={i}>
+            <line x1={cx} y1={cy} x2={x} y2={y} stroke={nd.color} strokeWidth="1.4" opacity="0.45" />
+            <circle cx={x} cy={y} r={r} fill={nd.color} opacity="0.18" />
+            <circle cx={x} cy={y} r={Math.max(4, r - 4)} fill={nd.color} />
+            <text x={right ? x + r + 5 : x - r - 5} y={y - 1} textAnchor={right ? "start" : "end"} fontSize="11" fill="var(--color-on-surface)" className="font-medium">
+              {nd.label.length > 20 ? nd.label.slice(0, 20) + "…" : nd.label}
+            </text>
+            <text x={right ? x + r + 5 : x - r - 5} y={y + 11} textAnchor={right ? "start" : "end"} fontSize="10" fill="var(--color-on-surface-variant)" className="mono">
+              {nd.value.toLocaleString()}
+            </text>
+          </g>
+        );
+      })}
+      <circle cx={cx} cy={cy} r="36" fill="var(--color-primary)" />
+      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="12" fill="#ffffff" className="font-semibold">
+        {center.length > 13 ? center.slice(0, 13) + "…" : center}
+      </text>
+    </svg>
+  );
+}
+
 // ── Horizontal bar list ───────────────────────────────────────────────
 // Optional `onSelect` makes each row a drill-down control (keyed by `it.key`);
 // `activeKey` highlights the currently-selected row. Both are additive — callers

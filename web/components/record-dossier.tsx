@@ -1,16 +1,17 @@
 import Link from "next/link";
-import { Beat, Card, Crumb, Field, SignalBadge } from "@/components/nessus";
-import { AvatarLogo } from "@/components/intelligence";
+import { Beat, Card, Crumb, Field, SignalBadge, SignalMeter } from "@/components/nessus";
+import { AvatarLogo, partyVisual } from "@/components/intelligence";
+import { EntityConnectionGraph } from "@/components/dataviz";
 import { OriginalSourceLink } from "@/components/ui";
 import type { EvidenceGraphResponse, GraphFinding, LateralGroup, PlayerRef, RecordDetail, RecordRef, RelationGroup } from "@/lib/api";
 import { moneyFull } from "@/lib/api";
 import { entityHref, findingHref, organizationHref, personHref, recordHref, sectorHref, sourceLabel, typeLabel } from "@/lib/navigation";
+import { sourceVisual } from "@/lib/source-visual";
 
 /* The shared record dossier — the adaptive two-column intelligence layout used by
    both the universal record page and the bespoke meeting view. Left column is the
-   narrative ("tell me": strategic read → analysis → full text → details); the right
-   rail is the evidence ("show me": connections → people → governing bodies →
-   timeline) and collapses gracefully on one-off records. */
+   narrative ("tell me"); the right rail is the evidence ("show me"), read in a
+   consistent per-source colour palette with a connection graph at the centre. */
 
 export function RecordDossier({
   detail,
@@ -31,8 +32,7 @@ export function RecordDossier({
   const assess = detail.assessment;
   const signal = detail.signal;
   const entityUrl = record.entity ? entityHref(record.entity) : null;
-  // Only DIRECT (record-supported) findings are relevant on a record; generic
-  // sector context belongs on the sector page, not padded onto every record.
+  const vis = sourceVisual(detail.table, record.source);
   const directFindings = (graph?.findings ?? []).filter(
     (f) => (f as GraphFinding & { relationship_strength?: string }).relationship_strength === "supported",
   );
@@ -43,16 +43,23 @@ export function RecordDossier({
       {context ? <InvestigationContext context={context} /> : null}
 
       <div className="flex flex-wrap justify-between items-start gap-4 mb-gutter pb-density-comfortable border-b border-outline-variant">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">{type} · {record.source || sourceLabel(detail.table)}</span>
-            <SectorChip detail={detail} context={context} />
-          </div>
-          <h1 className="font-display-lg text-headline-md md:text-display-lg text-primary leading-tight">{title}</h1>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 font-data-tabular text-data-tabular text-on-surface-variant">
-            {record.entity ? <span>{entityUrl ? <Link href={withContext(entityUrl, context) ?? entityUrl} className="text-primary hover:underline focus-ring rounded">{record.entity}</Link> : record.entity}</span> : null}
-            {record.date ? <span>{record.date}</span> : null}
-            {record.amount ? <span className="text-primary">{moneyFull(record.amount)}</span> : null}
+        <div className="flex items-start gap-4 min-w-0">
+          {/* Source-typed colour tile — the record's category at a glance */}
+          <span className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0" style={{ background: vis.soft }}>
+            <span className="material-symbols-outlined text-[26px]" style={{ color: vis.color }} aria-hidden="true">{vis.icon}</span>
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+              <span className="font-label-caps text-label-caps uppercase" style={{ color: vis.color }}>{type}</span>
+              <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">· {record.source || sourceLabel(detail.table)}</span>
+              <SectorChip detail={detail} context={context} />
+            </div>
+            <h1 className="font-display-lg text-headline-md md:text-display-lg text-primary leading-tight">{title}</h1>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 font-data-tabular text-data-tabular text-on-surface-variant">
+              {record.entity ? <span>{entityUrl ? <Link href={withContext(entityUrl, context) ?? entityUrl} className="text-primary hover:underline focus-ring rounded">{record.entity}</Link> : record.entity}</span> : null}
+              {record.date ? <span>{record.date}</span> : null}
+              {record.amount ? <span className="font-bold" style={{ color: "var(--color-up)" }}>{moneyFull(record.amount)}</span> : null}
+            </div>
           </div>
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
@@ -65,29 +72,36 @@ export function RecordDossier({
         <div className="lg:col-span-8 space-y-gutter">
           {leadCard}
 
-          <Card icon="insights" title="Strategic Read">
+          {/* Strategic Read — the verdict, as a navy hero block that anchors the page */}
+          <section className="rounded-lg bg-primary text-white overflow-hidden shadow-sm">
+            <div className="px-density-comfortable py-density-compact border-b border-white/10 flex items-center justify-between gap-3">
+              <h2 className="font-label-caps text-label-caps uppercase tracking-wider text-white/70 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px]">insights</span> Strategic Read
+              </h2>
+              {signal ? <SignalMeter level={signal.level} score={signal.score} variant="onDark" /> : null}
+            </div>
             <div className="p-density-comfortable">
-              <p className="font-memo-body text-[16px] text-on-surface leading-relaxed">{assess?.strategic_read || "No strategic reading is available for this record."}</p>
+              <p className="font-memo-body text-[17px] leading-relaxed text-white/95">{assess?.strategic_read || "No strategic reading is available for this record."}</p>
               {signal?.drivers?.length ? (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {signal.drivers.map((d) => (
-                    <span key={d.label} className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-2.5 py-1 font-data-tabular text-[11px] text-on-surface-variant">
-                      <span className="font-label-caps text-on-surface uppercase tracking-wide">{d.label}</span>
-                      <span aria-hidden="true">·</span>
+                    <span key={d.label} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/15 px-2.5 py-1 font-data-tabular text-[11px] text-white/85">
+                      <span className="font-label-caps uppercase tracking-wide text-white">{d.label}</span>
+                      <span aria-hidden="true" className="text-white/40">·</span>
                       <span>{d.detail}</span>
                     </span>
                   ))}
                 </div>
               ) : null}
             </div>
-          </Card>
+          </section>
 
           {assess ? (
             <Card icon="psychology" title="Analysis">
               <div className="p-density-comfortable space-y-5">
-                <Beat label="What this means">{assess.means}</Beat>
-                <Beat label="Why it matters">{assess.matters}</Beat>
-                <Beat label={detail.industry ? `Impact on ${detail.industry.name}` : "Impact"}>{assess.impact}</Beat>
+                <Beat label="What this means" icon="lightbulb" accent="#2563eb">{assess.means}</Beat>
+                <Beat label="Why it matters" icon="priority_high" accent="#d97706">{assess.matters}</Beat>
+                <Beat label={detail.industry ? `Impact on ${detail.industry.name}` : "Impact"} icon="trending_up" accent="var(--color-primary)">{assess.impact}</Beat>
               </div>
             </Card>
           ) : null}
@@ -96,7 +110,7 @@ export function RecordDossier({
             <Card icon="flag" title="Cited In Findings">
               <div className="p-density-comfortable space-y-2">
                 {directFindings.slice(0, 4).map((f) => (
-                  <Link key={f.title} href={withContext(findingHref(f), context) ?? "/signals"} className="block rounded border border-outline-variant bg-surface-container-lowest px-3 py-2 hover:border-primary transition-colors focus-ring">
+                  <Link key={f.title} href={withContext(findingHref(f), context) ?? "/signals"} className="block rounded border border-outline-variant bg-surface-container-lowest px-3 py-2 border-l-2 hover:border-primary transition-colors focus-ring" style={{ borderLeftColor: "var(--color-error)" }}>
                     <div className="font-body-md text-body-md text-on-surface">{f.title}</div>
                     {f.summary ? <p className="font-body-md text-[12px] text-on-surface-variant mt-0.5 line-clamp-2">{f.summary}</p> : null}
                   </Link>
@@ -155,6 +169,8 @@ function ConnectionsRail({ detail, context }: { detail: RecordDetail; context: I
   const total = detail.relations.total ?? 0;
   const entity = detail.entity?.name ?? detail.record.entity ?? null;
   const entityUrl = entity ? entityHref(entity) : null;
+  const maxCount = Math.max(1, ...groups.map((g) => g.count));
+  const graphNodes = groups.slice(0, 7).map((g) => ({ label: g.label, value: g.count, color: sourceVisual(g.table, g.label).color }));
 
   return (
     <Card icon="hub" title="How It Connects" right={total ? <span className="font-data-tabular text-data-tabular text-primary">{total.toLocaleString()}</span> : undefined}>
@@ -163,9 +179,15 @@ function ConnectionsRail({ detail, context }: { detail: RecordDetail; context: I
           <p className="font-memo-body text-memo-body text-on-surface leading-relaxed border-l-2 border-primary/50 bg-primary/5 pl-3 py-1.5">{sig.insight}</p>
         ) : null}
 
+        {graphNodes.length >= 2 ? (
+          <EntityConnectionGraph center={entity ?? "Entity"} nodes={graphNodes} />
+        ) : null}
+
         {groups.length ? (
           <>
-            {groups.slice(0, 6).map((group) => <ConnGroupRow key={`${group.table}-${group.source}`} group={group} context={context} />)}
+            <div className="space-y-2.5">
+              {groups.slice(0, 6).map((group) => <ConnGroupRow key={`${group.table}-${group.source}`} group={group} maxCount={maxCount} context={context} />)}
+            </div>
             {entityUrl ? (
               <Link href={withContext(entityUrl, context) ?? entityUrl} className="inline-flex items-center gap-1 font-body-md text-body-md text-primary hover:underline focus-ring rounded">
                 Full {entity} profile
@@ -186,24 +208,32 @@ function ConnectionsRail({ detail, context }: { detail: RecordDetail; context: I
   );
 }
 
-function ConnGroupRow({ group, context }: { group: RelationGroup; context: InvestigationContextValue | null }) {
+function ConnGroupRow({ group, maxCount, context }: { group: RelationGroup; maxCount: number; context: InvestigationContextValue | null }) {
+  const vis = sourceVisual(group.table, group.label);
   return (
     <div className="rounded border border-outline-variant bg-surface-container-lowest p-3">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="font-label-caps text-label-caps text-on-surface-variant uppercase">{group.label}</div>
-        <span className="font-data-tabular text-data-tabular text-primary">{group.count.toLocaleString()}</span>
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="w-6 h-6 rounded flex items-center justify-center shrink-0" style={{ background: vis.soft }}>
+          <span className="material-symbols-outlined text-[15px]" style={{ color: vis.color }} aria-hidden="true">{vis.icon}</span>
+        </span>
+        <div className="font-label-caps text-label-caps text-on-surface uppercase flex-1 min-w-0 truncate">{group.label}</div>
+        <span className="font-data-tabular text-data-tabular" style={{ color: vis.color }}>{group.count.toLocaleString()}</span>
+      </div>
+      <div className="h-1 rounded-full mb-2 overflow-hidden" style={{ background: vis.soft }}>
+        <div className="h-full rounded-full" style={{ width: `${Math.max(6, (group.count / maxCount) * 100)}%`, background: vis.color }} />
       </div>
       <div className="space-y-1.5">
         {group.records.slice(0, 3).map((ref) => <RefLink key={`${ref.table}-${ref.pk}`} refItem={ref} context={context} />)}
       </div>
-      {group.partial ? <div className="mt-2 font-data-tabular text-[11px] text-on-surface-variant">Showing {Math.min(3, group.records.length)} of {group.count.toLocaleString()}</div> : null}
     </div>
   );
 }
 
 function LateralGroupRow({ group, context }: { group: LateralGroup; context: InvestigationContextValue | null }) {
+  const first = group.records[0];
+  const vis = sourceVisual(first?.table);
   return (
-    <div className="rounded border border-outline-variant bg-surface-container-lowest p-3">
+    <div className="rounded border border-outline-variant bg-surface-container-lowest p-3 border-l-2" style={{ borderLeftColor: vis.color }}>
       <div className="font-label-caps text-label-caps text-on-surface-variant uppercase mb-0.5">{group.label}</div>
       <div className="font-data-tabular text-[11px] text-on-surface-variant mb-2">{group.basis}</div>
       <div className="space-y-1.5">
@@ -231,13 +261,14 @@ function PeopleRail({ people, context }: { people: PlayerRef[]; context: Investi
     <Card icon="groups" title="People On This Record">
       <div className="p-density-comfortable space-y-3">
         {people.map((p) => {
+          const accent = p.type === "politician" ? partyVisual(p.party).color : "var(--color-primary)";
           const href = p.type === "politician" && p.slug ? withContext(personHref(p.slug), context) : null;
           const inner = (
-            <div className="flex items-start gap-3 rounded border border-outline-variant bg-surface-container-lowest p-3 transition-colors group-hover:border-primary">
-              <AvatarLogo name={p.name} imageUrl={p.photo_url} type="person" />
+            <div className="flex items-start gap-3 rounded border border-outline-variant bg-surface-container-lowest p-3 border-l-[3px] transition-colors group-hover:border-primary" style={{ borderLeftColor: accent }}>
+              <AvatarLogo name={p.name} imageUrl={p.photo_url} type="person" accent={accent} />
               <div className="min-w-0">
                 <div className="font-body-md text-body-md font-bold text-primary">{p.name}</div>
-                <div className="font-data-tabular text-data-tabular text-on-surface-variant">{[p.role, p.party].filter(Boolean).join(" · ") || p.type}</div>
+                <div className="font-data-tabular text-data-tabular" style={{ color: p.type === "politician" && p.party ? accent : "var(--color-on-surface-variant)" }}>{[p.role, p.party].filter(Boolean).join(" · ") || p.type}</div>
                 <p className="font-body-md text-[12px] text-on-surface-variant mt-1 line-clamp-2">{p.why}</p>
               </div>
             </div>
@@ -258,10 +289,17 @@ function GoverningRail({ regulators, sectorName, context }: { regulators: string
         <div className="flex flex-wrap gap-2">
           {regulators.map((name) => {
             const href = withContext(organizationHref("regulator", name), context);
+            const cls = "inline-flex items-center gap-1.5 font-body-md text-body-md rounded-full border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-on-surface";
+            const body = (
+              <>
+                <span className="material-symbols-outlined text-[15px] text-secondary" aria-hidden="true">account_balance</span>
+                {name}
+              </>
+            );
             return href ? (
-              <Link key={name} href={href} className="font-body-md text-body-md rounded-full border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-on-surface hover:border-primary hover:text-primary transition-colors focus-ring">{name}</Link>
+              <Link key={name} href={href} className={`${cls} hover:border-primary hover:text-primary transition-colors focus-ring`}>{body}</Link>
             ) : (
-              <span key={name} className="font-body-md text-body-md rounded-full border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-on-surface">{name}</span>
+              <span key={name} className={cls}>{body}</span>
             );
           })}
         </div>
@@ -275,15 +313,17 @@ function TimelineRail({ timeline, context }: { timeline: RecordRef[]; context: I
   if (items.length < 2) return null;
   return (
     <Card icon="timeline" title="Activity Timeline">
-      <div className="p-density-comfortable space-y-2">
+      <div className="p-density-comfortable space-y-2.5">
         {items.slice(0, 12).map((ref) => {
+          const vis = sourceVisual(ref.table, ref.source);
           const href = withContext(recordHref(ref.table, ref.pk), context);
           const inner = (
             <div className={`flex items-start gap-3 ${ref.current ? "" : "group"}`}>
-              <span className="font-data-tabular text-[11px] text-on-surface-variant w-20 shrink-0 pt-0.5">{ref.date}</span>
+              <span className="font-data-tabular text-[11px] text-on-surface-variant w-[68px] shrink-0 pt-0.5">{ref.date}</span>
+              <span className="w-2.5 h-2.5 rounded-full shrink-0 mt-1 ring-2 ring-surface-container-lowest" style={{ background: ref.current ? "var(--color-primary)" : vis.color }} aria-hidden="true" />
               <div className="min-w-0">
                 <div className={`font-body-md text-body-md truncate ${ref.current ? "text-primary font-bold" : "text-on-surface group-hover:text-primary transition-colors"}`}>{ref.title}</div>
-                <div className="font-data-tabular text-[11px] text-on-surface-variant">{ref.current ? "This record" : (ref.source || typeLabel(ref.table))}</div>
+                <div className="font-data-tabular text-[11px]" style={{ color: ref.current ? "var(--color-primary)" : vis.color }}>{ref.current ? "This record" : (ref.source || typeLabel(ref.table))}</div>
               </div>
             </div>
           );

@@ -48,35 +48,68 @@ export function Card({ icon, title, right, children, className = "" }: { icon?: 
   );
 }
 
-/* Calibrated signal-strength badge (Strong/Moderate/Low) — replaces the old
-   miscalibrated severity chip. Brass = strong (brand accent), amber = moderate,
-   dim = low. Colour denotes how much the record lights up the graph, not good/bad. */
-export function SignalBadge({ level, score }: { level: "strong" | "moderate" | "low"; score?: number }) {
-  const cfg = {
-    strong: { label: "Strong signal", dots: 3, cls: "text-primary border-primary/40 bg-primary/10" },
-    moderate: { label: "Moderate signal", dots: 2, cls: "text-warn border-warn/40 bg-warn/10" },
-    low: { label: "Low signal", dots: 1, cls: "text-on-surface-variant border-outline-variant bg-surface-container-low" },
-  }[level];
+const SIGNAL_CFG = {
+  strong: { label: "Strong", fill: 3, color: "var(--color-up)" },
+  moderate: { label: "Moderate", fill: 2, color: "var(--color-warn)" },
+  low: { label: "Low", fill: 1, color: "var(--color-outline)" },
+} as const;
+
+type SignalLevelName = keyof typeof SIGNAL_CFG;
+
+/* Calibrated signal-strength badge (compact, for header/inline use). */
+export function SignalBadge({ level, score }: { level: SignalLevelName; score?: number }) {
+  const cfg = SIGNAL_CFG[level];
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ${cfg.cls}`}>
+    <span className="inline-flex items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-3 py-1.5">
       <span className="flex items-center gap-0.5" aria-hidden="true">
         {[0, 1, 2].map((i) => (
-          <span key={i} className={`w-1.5 h-1.5 rounded-full bg-current ${i < cfg.dots ? "" : "opacity-25"}`} />
+          <span key={i} className="w-1.5 h-4 rounded-sm" style={{ background: i < cfg.fill ? cfg.color : "var(--color-outline-variant)" }} />
         ))}
       </span>
-      <span className="font-label-caps text-label-caps uppercase tracking-wide">{cfg.label}</span>
-      {typeof score === "number" ? <span className="font-data-tabular text-[11px] opacity-70">{score}</span> : null}
+      <span className="font-label-caps text-label-caps uppercase tracking-wide text-on-surface">{cfg.label} signal</span>
+      {typeof score === "number" ? <span className="font-data-tabular text-[11px] text-on-surface-variant">{score}</span> : null}
     </span>
   );
 }
 
-/* One labeled narrative beat — the building block of the "What does it mean? Why
-   does it matter? What is the impact?" reading. */
-export function Beat({ label, children }: { label: string; children: React.ReactNode }) {
+/* Signal-strength meter — a segmented bar with a score readout, for the hero
+   verdict block. `variant="onDark"` adapts label colours for the navy panel. */
+export function SignalMeter({ level, score, variant = "light" }: { level: SignalLevelName; score?: number; variant?: "light" | "onDark" }) {
+  const cfg = SIGNAL_CFG[level];
+  const onDark = variant === "onDark";
+  const trackEmpty = onDark ? "rgba(255,255,255,0.16)" : "var(--color-outline-variant)";
   return (
-    <div>
-      <div className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-1.5">{label}</div>
-      <p className="font-memo-body text-memo-body text-on-surface leading-relaxed">{children}</p>
+    <div className="flex items-center gap-3">
+      <div className="flex items-end gap-1" aria-hidden="true">
+        {[0, 1, 2].map((i) => (
+          <span key={i} className="w-2.5 rounded-sm" style={{ height: 10 + i * 7, background: i < cfg.fill ? cfg.color : trackEmpty }} />
+        ))}
+      </div>
+      <div className="leading-tight">
+        <div className={`font-label-caps text-label-caps uppercase tracking-wide ${onDark ? "text-white/60" : "text-on-surface-variant"}`}>Signal strength</div>
+        <div className="flex items-baseline gap-2">
+          <span className="font-display-lg text-[20px]" style={{ color: cfg.color }}>{cfg.label}</span>
+          {typeof score === "number" ? <span className={`font-data-tabular text-data-tabular ${onDark ? "text-white/50" : "text-on-surface-variant"}`}>{score}/100</span> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* One labeled narrative beat — the building block of the "What does it mean? Why
+   does it matter? What is the impact?" reading. An optional coloured icon gives
+   each beat a distinct visual anchor instead of an undifferentiated grey block. */
+export function Beat({ label, icon, accent, children }: { label: string; icon?: string; accent?: string; children: React.ReactNode }) {
+  const color = accent ?? "var(--color-on-surface-variant)";
+  return (
+    <div className="flex gap-3">
+      {icon ? (
+        <span className="material-symbols-outlined text-[20px] mt-0.5 shrink-0" style={{ color }} aria-hidden="true">{icon}</span>
+      ) : null}
+      <div className="min-w-0">
+        <div className="font-label-caps text-label-caps uppercase tracking-wider mb-1" style={{ color }}>{label}</div>
+        <p className="font-memo-body text-memo-body text-on-surface leading-relaxed">{children}</p>
+      </div>
     </div>
   );
 }
