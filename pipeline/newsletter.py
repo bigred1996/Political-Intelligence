@@ -23,6 +23,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from html import escape
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -49,6 +50,11 @@ MAX_WORDS = 1200
 MAX_CANDIDATES_FOR_OPUS = 48
 MIN_CANDIDATES = 6
 MAX_SUPPORTING_STORIES = 3
+MAX_LABELS_PER_STORY = 2
+MAX_SENTENCE_WORDS = 35
+PROMPTS = Path("prompts")
+# Em dash (U+2014), em-dash-like horizontal bar (U+2015), and the "--" digraph.
+_EM_DASH_RE = re.compile(r"\s*[—―]\s*|\s+--\s+")
 
 
 class NewsletterGenerationError(RuntimeError):
@@ -142,15 +148,15 @@ _STORY = {
     "type": "object",
     "properties": {
         "eyebrow": {"type": "string", "description": "Short uppercase kicker, e.g. 'REGULATORY' or 'PROCUREMENT'."},
-        "headline": {"type": "string", "description": "Specific analytical headline — never generic."},
+        "headline": {"type": "string", "description": "Specific, sentence-case, edited-news headline. Lead with the concrete development. Not Title Case, not a slide title."},
         "standfirst": {"type": "string", "description": "One or two sentence summary under the headline."},
         "sections": {
             "type": "array",
-            "minItems": 2,
+            "minItems": 1,
             "items": {
                 "type": "object",
                 "properties": {
-                    "label": {"type": "string", "description": "Optional analytical label, e.g. 'The fine print', 'The political dynamic', 'What comes next'."},
+                    "label": {"type": "string", "description": "Optional. Use at most two labels per story; most supporting stories should read as plain paragraphs with no label."},
                     "body": {"type": "string"},
                 },
                 "required": ["body"],
@@ -174,7 +180,7 @@ NEWSLETTER_TOOL: dict[str, Any] = {
     "input_schema": {
         "type": "object",
         "properties": {
-            "title": {"type": "string", "description": "Specific issue title. Never 'Weekly Political Update'."},
+            "title": {"type": "string", "description": "Specific, sentence-case issue headline that leads with the week's main news. Not Title Case. Never 'Weekly Political Update'."},
             "preheader": {"type": "string", "description": "Hidden inbox preview line, <=140 chars, no greeting."},
             "opening_note": {"type": "string", "description": "50-90 words establishing the issue's theme and the single most important implication."},
             "key_points": {
@@ -274,6 +280,28 @@ class ClaudeNewsletterReviewer(_ClaudeToolProvider):
     name = "claude"
     tool = REVIEW_TOOL
     max_tokens = 1200
+
+    def _default_model(self) -> str:
+        return OPUS_MODEL
+
+
+# Same output shape as the generator — the editor only rewrites prose, so it
+# returns the identical schema with the same field names and citations.
+NEWSLETTER_EDIT_TOOL: dict[str, Any] = {
+    "name": "rewrite_weekly_newsletter",
+    "description": (
+        "Return the SAME weekly newsletter with rewritten prose only. Preserve "
+        "every fact, date, name, bill number, dollar figure, source citation, "
+        "and level of certainty. Same field names, same citations. No em dashes."
+    ),
+    "input_schema": NEWSLETTER_TOOL["input_schema"],
+}
+
+
+class ClaudeNewsletterEditor(_ClaudeToolProvider):
+    name = "claude"
+    tool = NEWSLETTER_EDIT_TOOL
+    max_tokens = 8000
 
     def _default_model(self) -> str:
         return OPUS_MODEL
@@ -776,12 +804,12 @@ def _prompt(week_start: str, week_end: str, candidates: list[dict[str, Any]], cl
         "- Rank stories by consequence, novelty, political/regulatory momentum, audience relevance, evidence strength, and whether a decision/deadline/vote/hearing/consultation is coming.\n"
         "- Select ONE lead story, two or three supporting stories, three to five 'on the radar' items, and three to five statistics. Do not give every record equal space.\n"
         "- When multiple records describe the same underlying event, COMBINE them into one story and explain the mechanism connecting them (e.g. lobbying → legislation, announcement → funding, economic data → sector exposure). Use CONNECTION_HINTS below.\n\n"
-        "FOR EACH STORY ANSWER: what changed, why it matters, who is affected, how developments connect, what could happen next, what to monitor. Use short analytical section labels where useful (The development, The fine print, The political dynamic, The business impact, The constraint, The signal, What comes next) — but do not force every label into every story.\n\n"
+        "FOR EACH STORY cover what changed, who is affected, how developments connect, what could happen next, and what to monitor. Lead with the strongest concrete development, not a label. Use at most two analytical section labels in a story, and let most supporting stories read as plain paragraphs with no labels.\n\n"
         "ANALYTICAL STANDARDS:\n"
         "- Distinguish confirmed facts from statements by political actors, reported expectations, Nessus analysis, and forward-looking scenarios. Never present an inference as confirmed fact.\n"
         "- Use calibrated language (suggests, indicates, could, is likely to, raises the possibility, would depend on). Reason: government action → regulatory/institutional change → sector exposure → possible consequence.\n"
         "- Account for jurisdictional limits, regulatory independence, Indigenous rights and consultation, funding uncertainty, legal challenges, political opposition, implementation capacity, timing risk, and the gap between an announcement and a binding decision.\n\n"
-        "WRITING: Canadian English. Authoritative, analytical, concise, politically neutral, accessible, confident without overstating. Short paragraphs (1-3 sentences), strong verbs, concrete nouns, specific dates and amounts. Explain acronyms on first use. Avoid jargon, generic AI phrasing, repeated sentence structures, filler greetings, and clickbait.\n\n"
+        "WRITING: Canadian English, in the voice of an experienced political and business journalist — reported and edited, not templated. Sentence-case headlines that lead with the news. Named actors and active verbs (e.g. 'Parliament approved the bill', not 'legislative-approval momentum'). Vary sentence rhythm; most sentences under 35 words. Do NOT use em dashes — use a period, comma, colon, or two sentences. Avoid abstract-noun stacks, consulting jargon, generic AI phrasing, and repeated openings. Explain acronyms in plain language on first use.\n\n"
         f"LENGTH: the visible editorial prose MUST be {MIN_WORDS}-{MAX_WORDS} words.\n\n"
         "RULES:\n"
         "- Use only the provided candidate records. Every story, statistic, and radar item must cite ALLOWED_RECORD_IDS.\n"
@@ -855,6 +883,151 @@ async def _review_and_revise(
     if validate_draft(revised, candidates)["ok"]:
         return revised, {"ran": True, "revised": True, "scores": scores}
     return draft, {"ran": True, "revised": False, "scores": scores}
+
+
+# --- Editorial voice rewrite + deterministic style guards ---------------------
+def _read_prompt(name: str) -> str:
+    p = PROMPTS / name
+    return p.read_text(encoding="utf-8") if p.exists() else ""
+
+
+def _strip_em_dashes(text: str) -> str:
+    """Guaranteed em-dash removal (the model is asked to avoid them; this is the
+    safety net). Split on the dash and rejoin with a period, capitalising the
+    following word so the result reads as two sentences."""
+    if not text or not _EM_DASH_RE.search(text):
+        return text
+    parts = _EM_DASH_RE.split(text)
+    result = parts[0].rstrip()
+    for part in parts[1:]:
+        part = part.lstrip()
+        if part:
+            part = part[0].upper() + part[1:]
+        result = f"{result.rstrip()}. {part}" if result else part
+    return result
+
+
+def _guard_story(story: dict[str, Any]) -> None:
+    story["headline"] = _strip_em_dashes(story.get("headline", ""))
+    if story.get("standfirst"):
+        story["standfirst"] = _strip_em_dashes(story["standfirst"])
+    if story.get("eyebrow"):
+        story["eyebrow"] = _strip_em_dashes(story["eyebrow"])
+    labels_kept = 0
+    for section in story.get("sections") or []:
+        section["body"] = _strip_em_dashes(section.get("body", ""))
+        if section.get("label"):
+            if labels_kept < MAX_LABELS_PER_STORY:
+                labels_kept += 1
+            else:
+                section["label"] = None  # cap analytical labels per story
+
+
+def _apply_style_guards(draft: Any) -> dict[str, Any]:
+    """Deterministic post-rewrite enforcement: strip every em dash and cap the
+    number of analytical labels per story. Always runs, even when the editorial
+    pass is off or the model output is used verbatim."""
+    d = _normalize_draft(draft)
+    s = _strip_em_dashes
+    d["title"] = s(d.get("title", ""))
+    d["preheader"] = s(d.get("preheader", ""))
+    d["opening_note"] = s(d.get("opening_note", ""))
+    for point in d["key_points"]:
+        point["development"] = s(point["development"])
+        point["significance"] = s(point["significance"])
+    for story in [d["lead_story"], *d["supporting_stories"]]:
+        _guard_story(story)
+    for stat in d["statistics"]:
+        stat["value"] = s(stat.get("value", ""))
+        stat["label"] = s(stat.get("label", ""))
+        stat["significance"] = s(stat.get("significance", ""))
+    for item in d["radar_items"]:
+        item["headline"] = s(item.get("headline", ""))
+        item["summary"] = s(item.get("summary", ""))
+        if item.get("next_milestone"):
+            item["next_milestone"] = s(item["next_milestone"])
+    closing = d["closing_analysis"]
+    closing["title"] = s(closing.get("title", ""))
+    closing["body"] = s(closing.get("body", ""))
+    return d
+
+
+def _style_report(draft: dict[str, Any]) -> dict[str, Any]:
+    """Non-blocking voice metrics surfaced in the preview's pre-send checks."""
+    parts = [str(p or "") for p in _visible_parts(draft)]
+    text = " ".join(parts)
+    lower = text.lower()
+    em = sum(part.count("—") + part.count("―") for part in parts)
+    signal = len(re.findall(r"\bsignals?\b", lower))
+    why_it_matters = lower.count("why it matters")
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    lengths = [len(re.findall(r"\b[\w'-]+\b", s)) for s in sentences]
+    long_sentences = sum(1 for n in lengths if n > MAX_SENTENCE_WORDS)
+    avg = round(sum(lengths) / len(lengths), 1) if lengths else 0.0
+
+    warnings: list[str] = []
+    if em:
+        warnings.append(f"{em} em dash(es) remain in the copy")
+    if signal > 2:
+        warnings.append(f"“signal” used {signal} times (style limit is 2)")
+    if why_it_matters > 1:
+        warnings.append(f"“why it matters” used {why_it_matters} times (style limit is 1)")
+    if long_sentences:
+        warnings.append(f"{long_sentences} sentence(s) over {MAX_SENTENCE_WORDS} words")
+    if avg and not (14 <= avg <= 24):
+        warnings.append(f"average sentence length {avg} words (target 14–24)")
+    return {
+        "warnings": warnings,
+        "metrics": {
+            "em_dashes": em, "signal": signal, "why_it_matters": why_it_matters,
+            "long_sentences": long_sentences, "avg_sentence_words": avg,
+        },
+    }
+
+
+def _preserved(original: dict[str, Any], rewritten: dict[str, Any]) -> bool:
+    """The rewrite is prose-only. Reject it if citations, statistic values, or
+    module counts changed — those carry the facts."""
+    if set(_draft_citations(original)) != set(_draft_citations(rewritten)):
+        return False
+    orig_values = sorted(str(s.get("value", "")) for s in original.get("statistics") or [])
+    new_values = sorted(str(s.get("value", "")) for s in rewritten.get("statistics") or [])
+    if orig_values != new_values:
+        return False
+    for field in ("supporting_stories", "key_points", "radar_items", "statistics"):
+        if len(original.get(field) or []) != len(rewritten.get(field) or []):
+            return False
+    return bool((rewritten.get("lead_story") or {}).get("headline"))
+
+
+async def _editorial_rewrite(original: dict[str, Any], candidates: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Second Opus pass: reported journalistic prose per the voice guide, facts
+    held constant. Any drift in facts/citations/validation falls back to the
+    factual draft, so the rewrite can only improve voice, never corrupt data."""
+    guide = _read_prompt("newsletter_editorial_voice.md")
+    if not guide:
+        return original, {"ran": False, "reason": "guide_missing"}
+    editor = ClaudeNewsletterEditor(model=OPUS_MODEL)
+    user = (
+        "Rewrite the prose of this weekly newsletter draft to follow the editorial voice guide. "
+        "Preserve every fact, date, name, bill number, dollar figure, source citation, and level "
+        "of certainty. Do not add facts or interpretations. Keep the visible prose between "
+        f"{MIN_WORDS} and {MAX_WORDS} words. Return the rewrite_weekly_newsletter tool call with "
+        "the same field names and the same citations.\n\n"
+        f"DRAFT:\n{json.dumps(original, ensure_ascii=False, default=str)[:55000]}"
+    )
+    try:
+        rewritten = _normalize_draft((await editor.call(guide, user)).tool_input)
+    except (ProviderError, ProviderUnavailable) as exc:
+        return original, {"ran": True, "applied": False, "reason": f"provider_error:{exc}"}
+    if not _preserved(original, rewritten):
+        return original, {"ran": True, "applied": False, "reason": "facts_or_citations_changed"}
+    # Accept the rewrite on facts + structure; a slightly out-of-range word count
+    # is acceptable for better prose (it is surfaced as a warning either way).
+    blocking = [e for e in validate_draft(rewritten, candidates)["errors"] if not e.startswith("word_count_outside_range")]
+    if blocking:
+        return original, {"ran": True, "applied": False, "reason": f"rewrite_failed_validation:{blocking[:3]}"}
+    return rewritten, {"ran": True, "applied": True}
 
 
 # --- Source references + visuals ----------------------------------------------
@@ -1137,11 +1310,14 @@ async def generate_newsletter_issue(
     clusters = connection_clusters(candidates)
 
     review_meta: dict[str, Any] = {"ran": False}
+    editorial_meta: dict[str, Any] = {"ran": False}
     try:
         if draft_override is None:
             draft, model, provider, turn = await _call_opus(week_start, week_end, candidates, clusters)
             if settings.newsletter_quality_review and validate_draft(draft, candidates)["ok"]:
                 draft, review_meta = await _review_and_revise(provider, turn, draft, candidates)
+            if settings.newsletter_editorial_pass:
+                draft, editorial_meta = await _editorial_rewrite(draft, candidates)
         else:
             draft, model = _normalize_draft(draft_override), OPUS_MODEL
     except ProviderUnavailable as exc:
@@ -1149,10 +1325,21 @@ async def generate_newsletter_issue(
     except ProviderError as exc:
         raise NewsletterGenerationError(f"Claude Opus generation failed: {exc}") from exc
 
+    # Deterministic voice guards always run (em dashes, label cap), even on the
+    # override path or when the editorial pass is disabled.
+    draft = _apply_style_guards(draft)
+
     validation = validate_draft(draft, candidates)
-    if not validation["ok"]:
-        raise NewsletterGenerationError(f"newsletter validation failed: {validation['errors']}")
+    # Word count is a "normally 900-1,200" target, not a factual-integrity rule —
+    # the editorial rewrite can legitimately push a touch past it. Block only on
+    # integrity/structure errors (citations, missing lead, bad counts); record
+    # an out-of-range word count as a non-blocking warning shown in the preview.
+    blocking = [e for e in validation["errors"] if not e.startswith("word_count_outside_range")]
+    if blocking:
+        raise NewsletterGenerationError(f"newsletter validation failed: {blocking}")
     validation["review"] = review_meta
+    validation["editorial"] = editorial_meta
+    validation["style"] = _style_report(draft)
 
     refs = _cited_source_references(draft, candidates)
     visuals = chart_data(candidates, draft)

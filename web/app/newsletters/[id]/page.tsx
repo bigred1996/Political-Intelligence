@@ -182,6 +182,17 @@ export default function NewsletterDetail({ params }: { params: Promise<{ id: str
                 {data.validation.errors.map((item) => <li key={item}>{item}</li>)}
               </ul>
             ) : null}
+            {data.validation.editorial?.ran ? (
+              <div className="mt-3 text-[12px] text-on-surface-variant">
+                Editorial rewrite:{" "}
+                {data.validation.editorial.applied
+                  ? <span className="text-up">applied</span>
+                  : <span className="text-on-surface-variant">kept factual draft ({data.validation.editorial.reason ?? "no change"})</span>}
+                {typeof data.validation.style?.metrics?.avg_sentence_words === "number"
+                  ? ` · avg sentence ${data.validation.style.metrics.avg_sentence_words} words`
+                  : null}
+              </div>
+            ) : null}
           </section>
 
           {sections.key_points?.length ? (
@@ -301,6 +312,8 @@ function collectWarnings(data: NewsletterIssue): string[] {
   });
   if (!data.source_references?.length) warnings.push("No source references resolved for this issue.");
   if (!data.html?.includes("nessus-horizontal")) warnings.push("Masthead logo is missing from the rendered HTML.");
+  // Editorial voice checks (em dashes, label spam, repetition counters).
+  for (const w of data.validation.style?.warnings ?? []) warnings.push(w);
   return warnings;
 }
 

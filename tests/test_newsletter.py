@@ -174,6 +174,60 @@ def test_ref_for_candidate_defaults_blank_source_and_title():
     assert ref["source"] and ref["title"]  # non-empty so EvidenceReference validation passes
 
 
+# --- editorial voice pass + deterministic style guards ------------------------
+def test_strip_em_dashes_replaces_with_sentences():
+    assert newsletter._strip_em_dashes("Ottawa moved fast — the bill passed.") == "Ottawa moved fast. The bill passed."
+    assert "—" not in newsletter._strip_em_dashes("cost—about $3B—was approved")
+    assert newsletter._strip_em_dashes("no dash here") == "no dash here"
+
+
+def test_style_guards_strip_em_dashes_everywhere_and_cap_labels():
+    draft = _valid_draft()
+    draft["opening_note"] = "Parliament acted — quickly."
+    draft["lead_story"]["sections"] = [
+        {"label": "The development", "body": "A — B"},
+        {"label": "The mechanism", "body": "C"},
+        {"label": "The constraint", "body": "D"},
+        {"label": "What comes next", "body": "E"},
+    ]
+    guarded = newsletter._apply_style_guards(draft)
+    # no em dash survives anywhere in the visible prose
+    assert all("—" not in str(p) for p in newsletter._visible_parts(guarded))
+    # at most two labels remain on the lead story
+    labels = [s.get("label") for s in guarded["lead_story"]["sections"] if s.get("label")]
+    assert len(labels) <= newsletter.MAX_LABELS_PER_STORY
+
+
+def test_style_report_flags_overuse_and_long_sentences():
+    draft = _valid_draft()
+    draft["closing_analysis"]["body"] = "signal signal signal " + " ".join(f"w{i}" for i in range(40)) + "."
+    report = newsletter._style_report(draft)
+    assert report["metrics"]["signal"] >= 3
+    assert any("signal" in w for w in report["warnings"])
+    assert any("over" in w for w in report["warnings"])  # long sentence flagged
+
+
+def test_preserved_accepts_prose_only_rewrite_and_rejects_fact_changes():
+    original = _valid_draft()
+    # prose-only change keeps citations, stat values, and counts
+    rewrite = _valid_draft()
+    rewrite["lead_story"]["headline"] = "Ottawa locks in housing money before the summer break"
+    rewrite["opening_note"] = "A reworded opening that keeps the same facts."
+    assert newsletter._preserved(original, rewrite)
+    # changing a statistic value is a factual change -> rejected
+    bad_stat = _valid_draft()
+    bad_stat["statistics"][0]["value"] = "$9.9B"
+    assert not newsletter._preserved(original, bad_stat)
+    # adding a citation is rejected
+    bad_cite = _valid_draft()
+    bad_cite["lead_story"]["citations"] = [{"table": "bills", "pk": 1}, {"table": "bills", "pk": 2}]
+    assert not newsletter._preserved(original, bad_cite)
+
+
+def test_editorial_voice_guide_loads():
+    assert "No em dashes" in newsletter._read_prompt("newsletter_editorial_voice.md")
+
+
 def test_newsletter_api_list_and_detail_with_mocked_generate(tmp_path, monkeypatch):
     asyncio.run(_newsletter_api_list_and_detail_with_mocked_generate(tmp_path, monkeypatch))
 

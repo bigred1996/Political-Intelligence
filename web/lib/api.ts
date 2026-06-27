@@ -802,7 +802,17 @@ export interface NewsletterIssue extends NewsletterSummary {
   visuals: NewsletterVisuals;
   evidence: Record<string, unknown>;
   source_references: EvidenceRef[];
-  validation: { ok?: boolean; errors?: string[]; word_count?: number; review?: Record<string, unknown> };
+  validation: {
+    ok?: boolean;
+    errors?: string[];
+    word_count?: number;
+    review?: Record<string, unknown>;
+    editorial?: { ran?: boolean; applied?: boolean; reason?: string };
+    style?: {
+      warnings?: string[];
+      metrics?: { em_dashes?: number; signal?: number; why_it_matters?: number; long_sentences?: number; avg_sentence_words?: number };
+    };
+  };
   html: string;
 }
 

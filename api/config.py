@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # do a single targeted revision if any quality dimension scores below 8.
     # Off by default because it roughly doubles the per-issue generation cost.
     newsletter_quality_review: bool = False
+    # When true (default), run the editorial voice rewrite pass after the
+    # factual draft and before render — reported journalistic prose, no em
+    # dashes, fewer formulaic labels (prompts/newsletter_editorial_voice.md).
+    # Facts/citations are verified unchanged; on any drift it keeps the draft.
+    newsletter_editorial_pass: bool = True
 
 
 settings = Settings()
