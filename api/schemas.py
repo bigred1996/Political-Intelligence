@@ -425,6 +425,41 @@ class ReportListResponse(APIModel):
     reports: list[ReportSummary] = Field(default_factory=list)
 
 
+class NewsletterGenerateBody(APIModel):
+    week_start: str | None = None
+    week_end: str | None = None
+
+
+class NewsletterSummary(APIModel):
+    id: str
+    week_start: str
+    week_end: str
+    title: str
+    status: str
+    generated_by: str
+    model: str
+    word_count: int
+    created_at: str
+
+
+class NewsletterIssueResponse(NewsletterSummary):
+    sections: dict[str, Any] = Field(default_factory=dict)
+    visuals: dict[str, Any] = Field(default_factory=dict)
+    evidence: dict[str, Any] = Field(default_factory=dict)
+    source_references: list[EvidenceReference] = Field(default_factory=list)
+    validation: dict[str, Any] = Field(default_factory=dict)
+    html: str = ""
+
+
+class NewsletterListResponse(APIModel):
+    count: int = Field(ge=0)
+    issues: list[NewsletterSummary] = Field(default_factory=list)
+
+
+class NewsletterGenerateResponse(NewsletterIssueResponse):
+    pass
+
+
 class IngestStartedResponse(APIModel):
     status: str
     max_rows: int | str | None = None

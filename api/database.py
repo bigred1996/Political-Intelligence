@@ -34,7 +34,7 @@ async def init_db() -> None:
     # Import models so they register on Base.metadata before create_all.
     from .models import (  # noqa: F401
         appointment, catalogue_entry, contract, donation, entity, grant, hansard_speech,
-        interpretation, ocl_registration, politician, regulation, report, request,
+        interpretation, newsletter, ocl_registration, politician, regulation, report, request,
         record_link, research_run, retrieval_set, review, scheduler_log, source_record,
         statcan_observation,
     )
