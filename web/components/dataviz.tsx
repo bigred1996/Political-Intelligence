@@ -58,8 +58,12 @@ export function CanadaMap({
       {geo.features.map((f, i) => {
         const code = NAME2CODE[f.properties.name];
         const v = code ? byCode[code] || 0 : 0;
-        const t = v > 0 ? 0.18 + 0.82 * (v / max) : 0;
-        const fill = v > 0 ? hexLerp("#15263f", "#f1c232", t) : "#0c1626";
+        // Single-hue sequential scale (light slate → Parliament Navy) — a
+        // two-hue lerp (e.g. navy→gold) crosses a muddy, off-brand olive
+        // band partway through; sequential choropleths read more clearly
+        // and stay on-palette at every magnitude.
+        const t = v > 0 ? 0.22 + 0.78 * (v / max) : 0;
+        const fill = v > 0 ? hexLerp("#cdd8ea", "#041632", t) : "var(--color-surface-container-low)";
         const isSel = selected === code;
         return (
           <path
@@ -67,8 +71,8 @@ export function CanadaMap({
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             d={path(f as any) || undefined}
             fill={fill}
-            stroke={isSel ? "var(--color-brass-bright)" : "#1c2c46"}
-            strokeWidth={isSel ? 1.8 : 0.6}
+            stroke={isSel ? "var(--color-primary)" : "var(--color-surface)"}
+            strokeWidth={isSel ? 1.8 : 1}
             style={{ cursor: onSelect && code ? "pointer" : "default", transition: "fill .3s" }}
             onClick={() => onSelect && code && onSelect(isSel ? null : code)}
           >

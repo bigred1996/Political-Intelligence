@@ -162,7 +162,7 @@ export function InterpretationBadge({ value }: { value: string }) {
 
 export function SourceTag({ children }: { children: React.ReactNode }) {
   return (
-    <span className="mono inline-block text-[10px] uppercase tracking-wide text-fg-dim rounded-md px-1.5 py-0.5 bg-panel-2">
+    <span className="mono inline-block text-[10px] uppercase tracking-wide text-on-surface-variant rounded px-1.5 py-0.5 bg-surface-container-high">
       {children}
     </span>
   );
@@ -249,11 +249,11 @@ export function MetricCard({
 }) {
   const toneColor = tone === "up" ? "var(--color-up)" : tone === "down" ? "var(--color-down)" : tone === "warn" ? "var(--color-warn)" : "var(--color-brass)";
   const body = (
-    <div className="panel p-[18px] min-h-[104px] transition-shadow hover:shadow-[0_1px_2px_rgba(30,32,28,.05),0_10px_28px_rgba(30,32,28,.08)]">
+    <div className="panel card-level-2 p-4 min-h-[104px]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[13px] text-fg-dim truncate">{label}</div>
-          <div className="text-[30px] leading-none font-bold text-fg-bright tracking-[-0.02em] mt-3">{value}</div>
+          <div className="font-label-caps text-label-caps uppercase text-on-surface-variant truncate">{label}</div>
+          <div className="text-[30px] leading-none font-bold text-on-surface tracking-[-0.02em] mt-3">{value}</div>
           {change ? <div className="mono text-[11px] mt-2.5" style={{ color: toneColor }}>{change}</div> : null}
         </div>
         {spark?.length ? <Sparkline data={spark} color={toneColor} /> : null}
@@ -317,7 +317,7 @@ export function EvidenceRows({
 export function FindingCard({ finding, href }: { finding: IntelligenceFinding; href?: string }) {
   const evidence = finding.related_records ?? [];
   return (
-    <article className="signal-card p-4 h-full hover:shadow-md transition-shadow">
+    <article className="signal-card card-level-2 p-4 h-full">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap gap-1.5 mb-2">
@@ -373,13 +373,18 @@ export function TimelineItem({ title, meta, href }: { title: string; meta?: stri
   return href ? <Link href={href} className="block hover:bg-panel-2 rounded px-1 focus-ring">{body}</Link> : body;
 }
 
-export function EmptyState({ children }: { children: React.ReactNode }) {
-  return <div className="text-sm text-fg-dim text-center py-6 rounded-lg bg-panel-2">{children}</div>;
+export function EmptyState({ children, icon = "inbox" }: { children: React.ReactNode; icon?: string }) {
+  return (
+    <div className="flex flex-col items-center gap-2 text-center py-8 px-4 rounded-lg border border-dashed border-outline-variant bg-surface-container-low/60">
+      <span className="material-symbols-outlined text-[22px] text-outline" aria-hidden="true">{icon}</span>
+      <p className="text-body-sm text-on-surface-variant max-w-sm">{children}</p>
+    </div>
+  );
 }
 
 export function Pill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-block text-[11.5px] text-fg-dim rounded-lg px-2.5 py-1 bg-panel-2">
+    <span className="inline-block font-body-sm text-body-sm text-on-surface-variant rounded px-2 py-0.5 bg-surface-container-high">
       {children}
     </span>
   );

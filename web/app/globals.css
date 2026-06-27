@@ -1,11 +1,14 @@
 @import "tailwindcss";
 
 /* ── Nessus Intelligence — "Intelligence Grade" design system ───────────
-   Exact replication of the designer's Tailwind config: Material-Design
-   token names (primary = Parliament Navy #041632), Public Sans for the
-   interface, Source Serif 4 for headlines/memos, tonal-layer cards with a
-   soft metallic border. Token names match the mockup class strings verbatim
-   (text-on-surface-variant, bg-surface-container-low, font-display-lg, …). */
+   Material-Design token names (primary = Parliament Navy #041632), tonal-
+   layer cards with a soft metallic border. Token names match the mockup
+   class strings verbatim (text-on-surface-variant, bg-surface-container-low,
+   font-display-lg, …). Three-typeface pairing: Source Serif 4 for headlines
+   and memo/narrative prose (editorial authority), Public Sans for interface
+   labels and body copy (neutral, highly legible at small sizes), JetBrains
+   Mono for data/IDs/dates/scores/citations (font-data-tabular / .mono) so
+   evidence reads as distinct from analyst prose at a glance. */
 @theme {
   /* Primary — Parliament Navy */
   --color-primary: #041632;
@@ -58,7 +61,10 @@
   --color-inverse-surface: #2d3133;
   --color-inverse-on-surface: #eff1f3;
 
-  --color-outline: #75777e;
+  /* Dimmest text/icon grey — darkened from #75777e so meta labels clear AA
+     even on tinted surface-container fills (the old value failed grey-on-grey).
+     Ladder stays: on-surface #191c1e > on-surface-variant #44474d > outline. */
+  --color-outline: #5f636c;
   --color-outline-variant: #c5c6ce;
   --color-background: #f7f9fb;
   --color-on-background: #191c1e;
@@ -78,18 +84,26 @@
   --font-body-md: var(--font-public-sans);
   --font-body-sm: var(--font-public-sans);
   --font-label-caps: var(--font-public-sans);
-  --font-data-tabular: var(--font-public-sans);
+  /* Data, IDs, citations and technical metadata read in the loaded mono face
+     (JetBrains Mono) — not Public Sans tabular — so evidence/provenance text
+     is visually distinct from narrative prose at a glance. */
+  --font-data-tabular: var(--font-mono-data);
 
-  /* Type scale (size + companion line-height / weight / tracking) */
-  --text-display-lg: 48px;
-  --text-display-lg--line-height: 56px;
+  /* Type scale (size + companion line-height / weight / tracking).
+     Restrained editorial scale — a dense intelligence terminal leads with data,
+     not billboard headlines. Page h1 tops out at 34px (was 48px); section heads
+     step down cleanly from there. */
+  --text-display-lg: 34px;
+  --text-display-lg--line-height: 40px;
   --text-display-lg--letter-spacing: -0.02em;
   --text-display-lg--font-weight: 600;
-  --text-headline-md: 32px;
-  --text-headline-md--line-height: 40px;
+  --text-headline-md: 26px;
+  --text-headline-md--line-height: 32px;
+  --text-headline-md--letter-spacing: -0.015em;
   --text-headline-md--font-weight: 600;
-  --text-headline-sm: 24px;
-  --text-headline-sm--line-height: 32px;
+  --text-headline-sm: 20px;
+  --text-headline-sm--line-height: 28px;
+  --text-headline-sm--letter-spacing: -0.01em;
   --text-headline-sm--font-weight: 600;
   --text-memo-body: 18px;
   --text-memo-body--line-height: 28px;
@@ -102,6 +116,7 @@
   --text-body-md--font-weight: 400;
   --text-body-sm: 12px;
   --text-body-sm--line-height: 16px;
+  --text-body-sm--font-weight: 400;
   --text-label-caps: 11px;
   --text-label-caps--line-height: 16px;
   --text-label-caps--letter-spacing: 0.05em;
@@ -119,6 +134,20 @@
   --spacing-margin-mobile: 16px;
   --spacing-margin-desktop: 40px;
 
+  /* Radius — institutional, not consumer. Controls/chips 4px, cards 6px.
+     Nothing in primary content rounds past `lg`; `xl` is retired from the
+     workspace surface (it read as startup/SaaS). */
+  --radius-sm: 0.25rem;
+  --radius: 0.25rem;
+  --radius-md: 0.3125rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+
+  /* Elevation — ONE canonical card shadow, navy-tinted (not flat black) so
+     lifts read as cohesive with the brand rather than a generic drop shadow.
+     Use var(--shadow-card); never hand-roll a new shadow stack per component. */
+  --shadow-card: 0 1px 2px rgba(4, 22, 50, 0.05), 0 8px 24px rgba(4, 22, 50, 0.07);
+
   /* ── Back-compat aliases (so not-yet-rebuilt pages stay on-palette) ── */
   --color-canvas: #f7f9fb;
   --color-panel: #ffffff;
@@ -127,7 +156,7 @@
   --color-line-soft: #eef1f5;
   --color-fg: #44474d;
   --color-fg-bright: #191c1e;
-  --color-fg-dim: #75777e;
+  --color-fg-dim: #5f636c;
   --color-brass: #041632;
   --color-brass-bright: #1b2b48;
   --color-brass-700: #041632;
@@ -149,8 +178,8 @@
   --color-amber-soft: #fef3c7;
   --color-info: #505f76;
   --color-info-soft: #d0e1fb;
-  --color-muted: #75777e;
-  --color-muted-2: #8a8d94;
+  --color-muted: #5f636c;
+  --color-muted-2: #7b7f88;
 
   /* Brand "deliverable" palette (reports / print) — kept for /briefings */
   --color-navy: #0b1d36;
@@ -185,8 +214,8 @@
 /* Editorial serif helper */
 .font-display, .serif { font-family: var(--font-display), Georgia, "Times New Roman", serif; }
 
-/* "mono"/data type — the design uses Public Sans tabular, not a monospace */
-.mono { font-family: var(--font-data-tabular), system-ui, sans-serif; font-feature-settings: "tnum"; letter-spacing: 0.01em; }
+/* "mono"/data type — JetBrains Mono, for IDs, dates, scores, citations */
+.mono { font-family: var(--font-data-tabular), ui-monospace, "SF Mono", Menlo, monospace; font-feature-settings: "tnum"; letter-spacing: 0.01em; }
 
 /* Material Symbols */
 .material-symbols-outlined {
@@ -202,7 +231,7 @@
 /* ── Cards (Level-1 surface + Level-2 hover lift) ── */
 .card-level-1 { background-color: var(--color-surface-container-lowest); border: 1px solid var(--color-hairline); }
 .card-level-2 { transition: box-shadow 0.2s ease, border-color 0.2s ease; }
-.card-level-2:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-color: var(--color-primary); }
+.card-level-2:hover { box-shadow: var(--shadow-card); border-color: var(--color-primary); }
 
 .glass-panel {
   background: rgba(255,255,255,0.7);
@@ -221,21 +250,21 @@
 .panel {
   background: var(--color-surface-container-lowest);
   border: 1px solid var(--color-hairline);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-lg);
   box-shadow: none;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .panel-head {
   display: flex; align-items: center; gap: 0.5rem;
-  min-height: 44px;
-  padding: 0.75rem 1rem;
+  min-height: 40px;
+  padding: 0.5rem 1rem;
   border-bottom: 1px solid var(--color-hairline);
   background: var(--color-surface-container-low);
-  border-radius: 0.5rem 0.5rem 0 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
-.panel-dark { background: var(--color-primary-container); color: var(--color-on-primary); border: 1px solid var(--color-primary-container); border-radius: 0.5rem; }
-.panel-accent { background: var(--color-primary); color: #fff; border-radius: 0.5rem; }
-.signal-card { background: var(--color-surface-container-lowest); border: 1px solid var(--color-hairline); border-radius: 0.5rem; }
+.panel-dark { background: var(--color-primary-container); color: var(--color-on-primary); border: 1px solid var(--color-primary-container); border-radius: var(--radius-lg); }
+.panel-accent { background: var(--color-primary); color: #fff; border-radius: var(--radius-lg); }
+.signal-card { background: var(--color-surface-container-lowest); border: 1px solid var(--color-hairline); border-radius: var(--radius-lg); }
 .app-shell { background: var(--color-background); }
 
 .eyebrow {

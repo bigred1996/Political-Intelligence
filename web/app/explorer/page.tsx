@@ -171,7 +171,7 @@ function buildExplorerNodes(findings: GraphFinding[]): ExplorerNode[] {
 function GraphNode({ node, primary }: { node: ExplorerNode; primary: boolean }) {
   const body = (
     <div
-      className={`${primary ? "w-24 h-24 rounded-xl bg-primary text-on-primary" : node.type === "record" ? "w-14 h-14 rounded-lg bg-secondary-container text-secondary border border-secondary/40" : "w-14 h-14 rounded-full bg-error-container text-error border border-error/40"} flex items-center justify-center shadow-lg`}
+      className={`${primary ? "w-24 h-24 rounded-lg bg-primary text-on-primary" : node.type === "record" ? "w-14 h-14 rounded-lg bg-secondary-container text-secondary border border-secondary/40" : "w-14 h-14 rounded-full bg-error-container text-error border border-error/40"} flex items-center justify-center shadow-sm`}
       title={node.label}
     >
       <span className="material-symbols-outlined text-[24px]">{nodeIcon(node.type)}</span>

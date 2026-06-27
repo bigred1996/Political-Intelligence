@@ -159,7 +159,7 @@ export default function IntelligenceDashboard() {
           {watched.map((slug) => {
             const meta = watchlistMeta[slug];
             return (
-              <span key={slug} className="inline-flex items-center gap-1 rounded-full border border-outline-variant bg-surface-container-lowest pl-3 pr-1 py-1">
+              <span key={slug} className="inline-flex items-center gap-1 rounded border border-outline-variant bg-surface-container-lowest pl-2.5 pr-1 py-0.5">
                 <Link href={sLink(slug)} className="font-body-md text-[13px] text-primary hover:underline focus-ring rounded">
                   {meta?.sector.name ?? slug}
                 </Link>
@@ -361,7 +361,7 @@ function PageHead({ cache, ttl }: { cache?: string; ttl?: number }) {
   return (
     <div className="flex flex-wrap justify-between items-end gap-4 border-b border-outline-variant pb-3">
       <div>
-        <h1 className="font-sans font-semibold text-headline-md md:text-display-lg text-primary leading-tight tracking-tight">Intelligence Dashboard</h1>
+        <h1 className="font-display-lg text-headline-md md:text-display-lg text-primary leading-tight">Intelligence Dashboard</h1>
         <p className="font-body-lg text-body-lg text-on-surface-variant mt-1">What changed, what matters commercially, and what to investigate next — across Canadian political &amp; regulatory sources.</p>
       </div>
       <div className="text-right shrink-0">
@@ -388,9 +388,8 @@ function IntelligenceSummary({
   const confidence = sourceStatus?.quality?.confidence;
   const scoped = scope.region !== ALL || scope.sector !== ALL;
   return (
-    <section aria-label="Intelligence summary" className="card-level-1 rounded-lg p-5 relative overflow-hidden">
-      <div className="absolute right-0 top-0 w-56 h-full bg-gradient-to-l from-surface-container-low to-transparent pointer-events-none opacity-60" />
-      <div className="relative">
+    <section aria-label="Intelligence summary" className="card-level-1 rounded-lg p-5">
+      <div>
         <div className="flex items-center justify-between gap-3 mb-3">
           <h2 className="font-sans text-[18px] font-semibold tracking-tight text-primary flex items-center gap-2">
             <span className="material-symbols-outlined text-[19px] text-on-surface-variant">summarize</span> Intelligence summary
@@ -417,7 +416,7 @@ function IntelligenceSummary({
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">Requires attention</span>
                 {data!.what_changed!.requires_attention!.map((s) => (
-                  <Link key={s.slug} href={sectorHref(s.slug) ?? "/sectors"} className="font-data-tabular text-data-tabular text-primary border border-outline-variant rounded-full px-2.5 py-0.5 hover:border-primary transition-colors focus-ring">
+                  <Link key={s.slug} href={sectorHref(s.slug) ?? "/sectors"} className="font-data-tabular text-data-tabular text-primary border border-outline-variant rounded px-2.5 py-0.5 hover:border-primary transition-colors focus-ring">
                     {s.name}
                   </Link>
                 ))}
@@ -660,13 +659,13 @@ function RiskChip({ level }: { level?: string | null }) {
     : l.includes("moderate") || l.includes("medium") || l.includes("watch")
     ? "status-chip-amber"
     : "status-chip-green";
-  return <span className={`font-label-caps text-label-caps ${cls} px-2 py-0.5 rounded-full uppercase`}>{level ?? "unknown"}</span>;
+  return <span className={`font-label-caps text-label-caps ${cls} px-2 py-0.5 rounded uppercase`}>{level ?? "unknown"}</span>;
 }
 
 function HealthPill({ tone, label }: { tone: "up" | "warn" | "neutral" | "muted"; label: string }) {
   const color = tone === "up" ? "var(--color-up)" : tone === "warn" ? "var(--color-warn)" : tone === "muted" ? "var(--color-on-surface-variant)" : "var(--color-on-surface-variant)";
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-outline-variant px-2 py-0.5">
+    <span className="inline-flex items-center gap-1 rounded border border-outline-variant px-2 py-0.5">
       <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />{label}
     </span>
   );

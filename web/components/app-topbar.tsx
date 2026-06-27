@@ -51,7 +51,7 @@ export function AppTopBar() {
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search bills, sectors, MPs…"
               aria-label="Global search"
-              className="w-full bg-surface-container-low border border-outline-variant rounded-full py-1.5 pl-10 pr-4 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+              className="w-full bg-surface-container-low border border-outline-variant rounded py-1.5 pl-10 pr-4 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
             />
           </form>
 
@@ -59,17 +59,18 @@ export function AppTopBar() {
             <button
               type="button"
               aria-label="Notifications"
-              className="w-9 h-9 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-all"
+              className="w-9 h-9 flex items-center justify-center rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors"
             >
               <span className="material-symbols-outlined text-[20px]">notifications</span>
             </button>
             <button
               type="button"
               onClick={() => window.print()}
-              aria-label="History"
-              className="hidden sm:flex w-9 h-9 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-all"
+              aria-label="Print this view"
+              title="Print this view"
+              className="hidden sm:flex w-9 h-9 items-center justify-center rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors"
             >
-              <span className="material-symbols-outlined text-[20px]">history</span>
+              <span className="material-symbols-outlined text-[20px]">print</span>
             </button>
             <div className="w-8 h-8 rounded-full bg-secondary-container border border-outline-variant ml-1 flex items-center justify-center text-[12px] font-bold text-on-secondary-container">
               AM

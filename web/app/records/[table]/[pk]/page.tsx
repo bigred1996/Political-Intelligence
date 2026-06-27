@@ -1,7 +1,7 @@
 import { RecordDossier, investigationContext, recordTypeLabel, type ParamGetter } from "@/components/record-dossier";
 import type { EvidenceGraphResponse, RecordDetail } from "@/lib/api";
 
-const API_BASE = process.env.POLARIS_API_BASE ?? "http://127.0.0.1:8078";
+const API_BASE = process.env.POLARIS_API_BASE ?? "http://127.0.0.1:8077";
 
 type PageSearchParams = Record<string, string | string[] | undefined>;
 

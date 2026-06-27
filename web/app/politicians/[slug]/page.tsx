@@ -145,7 +145,7 @@ export default function MPProfile({ params }: { params: Promise<{ slug: string }
 
         <div className="lg:col-span-4 flex flex-col gap-gutter">
           <section className="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden relative shadow-sm">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-secondary to-primary-container" />
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
             <div className="p-6">
               <h2 className="font-headline-sm text-[20px] font-semibold text-on-surface mb-1">Profile Data</h2>
               <p className="font-body-md text-body-md text-on-surface-variant mb-6">Important normalized fields</p>

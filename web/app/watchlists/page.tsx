@@ -53,7 +53,7 @@ export default function WatchlistsPage() {
 
       {error ? <Message tone="error">{error}</Message> : null}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter items-start">
         <section className="lg:col-span-2 card-level-1 rounded-lg overflow-hidden">
           <div className="bg-surface-container-low px-density-comfortable py-density-compact border-b border-outline-variant flex justify-between items-center gap-3">
             <h2 className="font-headline-sm text-headline-sm text-primary">Active Watchlists</h2>

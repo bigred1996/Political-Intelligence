@@ -60,7 +60,7 @@ type SignalLevelName = keyof typeof SIGNAL_CFG;
 export function SignalBadge({ level, score }: { level: SignalLevelName; score?: number }) {
   const cfg = SIGNAL_CFG[level];
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-3 py-1.5">
+    <span className="inline-flex items-center gap-2 rounded border border-outline-variant bg-surface-container-lowest px-2.5 py-1">
       <span className="flex items-center gap-0.5" aria-hidden="true">
         {[0, 1, 2].map((i) => (
           <span key={i} className="w-1.5 h-4 rounded-sm" style={{ background: i < cfg.fill ? cfg.color : "var(--color-outline-variant)" }} />

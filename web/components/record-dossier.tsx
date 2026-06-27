@@ -72,29 +72,39 @@ export function RecordDossier({
         <div className="lg:col-span-8 space-y-gutter">
           {leadCard}
 
-          {/* Strategic Read — the verdict, as a navy hero block that anchors the page */}
-          <section className="rounded-lg bg-primary text-white overflow-hidden shadow-sm">
-            <div className="px-density-comfortable py-density-compact border-b border-white/10 flex items-center justify-between gap-3">
-              <h2 className="font-label-caps text-label-caps uppercase tracking-wider text-white/70 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px]">insights</span> Strategic Read
-              </h2>
-              {signal ? <SignalMeter level={signal.level} score={signal.score} variant="onDark" /> : null}
-            </div>
-            <div className="p-density-comfortable">
-              <p className="font-memo-body text-[17px] leading-relaxed text-white/95">{assess?.strategic_read || "No strategic reading is available for this record."}</p>
-              {signal?.drivers?.length ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {signal.drivers.map((d) => (
-                    <span key={d.label} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/15 px-2.5 py-1 font-data-tabular text-[11px] text-white/85">
-                      <span className="font-label-caps uppercase tracking-wide text-white">{d.label}</span>
-                      <span aria-hidden="true" className="text-white/40">·</span>
-                      <span>{d.detail}</span>
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </section>
+          {/* Strategic Read — the verdict, as a navy hero block that anchors the
+              page. When there is no real assessment yet, drop to a quiet
+              outlined card instead of rendering an empty state at full hero
+              weight (which reads as a broken/loading block, not "nothing here"). */}
+          {assess?.strategic_read ? (
+            <section className="rounded-lg bg-primary text-white overflow-hidden shadow-sm">
+              <div className="px-density-comfortable py-density-compact border-b border-white/10 flex items-center justify-between gap-3">
+                <h2 className="font-label-caps text-label-caps uppercase tracking-wider text-white/70 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px]">insights</span> Strategic Read
+                </h2>
+                {signal ? <SignalMeter level={signal.level} score={signal.score} variant="onDark" /> : null}
+              </div>
+              <div className="p-density-comfortable">
+                <p className="font-memo-body text-[17px] leading-relaxed text-white/95">{assess.strategic_read}</p>
+                {signal?.drivers?.length ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {signal.drivers.map((d) => (
+                      <span key={d.label} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/15 px-2.5 py-1 font-data-tabular text-[11px] text-white/85">
+                        <span className="font-label-caps uppercase tracking-wide text-white">{d.label}</span>
+                        <span aria-hidden="true" className="text-white/40">·</span>
+                        <span>{d.detail}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          ) : (
+            <section className="rounded-lg border border-dashed border-outline-variant bg-surface-container-low/60 px-density-comfortable py-density-compact flex items-center gap-3">
+              <span className="material-symbols-outlined text-[18px] text-on-surface-variant shrink-0" aria-hidden="true">insights</span>
+              <p className="font-body-md text-body-md text-on-surface-variant italic">No strategic reading is available for this record yet.</p>
+            </section>
+          )}
 
           {assess ? (
             <Card icon="psychology" title="Analysis">

@@ -83,10 +83,10 @@ export default function SourceDetailPage({ params }: { params: Promise<{ id: str
       </section>
 
       {data.known_gaps.length ? (
-        <Panel bodyClass="p-[22px]">
+        <Panel bodyClass="p-5">
           <SectionHeader title="Known gaps" subtitle="These limits should temper interpretation and diligence conclusions." />
           <div className="grid md:grid-cols-2 gap-2">
-            {data.known_gaps.map((gap) => <div key={gap} className="rounded-xl border border-line bg-panel-2 p-3 text-[13px] text-fg/90 leading-snug">{gap}</div>)}
+            {data.known_gaps.map((gap) => <div key={gap} className="rounded-lg border border-line bg-panel-2 p-3 text-[13px] text-fg/90 leading-snug">{gap}</div>)}
           </div>
         </Panel>
       ) : null}
@@ -106,7 +106,7 @@ export default function SourceDetailPage({ params }: { params: Promise<{ id: str
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-line bg-panel-2 p-3 min-w-0">
+    <div className="rounded-lg border border-line bg-panel-2 p-3 min-w-0">
       <div className="mono text-[10px] text-muted uppercase">{label}</div>
       <div className="text-[13px] font-semibold text-fg-bright mt-1 break-words">{value}</div>
     </div>

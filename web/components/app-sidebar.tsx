@@ -37,13 +37,13 @@ function NavRow({ item, active }: { item: Item; active: boolean }) {
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
-      className={`flex items-center gap-density-comfortable px-density-compact py-density-compact rounded-lg cursor-pointer active:scale-95 transition-colors duration-200 ${
+      className={`flex items-center gap-density-comfortable px-density-compact py-1.5 rounded cursor-pointer transition-colors duration-150 ${
         active
-          ? "text-primary font-bold border-r-4 border-primary bg-primary-container/10"
+          ? "text-primary font-semibold border-r-2 border-primary bg-primary-container/10"
           : "text-on-surface-variant hover:text-primary hover:bg-surface-container-high"
       }`}
     >
-      <span className="material-symbols-outlined text-[22px]" style={active ? { fontVariationSettings: "'FILL' 1" } : undefined}>
+      <span className="material-symbols-outlined text-[20px]" style={active ? { fontVariationSettings: "'FILL' 1" } : undefined}>
         {item.icon}
       </span>
       <span className="font-body-md text-body-md">{item.label}</span>
@@ -72,7 +72,7 @@ export function AppSidebar() {
       <div className="px-4 mb-5">
         <Link
           href="/briefings"
-          className="w-full bg-primary text-on-primary py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-primary-container transition-colors font-body-md text-body-md font-medium focus-ring"
+          className="w-full bg-primary text-on-primary py-2 px-4 rounded flex items-center justify-center gap-2 hover:bg-primary-container transition-colors font-body-md text-body-md font-medium focus-ring"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
           New Briefing

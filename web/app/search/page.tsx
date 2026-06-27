@@ -129,7 +129,7 @@ function AskNessus() {
               className="max-w-4xl mx-auto"
               onSubmit={(e) => { e.preventDefault(); submit(input); }}
             >
-              <div className="relative bg-surface-container-lowest border border-outline-variant rounded-lg shadow-sm flex items-end p-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+              <div className="relative bg-surface-container-lowest border border-outline-variant rounded-lg shadow-sm flex items-end p-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-colors">
                 <button type="button" className="p-2 text-on-surface-variant hover:text-primary transition-colors mb-1 rounded-md hover:bg-surface-container-low"><span className="material-symbols-outlined">attach_file</span></button>
                 <textarea
                   value={input}

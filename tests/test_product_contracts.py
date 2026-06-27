@@ -604,7 +604,8 @@ def test_frontend_navigation_registry_keeps_record_aliases_and_internal_routes()
         '`/meetings/${encodeURIComponent(String(id))}`',
         'export function reportHref',
         '`/briefings/${encodeURIComponent(id)}`',
-        'return title ? `/signals/${encodeURIComponent(slugifyFindingTitle(title))}` : null',
+        "export function findingSlug",
+        "return slug ? `/signals/${encodeURIComponent(slug)}` : null",
         'return name ? `/entities/${encodeURIComponent(name)}` : null',
         'return slug ? `/politicians/${encodeURIComponent(slug)}` : null',
         'export function organizationHref',
@@ -663,7 +664,7 @@ def test_organization_route_is_registered_in_backend_and_frontend():
     assert 'if (from === "finding")' in page
     assert "hrefFor={(ref) => withContext(evidenceHref(ref), context)}" in page
     assert "findingRelatedItems(org.related_findings, context)" in page
-    assert "href: withContext(findingHref(finding.title), context)" in page
+    assert "href: withContext(findingHref(finding), context)" in page
     assert "href: withContext(sectorHref(sector.slug), context)" in page
     assert "AvatarLogo" in page
     assert "RelatedItems" in page
@@ -853,7 +854,7 @@ def test_sector_detail_uses_live_overview_and_internal_investigation_links():
     assert "graph?: EvidenceGraphResponse" in types
     assert "findingHref" in page
     assert "evidenceHref" in page
-    assert "recordHref" in page
+    assert "evidenceHref" in page
     assert "sourceHref" in page
     assert "from=sector&sector=" in page
     assert "withSectorContext" in page
@@ -941,11 +942,11 @@ def test_finding_detail_preserves_context_into_evidence_records():
     assert "withFindingContext(evidenceHref(ref), findingSlug)" in page
     assert "withFindingContext(entityHref(ref.entity), findingSlug)" in page
     assert "withFindingContext(personHref(slug), findingSlug)" in page
-    assert "sectorRelatedItems(finding, findingSlug)" in page
-    assert "committeeRelatedItems(finding, findingSlug)" in page
+    assert "sectorRelatedItems(finding, stableFindingSlug)" in page
+    assert "committeeRelatedItems(finding, stableFindingSlug)" in page
     assert "withFindingContext(sectorHref(sector.slug), findingSlug)" in page
     assert "withFindingContext(committeeHref(item.slug), findingSlug)" in page
-    assert "withFindingContext(reportHref(report.id), findingSlug)" in page
+    assert "withFindingContext(reportHref(report.id), stableFindingSlug)" in page
     assert "from=finding&finding=" in page
     assert 'relationship: "finding supported by record"' in page
     dossier = Path("web/components/record-dossier.tsx").read_text()
@@ -982,10 +983,10 @@ def test_search_context_preserves_through_connected_entities_people_and_organiza
 def test_finding_detail_promotes_connected_bills_companies_and_source_groups():
     page = Path("web/app/signals/[slug]/page.tsx").read_text()
     audit = Path("CONNECTED_INTELLIGENCE_AUDIT.md").read_text()
-    assert "companyRelatedItems(finding, findingSlug)" in page
-    assert "actorRelatedItems(finding, findingSlug)" in page
-    assert 'recordRelatedItems(finding, findingSlug, ["bills"])' in page
-    assert 'recordRelatedItems(finding, findingSlug, ["lobbying", "ocl_registrations", "gazette", "tribunal", "source_records"])' in page
+    assert "companyRelatedItems(finding, stableFindingSlug)" in page
+    assert "actorRelatedItems(finding, stableFindingSlug)" in page
+    assert 'recordRelatedItems(finding, stableFindingSlug, ["bills"])' in page
+    assert 'recordRelatedItems(finding, stableFindingSlug, ["lobbying", "ocl_registrations", "gazette", "tribunal", "source_records"])' in page
     assert "Companies & organizations" in page
     assert "Connected bills" in page
     assert "Lobbying, regulations & sources" in page
@@ -1014,7 +1015,7 @@ def test_report_api_and_reader_expose_internal_findings_and_evidence():
     assert "useSearchParams" in reader
     assert "briefingContext(searchParams)" in reader
     assert "reportFindingItems(data.graph_findings ?? [], context)" in reader
-    assert "href: withContext(findingHref(finding.title), context)" in reader
+    assert "href: withContext(findingHref(finding), context)" in reader
     assert "hrefFor={(ref) => withContext(evidenceHref(ref), context)}" in reader
     assert 'if (from === "search")' in reader
     assert 'if (from === "sector")' in reader
@@ -1034,4 +1035,4 @@ def test_finding_pages_link_back_to_reports_that_include_them():
     assert "_report_matches_finding_slug" in route
     assert "Reports including this finding" in page
     assert 'relationship: "report includes finding"' in page
-    assert "withFindingContext(reportHref(report.id), findingSlug)" in page
+    assert "withFindingContext(reportHref(report.id), stableFindingSlug)" in page

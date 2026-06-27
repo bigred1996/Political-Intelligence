@@ -92,7 +92,10 @@ export function RelatedItems({
           ))}
         </ul>
       ) : (
-        <div className="text-sm text-fg-dim border border-line rounded bg-panel-2 px-3 py-2">{empty}</div>
+        <div className="flex items-center gap-2 text-sm text-fg-dim border border-dashed border-line rounded bg-panel-2/60 px-3 py-2.5">
+          <span className="material-symbols-outlined text-[16px] shrink-0" aria-hidden="true">inbox</span>
+          <span>{empty}</span>
+        </div>
       )}
     </div>
   );
