@@ -9,7 +9,8 @@ export type NessusType =
   | "organization"
   | "committee"
   | "source"
-  | "report";
+  | "report"
+  | "newsletter";
 
 export interface TypeRegistryEntry {
   key: string;
@@ -37,6 +38,7 @@ export const TYPE_REGISTRY: TypeRegistryEntry[] = [
   { key: "source_records", label: "Source record", plural: "Source records", type: "record" },
   { key: "social_statements", label: "Public statement", plural: "Public statements", type: "record", aliases: ["public_statements", "social_posts"], sourceLabel: "Public statements" },
   { key: "reports", label: "Report", plural: "Reports", type: "report", aliases: ["briefings"] },
+  { key: "newsletters", label: "Newsletter", plural: "Newsletters", type: "newsletter" },
   { key: "sectors", label: "Sector", plural: "Sectors", type: "sector" },
   { key: "entities", label: "Entity", plural: "Entities", type: "entity" },
   { key: "meetings", label: "Meeting", plural: "Meetings", type: "record", aliases: ["communications", "contacts"] },
@@ -119,6 +121,10 @@ export function sourceHref(id?: string | null): string | null {
 
 export function reportHref(id?: string | null): string | null {
   return id ? `/briefings/${encodeURIComponent(id)}` : null;
+}
+
+export function newsletterHref(id?: string | null): string | null {
+  return id ? `/newsletters/${encodeURIComponent(id)}` : null;
 }
 
 export function slugifyFindingTitle(title: string): string {

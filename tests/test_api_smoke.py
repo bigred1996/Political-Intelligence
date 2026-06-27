@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from api.database import Base, get_session
 from api.main import app
 from api.models.donation import Bill
+from api.models.newsletter import NewsletterIssue
 from api.models.report import Report
 from api.models.source_record import SourceRecord
 
@@ -25,6 +26,7 @@ from api.models import (  # noqa: F401
     donation,
     entity,
     grant,
+    newsletter,
     ocl_registration,
     politician,
     regulation,
@@ -54,6 +56,8 @@ def test_openapi_publishes_shared_backend_contracts():
     assert "SearchReindexResponse" in schemas
     assert "ReportResponse" in schemas
     assert "ReportListResponse" in schemas
+    assert "NewsletterIssueResponse" in schemas
+    assert "NewsletterListResponse" in schemas
     assert "SourceSearchResponse" in schemas
     assert "RecordListResponse" in schemas
     assert "StatsResponse" in schemas

@@ -24,5 +24,15 @@ class Settings(BaseSettings):
     # extra cost is negligible. Override via SYNTHESIS_MODEL in .env.
     synthesis_model: str = "claude-opus-4-8"
 
+    # Absolute origin used to build image/asset URLs in exported newsletter
+    # email HTML (e.g. https://app.nessus.example). Empty = use root-relative
+    # paths, which resolve correctly in the in-app preview and Next proxy but
+    # not in a real outbound email client. Set this before sending real email.
+    public_base_url: str = ""
+    # When true, run one extra Opus "editor review" pass after the draft and
+    # do a single targeted revision if any quality dimension scores below 8.
+    # Off by default because it roughly doubles the per-issue generation cost.
+    newsletter_quality_review: bool = False
+
 
 settings = Settings()

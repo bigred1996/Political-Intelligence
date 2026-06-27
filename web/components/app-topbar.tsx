@@ -11,6 +11,7 @@ const MOBILE_NAV = [
   { href: "/watchlists", label: "Watchlists" },
   { href: "/search", label: "Ask Nessus" },
   { href: "/briefings", label: "Reports" },
+  { href: "/newsletters", label: "Newsletter" },
 ];
 
 export function AppTopBar() {

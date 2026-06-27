@@ -749,6 +749,63 @@ export interface ReportDetail extends ReportSummary {
   sections: { key: string; title: string; html: string }[];
 }
 
+export interface NewsletterSummary {
+  id: string;
+  week_start: string;
+  week_end: string;
+  title: string;
+  status: string;
+  generated_by: string;
+  model: string;
+  word_count: number;
+  created_at: string;
+}
+export interface NewslettersResponse {
+  count: number;
+  issues: NewsletterSummary[];
+}
+export interface NewsletterVisuals {
+  metrics?: {
+    records_reviewed?: number;
+    major_developments?: number;
+    sectors_affected?: number;
+    top_source_category?: string;
+  };
+  sector_heatmap?: { sector: string; count: number }[];
+  source_mix?: { category: string; count: number }[];
+  timeline?: { date: string | null; title: string; source: string; id: string }[];
+}
+export interface NewsletterCitation {
+  table: string;
+  pk: number | string;
+}
+export interface NewsletterStory {
+  eyebrow?: string;
+  headline: string;
+  standfirst?: string;
+  sections: { label?: string; body: string }[];
+  citations: NewsletterCitation[];
+}
+export interface NewsletterSections {
+  title?: string;
+  preheader?: string;
+  opening_note?: string;
+  key_points?: { development: string; significance: string }[];
+  lead_story?: NewsletterStory;
+  supporting_stories?: NewsletterStory[];
+  statistics?: { value: string; label: string; significance: string; citation?: NewsletterCitation }[];
+  radar_items?: { headline: string; summary: string; next_milestone?: string; citation?: NewsletterCitation }[];
+  closing_analysis?: { title: string; body: string };
+}
+export interface NewsletterIssue extends NewsletterSummary {
+  sections: NewsletterSections;
+  visuals: NewsletterVisuals;
+  evidence: Record<string, unknown>;
+  source_references: EvidenceRef[];
+  validation: { ok?: boolean; errors?: string[]; word_count?: number; review?: Record<string, unknown> };
+  html: string;
+}
+
 export interface ContractSearch {
   company: string; canonical_name: string; count: number; total_value: number;
   contracts: { vendor_name: string; description: string; contract_value: number; contract_date: string; owner_org_title: string }[];

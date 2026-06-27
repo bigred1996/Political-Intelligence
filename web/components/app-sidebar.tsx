@@ -14,6 +14,7 @@ const NAV: Item[] = [
   { href: "/search", label: "Ask Nessus", icon: "forum" },
   { href: "/reviews", label: "Diligence", icon: "fact_check" },
   { href: "/briefings", label: "Reports", icon: "description" },
+  { href: "/newsletters", label: "Newsletter", icon: "mark_email_read" },
 ];
 
 const DIRECTORY: Item[] = [
