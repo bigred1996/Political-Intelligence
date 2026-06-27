@@ -59,8 +59,8 @@ def _valid_draft() -> dict:
         "preheader": "A royal-assent sprint reshapes mining and defence exposure",
         "opening_note": _words(90),
         "key_points": [
-            {"development": "Bill C-9 cleared the Senate", "significance": _words(12)},
-            {"development": "Lobbying filings spiked", "significance": _words(12)},
+            {"text": "Bill C-9 cleared the Senate. " + _words(14)},
+            {"text": _words(20)},
         ],
         "lead_story": _story("Minerals bill clears the Senate before recess", 120, cit),
         "supporting_stories": [
@@ -226,6 +226,106 @@ def test_preserved_accepts_prose_only_rewrite_and_rejects_fact_changes():
 
 def test_editorial_voice_guide_loads():
     assert "No em dashes" in newsletter._read_prompt("newsletter_editorial_voice.md")
+
+
+# --- iteration 2: connections, audience, structure, headlines, legislation ----
+def test_no_em_dash_or_spaced_hyphen_in_rendered_output():
+    draft = _valid_draft()
+    draft["opening_note"] = "Parliament acted - quickly - before recess."  # spaced hyphens as dashes
+    draft["lead_story"]["sections"][0]["body"] = "The agency is created — funding follows."
+    guarded = newsletter._apply_style_guards(draft)
+    html = newsletter.render_newsletter_html(
+        guarded, newsletter.chart_data([_candidate()], guarded),
+        newsletter._cited_source_references(guarded, [_candidate()]), "2026-06-15", "2026-06-21",
+    )
+    assert "—" not in html
+    assert "―" not in html
+    # no " - " or " – " spaced-dash substitute survives in the model-authored prose
+    assert all(" - " not in str(p) and " – " not in str(p) for p in newsletter._visible_parts(guarded))
+
+
+def test_key_points_render_without_dash_format():
+    draft = newsletter._apply_style_guards(_valid_draft())
+    html = newsletter.render_newsletter_html(draft, newsletter.chart_data([_candidate()], draft), [], "2026-06-15", "2026-06-21")
+    assert " — " not in html  # the old "fact — consequence" separator is gone
+    assert draft["key_points"][0]["text"]
+
+
+def test_by_the_numbers_omitted_when_no_statistics():
+    draft = _valid_draft()
+    draft["statistics"] = []
+    guarded = newsletter._apply_style_guards(draft)
+    assert newsletter.validate_draft(guarded, [_candidate()])["ok"]  # statistics now optional
+    html = newsletter.render_newsletter_html(guarded, newsletter.chart_data([_candidate()], guarded), [], "2026-06-15", "2026-06-21")
+    assert "By the numbers" not in html
+
+
+def test_statistics_heading_can_be_renamed_to_key_dates():
+    draft = _valid_draft()
+    draft["statistics_heading"] = "Key dates and milestones"
+    guarded = newsletter._apply_style_guards(draft)
+    html = newsletter.render_newsletter_html(guarded, newsletter.chart_data([_candidate()], guarded), [], "2026-06-15", "2026-06-21")
+    assert "Key dates and milestones" in html
+    assert "By the numbers" not in html
+
+
+def test_headline_warnings_flag_long_and_colon_headlines():
+    draft = _valid_draft()
+    draft["lead_story"]["headline"] = "Pre-recess royal assent wave reshapes the economic policy landscape across the country before the summer recess"
+    draft["supporting_stories"][0]["headline"] = "Financial Crimes Agency: heads to committee"
+    warnings = newsletter._style_report(draft)["warnings"]
+    assert any("words" in w and "lead headline" in w for w in warnings)
+    assert any("colon" in w for w in warnings)
+
+
+def test_editorial_lint_flags_audience_callouts_and_consulting_phrasing():
+    draft = _valid_draft()
+    draft["opening_note"] = "For investors and counsel, the key signal is that execution risk remains."
+    warnings = newsletter._editorial_lint(draft)
+    assert any("audience callouts" in w for w in warnings)
+    assert any("consulting/self-conscious" in w for w in warnings)
+
+
+def test_coming_into_force_overclaim_is_flagged():
+    draft = _valid_draft()
+    draft["lead_story"]["sections"][0]["body"] = "The bill received royal assent and immediately came into force."
+    warnings = newsletter._editorial_lint(draft)
+    assert any("coming-into-force" in w for w in warnings)
+
+
+def test_duplicate_radar_item_is_flagged():
+    draft = _valid_draft()
+    shared = "housing agency funding parliament senate royal assent delivery provinces staffing procurement"
+    draft["lead_story"]["sections"][0]["body"] = shared
+    # a radar item that echoes the lead story's content words should be flagged
+    draft["radar_items"][0] = {"headline": "housing agency funding decision", "summary": shared}
+    warnings = newsletter._duplicate_section_warnings(draft)
+    assert any("radar item" in w for w in warnings)
+
+
+def test_normalize_coerces_string_list_fields_without_walking_characters():
+    # A model turn returning a string where a list is expected must not explode
+    # into one entry per character.
+    draft = newsletter._normalize_draft({
+        "key_points": "a single string instead of a list",
+        "supporting_stories": "also a string",
+        "statistics": "nope",
+        "radar_items": "nope",
+        "lead_story": {"headline": "h", "sections": "a string", "citations": []},
+    })
+    assert draft["key_points"] == []
+    assert draft["supporting_stories"] == []
+    assert draft["statistics"] == []
+    assert draft["radar_items"] == []
+    assert draft["lead_story"]["sections"] == []
+
+
+def test_preserved_rejects_dropped_bill_number():
+    original = _valid_draft()  # key point 1 contains "C-9"
+    rewrite = _valid_draft()
+    rewrite["key_points"][0] = {"text": "The Senate cleared the bill. " + _words(14)}  # C-9 dropped
+    assert "C-9" in original["key_points"][0]["text"]
+    assert not newsletter._preserved(original, rewrite)
 
 
 def test_newsletter_api_list_and_detail_with_mocked_generate(tmp_path, monkeypatch):

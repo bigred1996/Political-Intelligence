@@ -200,9 +200,8 @@ export default function NewsletterDetail({ params }: { params: Promise<{ id: str
               <h2 className="font-headline-sm text-headline-sm text-primary mb-3">What Matters Today</h2>
               <ul className="space-y-2">
                 {sections.key_points.map((point, index) => (
-                  <li key={index} className="text-body-md">
-                    <span className="font-semibold text-on-surface">{point.development}</span>
-                    <span className="text-on-surface-variant"> — {point.significance}</span>
+                  <li key={index} className="text-body-md text-on-surface border-l-2 border-brass pl-3">
+                    {point.text}
                   </li>
                 ))}
               </ul>
@@ -211,7 +210,7 @@ export default function NewsletterDetail({ params }: { params: Promise<{ id: str
 
           {sections.statistics?.length ? (
             <section className="card-level-1 rounded-lg p-density-comfortable">
-              <h2 className="font-headline-sm text-headline-sm text-primary mb-3">By the Numbers</h2>
+              <h2 className="font-headline-sm text-headline-sm text-primary mb-3">{sections.statistics_heading ?? "By the Numbers"}</h2>
               <div className="space-y-3">
                 {sections.statistics.map((stat, index) => (
                   <div key={index} className="flex gap-3">

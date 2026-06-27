@@ -790,9 +790,10 @@ export interface NewsletterSections {
   title?: string;
   preheader?: string;
   opening_note?: string;
-  key_points?: { development: string; significance: string }[];
+  key_points?: { text: string }[];
   lead_story?: NewsletterStory;
   supporting_stories?: NewsletterStory[];
+  statistics_heading?: string;
   statistics?: { value: string; label: string; significance: string; citation?: NewsletterCitation }[];
   radar_items?: { headline: string; summary: string; next_milestone?: string; citation?: NewsletterCitation }[];
   closing_analysis?: { title: string; body: string };

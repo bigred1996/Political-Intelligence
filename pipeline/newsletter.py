@@ -53,8 +53,10 @@ MAX_SUPPORTING_STORIES = 3
 MAX_LABELS_PER_STORY = 2
 MAX_SENTENCE_WORDS = 35
 PROMPTS = Path("prompts")
-# Em dash (U+2014), em-dash-like horizontal bar (U+2015), and the "--" digraph.
-_EM_DASH_RE = re.compile(r"\s*[—―]\s*|\s+--\s+")
+# Em dash (U+2014) and horizontal bar (U+2015), optionally spaced; plus a spaced
+# en dash (U+2013), spaced "--", or a spaced single hyphen used as a dash. The
+# spaced forms require surrounding whitespace so ranges like "2026-27" are safe.
+_EM_DASH_RE = re.compile(r"\s*[—―]\s*|\s+(?:--|[–-])\s+")
 
 
 class NewsletterGenerationError(RuntimeError):
@@ -148,7 +150,7 @@ _STORY = {
     "type": "object",
     "properties": {
         "eyebrow": {"type": "string", "description": "Short uppercase kicker, e.g. 'REGULATORY' or 'PROCUREMENT'."},
-        "headline": {"type": "string", "description": "Specific, sentence-case, edited-news headline. Lead with the concrete development. Not Title Case, not a slide title."},
+        "headline": {"type": "string", "description": "Sentence-case news headline, 6-12 words, active verb, leads with the concrete development. No colon, no Title Case, not a slide title."},
         "standfirst": {"type": "string", "description": "One or two sentence summary under the headline."},
         "sections": {
             "type": "array",
@@ -180,9 +182,9 @@ NEWSLETTER_TOOL: dict[str, Any] = {
     "input_schema": {
         "type": "object",
         "properties": {
-            "title": {"type": "string", "description": "Specific, sentence-case issue headline that leads with the week's main news. Not Title Case. Never 'Weekly Political Update'."},
+            "title": {"type": "string", "description": "Sentence-case issue headline, 6-12 words, leads with the week's main news, active verb, no colon. Never Title Case, never 'Weekly Political Update'."},
             "preheader": {"type": "string", "description": "Hidden inbox preview line, <=140 chars, no greeting."},
-            "opening_note": {"type": "string", "description": "50-90 words establishing the issue's theme and the single most important implication."},
+            "opening_note": {"type": "string", "description": "50-90 words. One tension: what happened, what is still unresolved, why the distinction matters. Do not list every story or address 'executives, investors and counsel'."},
             "key_points": {
                 "type": "array",
                 "minItems": 2,
@@ -190,18 +192,19 @@ NEWSLETTER_TOOL: dict[str, Any] = {
                 "items": {
                     "type": "object",
                     "properties": {
-                        "development": {"type": "string"},
-                        "significance": {"type": "string", "description": "The immediate so-what, not a restatement."},
+                        "text": {"type": "string", "description": "Two or three short sentences: the fact, its consequence, and the open question. Never a 'fact - consequence' dash format."},
                     },
-                    "required": ["development", "significance"],
+                    "required": ["text"],
                 },
             },
             "lead_story": _STORY,
             "supporting_stories": {"type": "array", "minItems": 2, "maxItems": 3, "items": _STORY},
+            "statistics_heading": {"type": "string", "description": "'By the numbers' for real quantities, or 'Key dates and milestones' if the items are dates."},
             "statistics": {
                 "type": "array",
-                "minItems": 3,
+                "minItems": 0,
                 "maxItems": 5,
+                "description": "Optional. Only real quantities (dollars, totals, counts, timelines, vote totals, percentages) or, retitled, key dates. Never procedural stages like 'third reading'. Omit entirely if there is nothing meaningful.",
                 "items": {
                     "type": "object",
                     "properties": {
@@ -232,14 +235,14 @@ NEWSLETTER_TOOL: dict[str, Any] = {
                 "type": "object",
                 "properties": {
                     "title": {"type": "string", "description": "e.g. 'The bottom line', 'The Nessus view', 'What to watch'."},
-                    "body": {"type": "string", "description": "The broader pattern + what evidence would change the read. Must NOT repeat the opening note."},
+                    "body": {"type": "string", "description": "80-140 words. One editorial argument: connect the main developments, name the unresolved test, point to one or two concrete indicators to watch. Do NOT repeat the opening note. No 'strengthen vs weaken' framing."},
                 },
                 "required": ["title", "body"],
             },
         },
         "required": [
             "title", "preheader", "opening_note", "key_points",
-            "lead_story", "supporting_stories", "statistics", "radar_items", "closing_analysis",
+            "lead_story", "supporting_stories", "radar_items", "closing_analysis",
         ],
     },
 }
@@ -642,10 +645,16 @@ def _norm_citations(value: Any) -> list[dict[str, Any]]:
     return [c for c in items if isinstance(c, dict) and c.get("table") is not None and c.get("pk") is not None]
 
 
+def _as_list(value: Any) -> list[Any]:
+    # A model turn can return a string where a list is expected; iterating it
+    # directly would walk characters. Coerce anything non-list to [].
+    return value if isinstance(value, list) else []
+
+
 def _norm_story(value: Any) -> dict[str, Any]:
     story = value if isinstance(value, dict) else {}
     sections = []
-    for section in story.get("sections") or []:
+    for section in _as_list(story.get("sections")):
         if isinstance(section, dict):
             sections.append({"label": section.get("label"), "body": str(section.get("body") or "")})
         elif section:
@@ -667,26 +676,32 @@ def _norm_single_citation(value: Any) -> dict[str, Any] | None:
 def _normalize_draft(draft: Any) -> dict[str, Any]:
     d = dict(draft or {})
     key_points = []
-    for point in d.get("key_points") or []:
+    for point in _as_list(d.get("key_points")):
         if isinstance(point, dict):
-            key_points.append({"development": str(point.get("development") or ""), "significance": str(point.get("significance") or "")})
-        elif point:
-            key_points.append({"development": str(point), "significance": ""})
+            # Tolerate the legacy {development, significance} shape.
+            text = point.get("text") or " ".join(filter(None, [point.get("development"), point.get("significance")]))
+            text = str(text or "").strip()
+        else:
+            text = str(point or "").strip()
+        if text:
+            key_points.append({"text": text})
     d["key_points"] = key_points
     d["lead_story"] = _norm_story(d.get("lead_story"))
-    d["supporting_stories"] = [_norm_story(s) for s in d.get("supporting_stories") or []]
+    d["supporting_stories"] = [_norm_story(s) for s in _as_list(d.get("supporting_stories"))]
 
     stats = []
-    for stat in d.get("statistics") or []:
+    for stat in _as_list(d.get("statistics")):
         if isinstance(stat, dict):
             stats.append({
                 "value": str(stat.get("value") or ""), "label": str(stat.get("label") or ""),
                 "significance": str(stat.get("significance") or ""), "citation": _norm_single_citation(stat.get("citation")),
             })
     d["statistics"] = stats
+    heading = str(d.get("statistics_heading") or "").strip()
+    d["statistics_heading"] = heading or "By the numbers"
 
     radar = []
-    for item in d.get("radar_items") or []:
+    for item in _as_list(d.get("radar_items")):
         if isinstance(item, dict):
             radar.append({
                 "headline": str(item.get("headline") or ""), "summary": str(item.get("summary") or ""),
@@ -709,7 +724,7 @@ def _story_text(story: dict[str, Any]) -> list[str]:
 def _visible_parts(draft: dict[str, Any]) -> list[str]:
     parts: list[str] = [draft.get("opening_note", "")]
     for point in draft.get("key_points") or []:
-        parts.extend([point.get("development", ""), point.get("significance", "")])
+        parts.append(point.get("text", ""))
     parts.extend(_story_text(draft.get("lead_story") or {}))
     for story in draft.get("supporting_stories") or []:
         parts.extend(_story_text(story))
@@ -773,7 +788,9 @@ def validate_draft(draft: dict[str, Any], candidates: list[dict[str, Any]]) -> d
 
     if not (2 <= len(draft.get("key_points") or []) <= 3):
         errors.append(f"key_points_count_invalid:{len(draft.get('key_points') or [])}")
-    if not (3 <= len(draft.get("statistics") or []) <= 5):
+    # "By the numbers" is optional now (omit when there is nothing meaningful),
+    # so only an over-full statistics block is an error.
+    if len(draft.get("statistics") or []) > 5:
         errors.append(f"statistics_count_invalid:{len(draft.get('statistics') or [])}")
     if not (3 <= len(draft.get("radar_items") or []) <= 5):
         errors.append(f"radar_count_invalid:{len(draft.get('radar_items') or [])}")
@@ -797,24 +814,30 @@ def validate_draft(draft: dict[str, Any], candidates: list[dict[str, Any]]) -> d
 def _prompt(week_start: str, week_end: str, candidates: list[dict[str, Any]], clusters: list[dict[str, Any]]) -> str:
     allowed = [{"table": c["table"], "pk": c["pk"], "title": c["title"]} for c in candidates]
     return (
-        "Compose the Weekly Political Intelligence issue for Canadian strategic readers.\n"
-        f"Window: {week_start} through {week_end}.\n"
-        "Audience: corporate strategy/development, PE/VC, GR/public affairs, consultants, lawyers, executives, institutional investors, and research teams.\n\n"
-        "EDITORIAL DECISIONS YOU MUST MAKE:\n"
-        "- Rank stories by consequence, novelty, political/regulatory momentum, audience relevance, evidence strength, and whether a decision/deadline/vote/hearing/consultation is coming.\n"
-        "- Select ONE lead story, two or three supporting stories, three to five 'on the radar' items, and three to five statistics. Do not give every record equal space.\n"
-        "- When multiple records describe the same underlying event, COMBINE them into one story and explain the mechanism connecting them (e.g. lobbying → legislation, announcement → funding, economic data → sector exposure). Use CONNECTION_HINTS below.\n\n"
-        "FOR EACH STORY cover what changed, who is affected, how developments connect, what could happen next, and what to monitor. Lead with the strongest concrete development, not a label. Use at most two analytical section labels in a story, and let most supporting stories read as plain paragraphs with no labels.\n\n"
-        "ANALYTICAL STANDARDS:\n"
-        "- Distinguish confirmed facts from statements by political actors, reported expectations, Nessus analysis, and forward-looking scenarios. Never present an inference as confirmed fact.\n"
-        "- Use calibrated language (suggests, indicates, could, is likely to, raises the possibility, would depend on). Reason: government action → regulatory/institutional change → sector exposure → possible consequence.\n"
-        "- Account for jurisdictional limits, regulatory independence, Indigenous rights and consultation, funding uncertainty, legal challenges, political opposition, implementation capacity, timing risk, and the gap between an announcement and a binding decision.\n\n"
-        "WRITING: Canadian English, in the voice of an experienced political and business journalist — reported and edited, not templated. Sentence-case headlines that lead with the news. Named actors and active verbs (e.g. 'Parliament approved the bill', not 'legislative-approval momentum'). Vary sentence rhythm; most sentences under 35 words. Do NOT use em dashes — use a period, comma, colon, or two sentences. Avoid abstract-noun stacks, consulting jargon, generic AI phrasing, and repeated openings. Explain acronyms in plain language on first use.\n\n"
-        f"LENGTH: the visible editorial prose MUST be {MIN_WORDS}-{MAX_WORDS} words.\n\n"
+        "Write the Weekly Political Intelligence issue as an experienced Canadian political and business journalist would: reported and edited, not assembled from a template. Be selective, not exhaustive.\n"
+        f"Window: {week_start} through {week_end}.\n\n"
+        "SELECTION:\n"
+        "- Rank by consequence, novelty, political/regulatory momentum, evidence strength, and whether a decision/deadline/vote/hearing/consultation is coming.\n"
+        "- One lead story, two or three supporting stories, three to five 'on the radar' items. Do not give every record equal space.\n\n"
+        "CONNECTIONS — do not force them. Connect two developments only when one genuinely alters, enables, constrains, accelerates, funds, delays, or explains the other (use CONNECTION_HINTS as candidates, not mandates). Do NOT link records merely because they share a week, a minister, the label 'federal bill', or broad reliance on parliamentary spending. If no strong link exists, treat records separately. Not every story needs a connection.\n\n"
+        "STRUCTURE — vary it. Lead with the strongest concrete development. The lead story may use one or two short labels; supporting stories should normally be plain paragraphs with NO labels. Do not open consecutive stories the same way. One point per paragraph.\n\n"
+        "VOICE:\n"
+        "- Named actors and active verbs ('Parliament approved the bill', 'Ottawa authorized the funding'), not abstract-noun stacks ('implementation-capacity risk', 'financial-crime architecture', 'regulatory momentum').\n"
+        "- Show who is affected through the concrete consequence. Do NOT write 'for executives/investors/counsel/stakeholders'. Do not use 'investors' as a generic audience word.\n"
+        "- State conclusions directly. Do not announce that you are analysing ('the key signal is', 'Nessus reads this as', 'this is significant because').\n"
+        "- Do not treat a minister sponsoring several bills as a strategic insight unless the records show a real shift in responsibility, mandate, or authority.\n"
+        "- Vary sentence length; most sentences well under 35 words. No em dashes and no spaced hyphen used as a dash: use a period, comma, colon, or two sentences. Canadian English. Explain acronyms in plain language on first use.\n\n"
+        "LEGISLATIVE PRECISION: distinguish received royal assent / became law / in force now / comes into force on a set date / requires an order in council or regulations / remains at committee / passed one chamber. Do not call provisions operative unless the records confirm they are in force. If two records conflict, use the most authoritative and recent, or leave it for an analyst.\n\n"
+        "SECTIONS:\n"
+        "- opening_note: one tension (what happened, what is unresolved, why the distinction matters). Do not list every story.\n"
+        "- key_points: two or three items, each the fact, its consequence, and the open question. Never a 'fact - consequence' dash.\n"
+        "- statistics: OPTIONAL. Include only real quantities (dollars, totals, counts, timelines, vote totals, percentages). Never use procedural stages ('third reading') as statistics. If the useful content is dates, set statistics_heading to 'Key dates and milestones'. If nothing meaningful exists, omit statistics entirely.\n"
+        "- headlines: 6-12 words, sentence case, active verb, no colon.\n"
+        "- closing_analysis: 80-140 words, one editorial argument naming one or two concrete indicators to watch. Do NOT repeat the opening and do NOT use 'strengthen vs weaken' framing.\n\n"
+        f"LENGTH: visible editorial prose {MIN_WORDS}-{MAX_WORDS} words.\n\n"
         "RULES:\n"
         "- Use only the provided candidate records. Every story, statistic, and radar item must cite ALLOWED_RECORD_IDS.\n"
         "- Do not invent dates, names, values, URLs, motivations, or causal relationships.\n"
-        "- The closing analysis must NOT repeat the opening note; it should name what evidence would strengthen, weaken, or change the read.\n"
         "- Return only the forced tool call.\n\n"
         f"CONNECTION_HINTS (deterministic cross-record links — explain the mechanism, do not just assert relatedness):\n{json.dumps(clusters, ensure_ascii=False, default=str)}\n\n"
         f"ALLOWED_RECORD_IDS:\n{json.dumps(allowed, ensure_ascii=False)}\n\n"
@@ -838,13 +861,21 @@ async def _call_opus(
     provider = ClaudeNewsletterProvider(model=OPUS_MODEL)
     turn = await provider.call(_SYSTEM, _prompt(week_start, week_end, candidates, clusters))
     draft = _normalize_draft(turn.tool_input)
-    result = validate_draft(draft, candidates)
-    if not result["ok"]:
+    # Up to two structured-repair turns: the model occasionally returns a
+    # malformed shape (a string where a list is expected, missing modules); one
+    # retry is often not enough to fully recover.
+    for _ in range(2):
+        result = validate_draft(draft, candidates)
+        if result["ok"]:
+            break
         correction = (
             "Your newsletter draft failed validation:\n"
             + "\n".join(f"- {error}" for error in result["errors"])
-            + f"\n\nCall build_weekly_newsletter again. Fix only these issues. Keep all citations "
-            f"inside ALLOWED_RECORD_IDS and the visible prose at {MIN_WORDS}-{MAX_WORDS} words."
+            + "\n\nCall build_weekly_newsletter again with the FULL object: title, preheader, "
+            "opening_note, key_points (a list of 2-3 objects), lead_story, supporting_stories (a "
+            "list of 2-3 story objects), radar_items (3-5), closing_analysis, and optional "
+            f"statistics. Keep every citation inside ALLOWED_RECORD_IDS and the prose at "
+            f"{MIN_WORDS}-{MAX_WORDS} words."
         )
         turn = await provider.continue_call(_SYSTEM, turn, correction)
         draft = _normalize_draft(turn.tool_input)
@@ -933,8 +964,7 @@ def _apply_style_guards(draft: Any) -> dict[str, Any]:
     d["preheader"] = s(d.get("preheader", ""))
     d["opening_note"] = s(d.get("opening_note", ""))
     for point in d["key_points"]:
-        point["development"] = s(point["development"])
-        point["significance"] = s(point["significance"])
+        point["text"] = s(point["text"])
     for story in [d["lead_story"], *d["supporting_stories"]]:
         _guard_story(story)
     for stat in d["statistics"]:
@@ -952,12 +982,87 @@ def _apply_style_guards(draft: Any) -> dict[str, Any]:
     return d
 
 
+# Generic consulting / self-conscious-analysis phrasing to flag (not technical
+# terms — these are flagged only as generic usage). Audience callouts are listed
+# separately so the warning can name the pattern.
+_BANNED_PHRASES = (
+    "nessus reads", "the key signal", "the read here", "this is significant",
+    "materially raises", "execution risk", "implementation-capacity",
+    "implementation capacity", "necessary but not sufficient", "strategic implication",
+    "what this means for readers",
+)
+_AUDIENCE_CALLOUTS = (
+    "for executives", "for investors", "for counsel", "for stakeholders",
+    "for readers", "for clients", "for business leaders", "readers should watch",
+    "compliance teams should",
+)
+# Over-claims that royal assent rarely supports — flag for a coming-into-force check.
+_FORCE_CLAIMS = ("came into force", "now in force", "immediately operative", "takes effect immediately", "now operative")
+_STOPWORDS = frozenset({"that", "this", "with", "from", "have", "will", "their", "which", "about", "into", "they", "than", "then", "them", "been", "were", "would", "could", "after", "before", "over", "more", "most", "some", "such", "only", "also", "both"})
+
+
+def _content_tokens(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z][a-z'-]{3,}", (text or "").lower()) if w not in _STOPWORDS}
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _headline_warnings(draft: dict[str, Any]) -> list[str]:
+    warnings: list[str] = []
+    named = [("issue title", draft.get("title", "")), ("lead headline", (draft.get("lead_story") or {}).get("headline", ""))]
+    named += [(f"supporting headline {i + 1}", st.get("headline", "")) for i, st in enumerate(draft.get("supporting_stories") or [])]
+    for label, head in named:
+        words = len(re.findall(r"\b[\w'-]+\b", head))
+        if words > 12:
+            warnings.append(f"{label} is {words} words (aim for 6–12)")
+        if ":" in head:
+            warnings.append(f"{label} uses a colon — prefer a single clause")
+    return warnings
+
+
+def _duplicate_section_warnings(draft: dict[str, Any]) -> list[str]:
+    """Token-overlap (Jaccard) repetition check across modules."""
+    warnings: list[str] = []
+    opening = _content_tokens(draft.get("opening_note", ""))
+    closing = _content_tokens((draft.get("closing_analysis") or {}).get("body", ""))
+    if _jaccard(opening, closing) > 0.5:
+        warnings.append("closing repeats the opening — give it a distinct argument")
+    stories = [draft.get("lead_story") or {}, *(draft.get("supporting_stories") or [])]
+    story_tokens = [_content_tokens(" ".join(_story_text(s))) for s in stories]
+    for i, item in enumerate(draft.get("radar_items") or []):
+        radar_tokens = _content_tokens(f"{item.get('headline', '')} {item.get('summary', '')}")
+        if any(_jaccard(radar_tokens, st) > 0.45 for st in story_tokens):
+            warnings.append(f"radar item {i + 1} repeats a main story — replace it or rebuild around a new milestone")
+    return warnings
+
+
+def _editorial_lint(draft: dict[str, Any]) -> list[str]:
+    lower = " ".join(str(p or "") for p in _visible_parts(draft)).lower()
+    warnings: list[str] = []
+    hits = [p for p in _BANNED_PHRASES if p in lower]
+    if hits:
+        warnings.append("consulting/self-conscious phrasing: " + ", ".join(f"“{h}”" for h in hits[:6]))
+    callouts = [p for p in _AUDIENCE_CALLOUTS if p in lower]
+    if callouts:
+        warnings.append("audience callouts (show relevance through consequence): " + ", ".join(f"“{c}”" for c in callouts[:6]))
+    if "architecture" in lower:
+        warnings.append("“architecture” reads as a policy metaphor — prefer a concrete noun")
+    if any(c in lower for c in _FORCE_CLAIMS):
+        warnings.append("verify coming-into-force: royal assent does not always mean provisions are in force")
+    return warnings
+
+
 def _style_report(draft: dict[str, Any]) -> dict[str, Any]:
-    """Non-blocking voice metrics surfaced in the preview's pre-send checks."""
+    """Non-blocking voice metrics + editorial lint surfaced in the preview."""
     parts = [str(p or "") for p in _visible_parts(draft)]
     text = " ".join(parts)
     lower = text.lower()
     em = sum(part.count("—") + part.count("―") for part in parts)
+    spaced_hyphen = len(re.findall(r"\S\s+[-–]\s+\S", text))
     signal = len(re.findall(r"\bsignals?\b", lower))
     why_it_matters = lower.count("why it matters")
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
@@ -968,6 +1073,8 @@ def _style_report(draft: dict[str, Any]) -> dict[str, Any]:
     warnings: list[str] = []
     if em:
         warnings.append(f"{em} em dash(es) remain in the copy")
+    if spaced_hyphen:
+        warnings.append(f"{spaced_hyphen} spaced hyphen(s) used as a dash")
     if signal > 2:
         warnings.append(f"“signal” used {signal} times (style limit is 2)")
     if why_it_matters > 1:
@@ -976,23 +1083,35 @@ def _style_report(draft: dict[str, Any]) -> dict[str, Any]:
         warnings.append(f"{long_sentences} sentence(s) over {MAX_SENTENCE_WORDS} words")
     if avg and not (14 <= avg <= 24):
         warnings.append(f"average sentence length {avg} words (target 14–24)")
+    warnings.extend(_headline_warnings(draft))
+    warnings.extend(_duplicate_section_warnings(draft))
+    warnings.extend(_editorial_lint(draft))
     return {
         "warnings": warnings,
         "metrics": {
-            "em_dashes": em, "signal": signal, "why_it_matters": why_it_matters,
-            "long_sentences": long_sentences, "avg_sentence_words": avg,
+            "em_dashes": em, "spaced_hyphens": spaced_hyphen, "signal": signal,
+            "why_it_matters": why_it_matters, "long_sentences": long_sentences,
+            "avg_sentence_words": avg,
         },
     }
 
 
+def _bill_numbers(draft: dict[str, Any]) -> set[str]:
+    text = " ".join(str(p or "") for p in _visible_parts(draft))
+    return {m.upper() for m in re.findall(r"\b[CS]-\d{1,4}\b", text)}
+
+
 def _preserved(original: dict[str, Any], rewritten: dict[str, Any]) -> bool:
-    """The rewrite is prose-only. Reject it if citations, statistic values, or
-    module counts changed — those carry the facts."""
+    """The rewrite is prose-only. Reject it if citations, statistic values, bill
+    numbers, or module counts changed — those carry the facts."""
     if set(_draft_citations(original)) != set(_draft_citations(rewritten)):
         return False
     orig_values = sorted(str(s.get("value", "")) for s in original.get("statistics") or [])
     new_values = sorted(str(s.get("value", "")) for s in rewritten.get("statistics") or [])
     if orig_values != new_values:
+        return False
+    # Bill numbers (C-26, S-7) are stable tokens a faithful rewrite never drops.
+    if not _bill_numbers(original) <= _bill_numbers(rewritten):
         return False
     for field in ("supporting_stories", "key_points", "radar_items", "statistics"):
         if len(original.get(field) or []) != len(rewritten.get(field) or []):
@@ -1157,8 +1276,8 @@ def render_newsletter_html(draft: dict[str, Any], visuals: dict[str, Any], refs:
     logo = _asset("/brand/nessus-horizontal-on-dark.png")
 
     key_points = "".join(
-        f'<tr><td style="padding:0 0 14px"><span style="font-family:{SANS};font-size:16px;font-weight:700;color:{NAVY}">{escape(point.get("development",""))}</span>'
-        f'<span style="font-family:{SANS};font-size:16px;color:{INK}"> — {escape(point.get("significance",""))}</span></td></tr>'
+        f'<tr><td style="padding:0 0 14px;border-left:3px solid {GOLD};padding-left:12px">'
+        f'<span style="font-family:{SANS};font-size:16px;line-height:1.55;color:{INK}">{escape(point.get("text",""))}</span></td></tr>'
         for point in draft.get("key_points") or []
     )
 
@@ -1184,11 +1303,19 @@ def render_newsletter_html(draft: dict[str, Any], visuals: dict[str, Any], refs:
     stories = _story_html(draft.get("lead_story") or {}, numbers, lead=True)
     stories += "".join(_story_html(story, numbers, lead=False) for story in draft.get("supporting_stories") or [])
 
+    # "By the numbers" is optional — render nothing when there are no statistics.
+    stats_section = (
+        f'<tr><td style="padding:22px 28px 6px;border-top:1px solid {BORDER}" class="pad">'
+        f'<div style="font-family:{SANS};font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:{GOLD};margin-bottom:8px">{escape(draft.get("statistics_heading") or "By the numbers")}</div>'
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid {BORDER}">{stats}</table>'
+        '</td></tr>'
+    ) if stats else ""
+
     closing = draft.get("closing_analysis") or {}
     sources = "".join(
         f'<li style="margin-bottom:8px"><a href="{_asset("/records/" + escape(str(ref["table"])) + "/" + escape(str(ref["pk"])))}" '
         f'style="color:{NAVY_SURFACE};text-decoration:underline">{escape(ref.get("title",""))}</a> '
-        f'<span style="color:{MUTED}">— {escape(ref.get("source",""))}'
+        f'<span style="color:{MUTED}">· {escape(ref.get("source",""))}'
         + (f', {escape(str(ref.get("date")))}' if ref.get("date") else "")
         + '</span>'
         + (f' · <a href="{escape(ref["url"])}" style="color:{NAVY_SURFACE}">original source</a>' if ref.get("url") else "")
@@ -1230,11 +1357,8 @@ def render_newsletter_html(draft: dict[str, Any], visuals: dict[str, Any], refs:
     </td></tr>
     <!-- stories (lead + supporting) -->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">{stories}</table>
-    <!-- by the numbers -->
-    <tr><td style="padding:22px 28px 6px;border-top:1px solid {BORDER}" class="pad">
-      <div style="font-family:{SANS};font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:{GOLD};margin-bottom:8px">By the numbers</div>
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid {BORDER}">{stats}</table>
-    </td></tr>
+    <!-- by the numbers / key dates (optional) -->
+    {stats_section}
     <!-- on the radar -->
     <tr><td style="padding:22px 28px 6px" class="pad">
       <div style="font-family:{SANS};font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:{GOLD};margin-bottom:12px">On the radar</div>
